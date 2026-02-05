@@ -167,6 +167,96 @@ class ShopifyClient:
             
         return products
 
+    async def get_collections(self, first: int = 50) -> List[dict]:
+        gql_query = """
+        query getCollections($first: int!) {
+          collections(first: $first) {
+            edges {
+              node {
+                id
+                handle
+                title
+                description
+                image {
+                  url
+                }
+              }
+            }
+          }
+        }
+        """
+        try:
+            # Note: int! in GraphQL schema might need to be Int!
+            gql_query = gql_query.replace("$first: int!", "$first: Int!")
+            data = await self._query(gql_query, {"first": first})
+            collections = []
+            for edge in data["collections"]["edges"]:
+                node = edge["node"]
+                collections.append({
+                    "id": node["id"],
+                    "handle": node["handle"],
+                    "title": node["title"],
+                    "description": node.get("description", ""),
+                    "image": node.get("image", {}).get("url") if node.get("image") else None
+                })
+            print(f"Successfully fetched {len(collections)} collections")
+            return collections
+        except Exception as e:
+            print(f"Error fetching collections from Shopify: {e}")
+            raise
+
+    async def get_collection_products(self, handle: str, first: int = 50) -> List[dict]:
+        gql_query = """
+        query getCollectionProducts($handle: String!, $first: Int!) {
+          collection(handle: $handle) {
+            products(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  tags
+                  handle
+                  featuredImage {
+                    url
+                  }
+                  images(first: 10) {
+                    edges {
+                      node {
+                        url
+                      }
+                    }
+                  }
+                  variants(first: 1) {
+                    edges {
+                      node {
+                        id
+                        availableForSale
+                        price {
+                          amount
+                          currencyCode
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        try:
+            data = await self._query(gql_query, {"handle": handle, "first": first})
+            if not data or not data.get("collection"):
+                print(f"Collection with handle '{handle}' not found.")
+                return []
+            
+            products = [self._map_product(edge["node"]) for edge in data["collection"]["products"]["edges"]]
+            print(f"Successfully fetched {len(products)} products from collection '{handle}'")
+            return products
+        except Exception as e:
+            print(f"Error fetching products from collection '{handle}': {e}")
+            raise
+
     async def get_product(self, product_id: str) -> Optional[dict]:
         if product_id.startswith("mock_"):
             from app.utils.mock_data import MOCK_PRODUCTS
