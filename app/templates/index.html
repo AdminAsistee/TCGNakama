@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md">
+    <div class="flex items-center p-4 px-6 justify-between max-w-7xl mx-auto">
+        <div class="flex items-center gap-3">
+            <img src="/static/logo.png" alt="TCG Nakama" class="h-10 w-auto rounded-full shadow-lg shadow-black/50">
+            <h2 class="text-xl font-bold tracking-tighter uppercase italic text-white flex gap-2">
+                <span class="opacity-50">TCG</span>
+                <span>Nakama</span>
+            </h2>
+        </div>
+        <div class="flex items-center gap-3">
+            <button
+                class="relative w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                hx-get="/search" hx-target="#product-grid" hx-include="#search-input, #rarity-input, #price-slider"
+                title="Force Sync with Shopify Vault">
+                <span class="material-symbols-outlined text-white transition-opacity duration-300">sync</span>
+                <!-- Loading State (Absolute centered) -->
+                <span
+                    class="material-symbols-outlined text-primary animate-spin absolute inset-0 m-auto htmx-indicator">sync</span>
+            </button>
+            <button id="cart-btn"
+                class="relative w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                hx-get="/cart/drawer" hx-target="#cart-drawer-container">
+                <span class="material-symbols-outlined text-white">shopping_bag</span>
+                <span id="cart-count"
+                    class="absolute top-1 right-1 w-4 h-4 bg-primary text-[10px] font-black text-white rounded-full flex items-center justify-center border-2 border-background-dark">{{
+                    cart_count }}</span>
+            </button>
+        </div>
+    </div>
+    <div class="px-6 pb-4 max-w-7xl mx-auto">
+        <label class="flex flex-col w-full relative">
+            <div
+                class="flex w-full items-stretch rounded-full h-11 bg-white/5 border border-white/10 focus-within:border-primary/50 transition-colors">
+                <div class="text-primary/60 flex items-center justify-center pl-4">
+                    <span class="material-symbols-outlined text-lg">search</span>
+                </div>
+                <input id="search-input" name="q"
+                    class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-600 text-white"
+                    placeholder="Search the TCG Nakama Vault" type="text" hx-get="/search"
+                    hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-indicator="#search-loading"
+                    hx-on:input="clearFilterVisuals()" />
+                <div class="flex items-center pr-4 gap-2">
+                    <div id="search-loading" class="htmx-indicator">
+                        <span class="material-symbols-outlined text-primary text-sm animate-spin">sync</span>
+                    </div>
+                    <span class="material-symbols-outlined text-gray-400 text-lg">mic</span>
+                </div>
+            </div>
+        </label>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto min-h-screen pb-24 px-6">
+    <!-- Filter Stickies -->
+    <div
+        class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
+        <div class="flex gap-3 overflow-x-auto hide-scrollbar">
+            <!-- Hidden Rarity Input for Additive Filtering -->
+            <input type="hidden" name="rarity" id="rarity-input" value="">
+
+            <!-- Price Range Slider -->
+            <div class="flex flex-col gap-2 min-w-[200px] px-4">
+                <div
+                    class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <span>Price Range</span>
+                    <span id="price-value" class="text-primary">¥0 - ¥10,000,000</span>
+                </div>
+                <input type="range" id="price-slider" name="max_price" min="0" max="10000000" value="10000000"
+                    class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                    oninput="updatePriceDisplay(this.value)" hx-get="/filter" hx-trigger="change, search delay:500ms"
+                    hx-target="#product-grid" hx-swap="innerHTML" hx-include="#search-input, #rarity-input" />
+            </div>
+
+            <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
+
+            <!-- Rarity Filters -->
+            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Common', this)"
+                hx-include="#search-input, #price-slider, #rarity-input">
+                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Common</p>
+            </div>
+            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Uncommon', this)"
+                hx-include="#search-input, #price-slider, #rarity-input">
+                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Uncommon</p>
+            </div>
+            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Rare', this)"
+                hx-include="#search-input, #price-slider, #rarity-input">
+                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Rare</p>
+            </div>
+            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Epic', this)"
+                hx-include="#search-input, #price-slider, #rarity-input">
+                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Epic</p>
+            </div>
+            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Ultra Rare', this)"
+                hx-include="#search-input, #price-slider, #rarity-input">
+                <p class="text-white text-[10px] font-bold uppercase whitespace-nowrap">Ultra Rare</p>
+            </div>
+
+            <div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
+                hx-get="/" hx-target="body" onclick="resetFilters()">
+                <span class="material-symbols-outlined text-gray-400 text-sm">restart_alt</span>
+                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Reset</p>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="py-8">
+        <div class="flex items-center justify-between mb-8 px-1">
+            <h3 class="text-sm font-bold uppercase tracking-[0.25em] text-gray-400">Vault Grails</h3>
+            <span class="text-primary text-xs font-bold uppercase tracking-wider cursor-pointer" hx-get="/filter"
+                hx-target="#product-grid" onclick="resetFilters()">View All</span>
+        </div>
+
+        <div id="product-grid"
+            class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-10 fade-me-in">
+            {% include "partials/product_grid.html" %}
+        </div>
+
+    </div>
+
+    <!-- Trusted Footer Section -->
+    <div
+        class="mt-8 p-12 rounded-[3rem] bg-gradient-to-b from-white/5 to-transparent border border-white/10 text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-primary/5 mix-blend-overlay"></div>
+        <div class="relative z-10">
+            <div class="flex justify-center mb-6">
+                <span class="material-symbols-outlined text-primary text-5xl fill-[1]">verified</span>
+            </div>
+            <h4 class="text-xl font-bold tracking-tight">Trusted Shopify Merchant</h4>
+            <p class="text-xs text-gray-400 mt-3 leading-relaxed max-w-[240px] mx-auto">Every card in the TCG Nakama
+                is physically inspected and synchronized live with our Shopify inventory for 100% security.</p>
+            <div class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/10">
+                <div class="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                <span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-300">Vault Systems Online</span>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-16 pb-24 px-8 text-center">
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2024 TCG Nakama</p>
+        <p class="text-[9px] text-gray-700 mt-2 uppercase tracking-widest">Premium Collector Marketplace</p>
+    </footer>
+
+</main>
+
+<div id="modal-container"></div>
+<div id="cart-drawer-container"></div>
+
+<a class="fixed bottom-6 right-6 z-[60] obsidian-glass w-12 h-12 rounded-full flex items-center justify-center text-primary/80 transition-all active:scale-95 group"
+    href="#top">
+    <span class="material-symbols-outlined text-2xl group-hover:-translate-y-1 transition-transform">arrow_upward</span>
+</a>
+<!-- Price Slider Script -->
+<script>
+    function updatePriceDisplay(val) {
+        const formatted = new Intl.NumberFormat('ja-JP', {
+            style: 'currency',
+            currency: 'JPY',
+            maximumFractionDigits: 0
+        }).format(val);
+        document.getElementById('price-value').innerText = `¥0 - ${formatted}`;
+    }
+
+    function setActiveFilter(rarity, el) {
+        // Toggle behavior: if already active, remove it
+        const input = document.getElementById('rarity-input');
+        const isActive = el.classList.contains('holographic-glow');
+
+        document.querySelectorAll('.rarity-filter').forEach(f => {
+            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
+            f.querySelector('p').classList.remove('text-primary');
+            f.querySelector('p').classList.add('text-gray-300');
+        });
+
+        if (isActive) {
+            input.value = "";
+        } else {
+            input.value = rarity;
+            el.classList.add('bg-primary/20', 'border-primary/40', 'holographic-glow');
+            el.querySelector('p').classList.remove('text-gray-300');
+            el.querySelector('p').classList.add('text-primary');
+        }
+    }
+
+    function clearFilterVisuals() {
+        const rarityInput = document.getElementById('rarity-input');
+        if (rarityInput) rarityInput.value = '';
+
+        // Reset price slider visually
+        const slider = document.getElementById('price-slider');
+        if (slider) {
+            slider.value = 10000000;
+            updatePriceDisplay(10000000);
+        }
+
+        document.querySelectorAll('.rarity-filter').forEach(f => {
+            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
+            f.querySelector('p').classList.remove('text-primary');
+            f.querySelector('p').classList.add('text-gray-300');
+        });
+    }
+
+    function resetFilters() {
+        const slider = document.getElementById('price-slider');
+        if (slider) {
+            slider.value = 10000000;
+            updatePriceDisplay(10000000);
+        }
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+
+        const rarityInput = document.getElementById('rarity-input');
+        if (rarityInput) rarityInput.value = '';
+
+        document.querySelectorAll('.rarity-filter').forEach(f => {
+            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
+            f.querySelector('p').classList.remove('text-primary');
+            f.querySelector('p').classList.add('text-gray-300');
+        });
+    }
+
+    // Cart Drawer Logic
+    function openCartDrawer() {
+        console.log("DEBUG: Manually triggering cart drawer");
+        htmx.ajax('GET', '/cart/drawer', '#cart-drawer-container');
+    }
+
+    document.body.addEventListener('htmx:afterOnLoad', (evt) => {
+        if (evt.detail.target.id === 'cart-drawer-container') {
+            console.log("DEBUG: Cart Drawer content loaded via HTMX");
+        }
+    });
+
+    function closeCartDrawer() {
+        const drawer = document.getElementById('cart-drawer');
+        const backdrop = document.getElementById('cart-drawer-backdrop');
+        if (drawer) drawer.classList.add('translate-x-full');
+        if (backdrop) backdrop.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => {
+            document.getElementById('cart-drawer-container').innerHTML = '';
+        }, 300);
+    }
+</script>
+{% endblock %}

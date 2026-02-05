@@ -1,0 +1,137 @@
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
+
+    <!-- Modal Content -->
+    <div
+        class="relative w-full max-w-sm bg-vault-card border border-white/10 rounded-3xl overflow-hidden shadow-2xl transform transition-all scale-100 holographic-glow">
+        <button onclick="closeModal()"
+            class="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors">
+            <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+
+        <div
+            class="relative aspect-[4/5] p-6 flex justify-center items-center bg-gradient-to-b from-white/5 to-transparent overflow-hidden group">
+
+            {% if product.images and product.images|length > 1 %}
+            <!-- Prev Button -->
+            <button onclick="changeImage(-1)"
+                class="time-delay absolute left-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center border border-white/10 hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
+                <span class="material-symbols-outlined text-lg">chevron_left</span>
+            </button>
+            {% endif %}
+
+            <!-- Image Container -->
+            <div id="carousel-images" class="relative w-full h-full flex items-center justify-center">
+                {% if product.images %}
+                {% for img in product.images %}
+                <img src="{{ img }}" alt="{{ product.title }}" data-index="{{ loop.index0 }}"
+                    class="carousel-image absolute w-2/3 h-auto max-h-full object-contain rounded-xl shadow-2xl border border-white/10 transition-all duration-500 {{ 'opacity-100 z-10 scale-100' if loop.first else 'opacity-0 z-0 scale-95' }}">
+                {% endfor %}
+                {% else %}
+                <img src="{{ product.image }}" alt="{{ product.title }}"
+                    class="w-2/3 h-auto max-h-full object-contain rounded-xl shadow-2xl border border-white/10">
+                {% endif %}
+            </div>
+
+            {% if product.images and product.images|length > 1 %}
+            <!-- Next Button -->
+            <button onclick="changeImage(1)"
+                class="time-delay absolute right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center border border-white/10 hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
+                <span class="material-symbols-outlined text-lg">chevron_right</span>
+            </button>
+
+            <!-- Indicators -->
+            <div class="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-20">
+                {% for img in product.images %}
+                <div class="carousel-dot w-1.5 h-1.5 rounded-full {{ 'bg-white' if loop.first else 'bg-white/30' }} transition-colors"
+                    data-index="{{ loop.index0 }}"></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="p-6 space-y-4 bg-background-dark/50">
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xl font-bold text-white">{{ product.title }}</h3>
+                    <div
+                        class="px-2 py-1 {{ product.badge_color }} text-white text-[10px] font-black rounded uppercase">
+                        {{ product.badge }}</div>
+                </div>
+                <p class="text-sm text-gray-400">{{ product.set }} • {{ product.card_number }}</p>
+            </div>
+
+            <div class="flex flex-col gap-3 pt-4 border-t border-white/10">
+                <div class="flex items-center justify-between">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Price</span>
+                        <div class="flex items-end gap-2">
+                            <span class="text-2xl font-black text-primary">¥{{ "{:,.0f}".format(product.price) }}</span>
+                            {% if product.status == 'Sync' %}
+                            <span class="mb-1 text-[10px] font-bold text-green-400 flex items-center gap-0.5">
+                                <span class="material-symbols-outlined text-[10px]">check_circle</span> In Stock
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <!-- Quantity Control -->
+                        <div class="flex items-center bg-white/5 border border-white/10 rounded-full p-1 h-10">
+                            <button onclick="updateQty('modal-qty-{{ product.safe_id }}', -1)"
+                                class="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
+                                <span class="material-symbols-outlined text-sm">remove</span>
+                            </button>
+                            <span id="modal-qty-{{ product.safe_id }}"
+                                class="w-8 text-center text-sm font-black">1</span>
+                            <button onclick="updateQty('modal-qty-{{ product.safe_id }}', 1)"
+                                class="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
+                                <span class="material-symbols-outlined text-sm">add</span>
+                            </button>
+                        </div>
+
+                        <button
+                            class="p-3 bg-white/5 text-white border border-white/10 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center group"
+                            title="Add to Cart"
+                            onclick="handleCartAction('{{ product.variant_id }}', 'add', event, 'modal-qty-{{ product.safe_id }}')">
+                            <span
+                                class="material-symbols-outlined text-lg group-active:scale-90 transition-transform">add_shopping_cart</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        let currentIndex = 0;
+        const images = document.querySelectorAll('.carousel-image');
+        const dots = document.querySelectorAll('.carousel-dot');
+        const totalImages = images.length;
+
+        window.changeImage = function (direction) {
+            if (window.event) window.event.stopPropagation();
+            if (totalImages <= 1) return;
+
+            // Remove active classes from current
+            images[currentIndex].classList.remove('opacity-100', 'z-10', 'scale-100');
+            images[currentIndex].classList.add('opacity-0', 'z-0', 'scale-95');
+            if (dots.length > 0) dots[currentIndex].classList.replace('bg-white', 'bg-white/30');
+
+            // Update index
+            currentIndex = (currentIndex + direction + totalImages) % totalImages;
+
+            // Add active classes to new
+            images[currentIndex].classList.remove('opacity-0', 'z-0', 'scale-95');
+            images[currentIndex].classList.add('opacity-100', 'z-10', 'scale-100');
+            if (dots.length > 0) dots[currentIndex].classList.replace('bg-white/30', 'bg-white');
+        }
+
+        // Expose close Modal globally if not already
+        window.closeModal = function () {
+            if (window.event) window.event.stopPropagation();
+            document.getElementById('modal-container').innerHTML = '';
+        }
+    })();
+</script>

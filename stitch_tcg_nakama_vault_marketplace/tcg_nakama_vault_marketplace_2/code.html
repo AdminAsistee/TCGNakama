@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TCG Nakama Vault Marketplace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f425d1",
+                        "background-light": "#f8f5f8",
+                        "background-dark": "#0a0a0a",
+                        "vault-card": "#0f0a0f",
+                        "vault-border": "#211520"
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100dvh;
+            scroll-behavior: smooth;
+        }
+        .holographic-glow {
+            box-shadow: 0 0 15px rgba(244, 37, 209, 0.3);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .vault-card-outline {
+            border: 1px solid rgba(244, 37, 209, 0.15);
+        }
+        .obsidian-glass {
+            background: rgba(15, 10, 15, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(244, 37, 209, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(244, 37, 209, 0.1);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark text-white min-h-screen relative" id="top">
+<header class="sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md">
+<div class="flex items-center p-4 justify-between max-w-md mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-2xl font-bold">hexagon</span>
+</div>
+<h2 class="text-xl font-bold tracking-tighter uppercase italic text-white flex gap-2">
+<span class="opacity-50">TCG</span>
+<span>Nakama Vault</span>
+</h2>
+</div>
+<div class="flex items-center gap-3">
+<button class="relative w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-white">shopping_bag</span>
+<span class="absolute top-1 right-1 w-4 h-4 bg-primary text-[10px] font-black text-white rounded-full flex items-center justify-center border-2 border-background-dark">3</span>
+</button>
+</div>
+</div>
+<div class="px-4 pb-4 max-w-md mx-auto">
+<label class="flex flex-col w-full">
+<div class="flex w-full items-stretch rounded-full h-11 bg-white/5 border border-white/10">
+<div class="text-primary/60 flex items-center justify-center pl-4">
+<span class="material-symbols-outlined text-lg">search</span>
+</div>
+<input class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-600" placeholder="Search the Obsidian Vault..." type="text"/>
+<div class="flex items-center pr-4">
+<span class="material-symbols-outlined text-gray-400 text-lg">mic</span>
+</div>
+</div>
+</label>
+</div>
+</header>
+<main class="max-w-md mx-auto">
+<div class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
+<div class="flex gap-3 px-4 overflow-x-auto hide-scrollbar">
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border border-white/10 bg-white/5 px-4">
+<p class="text-[10px] font-bold uppercase tracking-wider">Price Range</p>
+<span class="material-symbols-outlined text-sm">expand_more</span>
+</div>
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary/20 border border-primary/40 px-4">
+<span class="material-symbols-outlined text-primary text-sm">flare</span>
+<p class="text-primary text-[10px] font-bold uppercase">Base Set</p>
+</div>
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4">
+<span class="material-symbols-outlined text-gray-400 text-sm">eco</span>
+<p class="text-gray-300 text-[10px] font-bold uppercase">Neo</p>
+</div>
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4">
+<span class="material-symbols-outlined text-gray-400 text-sm">bolt</span>
+<p class="text-gray-300 text-[10px] font-bold uppercase">Skyridge</p>
+</div>
+</div>
+<div class="flex gap-2 px-4 mt-3 overflow-x-auto hide-scrollbar">
+<div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-gray-500">PSA 10</div>
+<div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-gray-500">BGS 9.5</div>
+<div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-gray-500">CGC 10</div>
+<div class="px-4 py-1.5 rounded-full bg-primary text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/30">Raw NM</div>
+</div>
+</div>
+<div class="px-4 py-8">
+<div class="flex items-center justify-between mb-6 px-1">
+<h3 class="text-sm font-bold uppercase tracking-[0.25em] text-gray-400">Vault Grails</h3>
+<span class="text-primary text-xs font-bold uppercase tracking-wider cursor-pointer">View All</span>
+</div>
+<div class="grid grid-cols-2 gap-x-4 gap-y-8">
+<div class="flex flex-col group">
+<div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-vault-card border border-white/10 transition-all duration-300 group-hover:border-primary/50 group-hover:scale-[1.02] p-2">
+<img alt="Holographic Charizard Base Set Pokemon Card" class="w-full h-full object-cover rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnlxbCCW7ccJLac_9xcLOXxM-MQgVnouqpyKkiCDfy4FfqfF-di-JUgJIqWJ8lCnc_HYiWlsxm5jCjWF56iaORuRVkL_kbOB-RBc9rxKCLj0jPzxQ1ClNuMffzy_F0XUAW8RgtTJUIN8Ec2cIxTKENalMJzzdGbAl9Eq87pK2r5s6Gmo9cNEupS31EY89f5KlNZv6Q2sSYz5mfZH3RN51Tj1fLS6U82OqUoiU5toqg6brAXMD5VihYlGsJCQzBKrRuPvi1aTztNq19"/>
+<div class="absolute top-4 left-4 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/20">PSA 10</div>
+</div>
+<div class="mt-3 space-y-1 px-1">
+<div class="flex items-center justify-between">
+<h4 class="text-xs font-bold truncate">Charizard 1st Ed.</h4>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+<span class="text-[8px] text-gray-500 uppercase font-black tracking-tighter">Sync</span>
+</div>
+</div>
+<p class="text-[9px] text-gray-500 font-medium">Base Set • 4/102</p>
+<p class="text-sm font-black text-primary">$24,950.00</p>
+</div>
+</div>
+<div class="flex flex-col group">
+<div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-vault-card border border-white/10 transition-all duration-300 group-hover:border-primary/50 group-hover:scale-[1.02] p-2">
+<img alt="Umbreon VMAX Alt Art Evolving Skies Card" class="w-full h-full object-cover rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtdgPgDIX7LKx7CSs13Z2Qo2_nFjcpYUYjbnyxcXmQeV16aCY9JiUPZ7bWeSA8ByFo1Vk3LuXfLWgrs9fwUhd7pdr7UBO7GyGRxiqfbF8PaaY8AtRecafC7rJq4Ow8IidJClQYf07gWq-h5nGd8XQDMvnZ1-SPHhScjX5HS0ofmJloG_ZsTA5PWCV1KiufYF5Hcbr4d2hcAAxjrcOy3YRVZp7EVVBerbATuBtvBT12JlAfSAnBCXNA6li_5nA8fcrnZRI24KzMINMo"/>
+<div class="absolute top-4 left-4 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/20">BGS 9.5</div>
+</div>
+<div class="mt-3 space-y-1 px-1">
+<div class="flex items-center justify-between">
+<h4 class="text-xs font-bold truncate">Umbreon VMAX</h4>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+<span class="text-[8px] text-gray-500 uppercase font-black tracking-tighter">Sync</span>
+</div>
+</div>
+<p class="text-[9px] text-gray-500 font-medium">Evolving Skies • 215/203</p>
+<p class="text-sm font-black text-primary">$850.00</p>
+</div>
+</div>
+<div class="flex flex-col group">
+<div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-vault-card border border-white/10 transition-all duration-300 group-hover:border-primary/50 group-hover:scale-[1.02] p-2">
+<img alt="Lugia Neo Genesis Holo Pokemon Card" class="w-full h-full object-cover rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsqrAal1Ef4qIB2ndAfwW4htPLSpTatObyqtodT5e4oQzBvKx5SV0GXj1f-uGXsXpG_I1Z2mbAAz-54HoMn7djckfYOEPxSOrANSzzPw3J2HKVMcbfn_Rbo-49MEBLKDdyeuNJ9OHRLX9ZGh46lOxCsT0oFE7wvNv_6T00D5KRLSgVxo8Q0P0jJd8HtlAum6wQNhbANcc5uhkDowle4ap4HExIUqzLoWfktmS5uw5o5XsVrwpbfjgyoLb1tyxFepPHpCtCSYc_WpQk"/>
+<div class="absolute top-4 left-4 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/20">CGC 10</div>
+</div>
+<div class="mt-3 space-y-1 px-1">
+<div class="flex items-center justify-between">
+<h4 class="text-xs font-bold truncate">Lugia Holo</h4>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+<span class="text-[8px] text-gray-500 uppercase font-black tracking-tighter">Sync</span>
+</div>
+</div>
+<p class="text-[9px] text-gray-500 font-medium">Neo Genesis • 9/111</p>
+<p class="text-sm font-black text-primary">$1,200.00</p>
+</div>
+</div>
+<div class="flex flex-col group">
+<div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-vault-card border border-white/10 transition-all duration-300 group-hover:border-primary/50 group-hover:scale-[1.02] p-2">
+<img alt="Mewtwo GX Hidden Fates Shiny Pokemon Card" class="w-full h-full object-cover rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCim-GEGejIo3Tr8VhZ_xXxGQtGhHua7pBfNrlDmjQcOGG1lv6zRhuBT2OWfrWy679HVnT5txjvF_B7jjcW3f7LxxaGxhPJtJttGnCD1iserH0G24kim3KN5NzARxNqFG8YOgxnwBH2203GpaiBZ83DddFHGhuJdzzqhzjGQaKV090GfTRXHE1_711OaEp2UFKePqproYqMSaPE3E2cg2S7giUyzWjKxYujpVtJg8UHg11DvWV9KSGo2R64GjnUOUlVsho3WLHuqYzK"/>
+<div class="absolute top-4 left-4 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/20">RAW NM</div>
+</div>
+<div class="mt-3 space-y-1 px-1">
+<div class="flex items-center justify-between">
+<h4 class="text-xs font-bold truncate">Mewtwo GX Shiny</h4>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-[8px] text-gray-500 uppercase font-black tracking-tighter italic">Pending</span>
+</div>
+</div>
+<p class="text-[9px] text-gray-500 font-medium">Hidden Fates • SV59</p>
+<p class="text-sm font-black text-primary">$145.00</p>
+</div>
+</div>
+</div>
+</div>
+<div class="mx-4 mt-8 p-8 rounded-[2rem] bg-gradient-to-b from-white/5 to-transparent border border-white/10 text-center relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 mix-blend-overlay"></div>
+<div class="relative z-10">
+<div class="flex justify-center mb-6">
+<span class="material-symbols-outlined text-primary text-5xl fill-[1]">verified</span>
+</div>
+<h4 class="text-xl font-bold tracking-tight">Trusted Shopify Merchant</h4>
+<p class="text-xs text-gray-400 mt-3 leading-relaxed max-w-[240px] mx-auto">Every card in the Nakama Vault is physically inspected and synchronized live with our Shopify inventory for 100% security.</p>
+<div class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/10">
+<div class="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+<span class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-300">Vault Systems Online</span>
+</div>
+</div>
+</div>
+<footer class="mt-16 pb-24 px-8 text-center">
+<p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2024 TCG Nakama Vault</p>
+<p class="text-[9px] text-gray-700 mt-2 uppercase tracking-widest">Premium Collector Marketplace</p>
+</footer>
+</main>
+<a class="fixed bottom-6 right-6 z-[60] obsidian-glass w-12 h-12 rounded-full flex items-center justify-center text-primary/80 transition-all active:scale-95 group" href="#top">
+<span class="material-symbols-outlined text-2xl group-hover:-translate-y-1 transition-transform">arrow_upward</span>
+</a>
+
+</body></html>

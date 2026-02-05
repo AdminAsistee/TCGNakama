@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>TCG Nakama Marketplace</title>
+
+    <!-- HTMX -->
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Vault Terminal: Base Initialization...");
+            if (typeof htmx !== 'undefined') {
+                console.log("HTMX Engine: ONLINE");
+            } else {
+                console.error("HTMX Engine: OFFLINE - Site interactivity will be disabled.");
+            }
+        });
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f425d1",
+                        "background-light": "#f8f5f8",
+                        "background-dark": "#0a0a0a",
+                        "vault-card": "#0f0a0f",
+                        "vault-border": "#211520"
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100dvh;
+            scroll-behavior: smooth;
+        }
+        .holographic-glow {
+            box-shadow: 0 0 15px rgba(244, 37, 209, 0.3);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .vault-card-outline {
+            border: 1px solid rgba(244, 37, 209, 0.15);
+        }
+        .obsidian-glass {
+            background: rgba(15, 10, 15, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(244, 37, 209, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(244, 37, 209, 0.1);
+        }
+        .htmx-indicator {
+            display: none;
+        }
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+    </style>
+    <script>
+        function updateQty(id, delta) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            let val = parseInt(el.innerText) + delta;
+            if (val < 1) val = 1;
+            el.innerText = val;
+        }
+
+        async function handleCartAction(variantId, action, event, qtySourceId) {
+            if (event) event.preventDefault();
+            if (event) event.stopPropagation(); // Prevent modal opening if on grid
+            if (!variantId) return;
+
+            const qty = qtySourceId ? (parseInt(document.getElementById(qtySourceId).innerText) || 1) : 1;
+            const btn = event.currentTarget;
+            const originalContent = btn.innerHTML;
+
+            // OPTIMISTIC UI: Update cart count immediately
+            const cartCount = document.getElementById('cart-count');
+            let originalCount = 0;
+            if (cartCount) {
+                originalCount = parseInt(cartCount.innerText) || 0;
+                cartCount.innerText = originalCount + qty;
+                cartCount.classList.add('scale-125', 'text-green-400');
+                setTimeout(() => cartCount.classList.remove('scale-125', 'text-green-400'), 500);
+            }
+
+            if (action === 'buy') {
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">sync</span>';
+            }
+
+            btn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+
+            try {
+                const response = await fetch(`/cart/add?variant_id=${encodeURIComponent(variantId)}&quantity=${qty}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                // Final sync with server count
+                if (cartCount) cartCount.innerText = data.total_quantity;
+
+                if (action === 'buy' && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                } else if (action === 'add') {
+                    btn.innerHTML = '<span class="material-symbols-outlined text-green-500 scale-125">check_circle</span>';
+                    setTimeout(() => {
+                        btn.innerHTML = originalContent;
+                        btn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error("Cart error:", err);
+                // Revert optimistic count on error
+                if (cartCount) cartCount.innerText = originalCount;
+                btn.innerHTML = '<span class="material-symbols-outlined text-red-500">error</span>';
+                setTimeout(() => {
+                    btn.innerHTML = originalContent;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+                }, 2000);
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-background-dark text-white min-h-screen relative" id="top">
+    {% block content %}{% endblock %}
+</body>
+
+</html>
