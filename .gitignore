@@ -102,7 +102,7 @@ ipython_config.py
 #pdm.lock
 
 # runtime package data
-runtime.txt
+# runtime.txt
 
 # celery staticfiles
 celerybeat-schedule
