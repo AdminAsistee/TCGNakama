@@ -13,7 +13,8 @@
         <div class="flex items-center gap-3">
             <button
                 class="relative w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-                hx-get="/search" hx-target="#product-grid" hx-include="#search-input, #rarity-input, #price-slider"
+                hx-get="/search" hx-target="#product-grid"
+                hx-include="#search-input, #rarity-input, #price-slider, #collection-input"
                 title="Force Sync with Shopify Vault">
                 <span class="material-symbols-outlined text-white transition-opacity duration-300">sync</span>
                 <!-- Loading State (Absolute centered) -->
@@ -41,7 +42,7 @@
                     class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-600 text-white"
                     placeholder="Search the TCG Nakama Vault" type="text" hx-get="/search"
                     hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-indicator="#search-loading"
-                    hx-on:input="clearFilterVisuals()" />
+                    hx-include="#rarity-input, #price-slider, #collection-input" hx-on:input="clearFilterVisuals()" />
                 <div class="flex items-center pr-4 gap-2">
                     <div id="search-loading" class="htmx-indicator">
                         <span class="material-symbols-outlined text-primary text-sm animate-spin">sync</span>
@@ -59,56 +60,43 @@
         class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
         <div class="flex gap-3 overflow-x-auto hide-scrollbar">
             <!-- Hidden Rarity Input for Additive Filtering -->
-            <input type="hidden" name="rarity" id="rarity-input" value="">
+            <input type="hidden" name="rarity" id="rarity-input" value="" hx-get="/filter" hx-target="#product-grid"
+                hx-trigger="change" hx-include="#search-input, #price-slider, #collection-input">
+            <!-- Hidden Collection Input -->
+            <input type="hidden" name="collection" id="collection-input" value="" hx-get="/filter"
+                hx-target="#product-grid" hx-trigger="change" hx-include="#search-input, #price-slider, #rarity-input">
 
             <!-- Price Range Slider -->
             <div class="flex flex-col gap-2 min-w-[200px] px-4">
                 <div
                     class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
                     <span>Price Range</span>
-                    <span id="price-value" class="text-primary">¥0 - ¥10,000,000</span>
+                    <span id="price-value" class="text-primary">¥0 - ¥50,000</span>
                 </div>
-                <input type="range" id="price-slider" name="max_price" min="0" max="10000000" value="10000000"
+                <input type="range" id="price-slider" name="max_price" min="0" max="50000" value="50000"
                     class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                     oninput="updatePriceDisplay(this.value)" hx-get="/filter" hx-trigger="change, search delay:500ms"
-                    hx-target="#product-grid" hx-swap="innerHTML" hx-include="#search-input, #rarity-input" />
+                    hx-target="#product-grid" hx-swap="innerHTML"
+                    hx-include="#search-input, #rarity-input, #collection-input" />
             </div>
 
             <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
 
             <!-- Rarity Filters -->
-            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Common', this)"
-                hx-include="#search-input, #price-slider, #rarity-input">
-                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Common</p>
-            </div>
-            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Uncommon', this)"
-                hx-include="#search-input, #price-slider, #rarity-input">
-                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Uncommon</p>
-            </div>
-            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Rare', this)"
-                hx-include="#search-input, #price-slider, #rarity-input">
-                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Rare</p>
-            </div>
-            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Epic', this)"
-                hx-include="#search-input, #price-slider, #rarity-input">
-                <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Epic</p>
-            </div>
-            <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/filter" hx-target="#product-grid" onclick="setActiveFilter('Ultra Rare', this)"
-                hx-include="#search-input, #price-slider, #rarity-input">
-                <p class="text-white text-[10px] font-bold uppercase whitespace-nowrap">Ultra Rare</p>
+            <div id="rarity-filters-container">
+                {% include "partials/rarity_filters.html" %}
             </div>
 
             <div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 px-4 cursor-pointer hover:bg-white/10"
-                hx-get="/" hx-target="body" onclick="resetFilters()">
+                onclick="resetFilters()">
                 <span class="material-symbols-outlined text-gray-400 text-sm">restart_alt</span>
                 <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Reset</p>
             </div>
         </div>
+
+        <!-- Collection Filters -->
+        {% set oob = false %}
+        {% include "partials/collection_filters.html" %}
 
     </div>
 
@@ -119,8 +107,7 @@
                 hx-target="#product-grid" onclick="resetFilters()">View All</span>
         </div>
 
-        <div id="product-grid"
-            class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-10 fade-me-in">
+        <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-10">
             {% include "partials/product_grid.html" %}
         </div>
 
@@ -175,11 +162,11 @@
     function setActiveFilter(rarity, el) {
         // Toggle behavior: if already active, remove it
         const input = document.getElementById('rarity-input');
-        const isActive = el.classList.contains('holographic-glow');
+        const isActive = el.classList.contains('bg-primary');
 
         document.querySelectorAll('.rarity-filter').forEach(f => {
-            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
-            f.querySelector('p').classList.remove('text-primary');
+            f.classList.remove('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
+            f.querySelector('p').classList.remove('text-white');
             f.querySelector('p').classList.add('text-gray-300');
         });
 
@@ -187,26 +174,60 @@
             input.value = "";
         } else {
             input.value = rarity;
-            el.classList.add('bg-primary/20', 'border-primary/40', 'holographic-glow');
+            el.classList.add('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
             el.querySelector('p').classList.remove('text-gray-300');
-            el.querySelector('p').classList.add('text-primary');
+            el.querySelector('p').classList.add('text-white');
         }
+
+        // Trigger HTMX via the hidden input
+        htmx.trigger(input, 'change');
+    }
+
+    function setActiveCollection(handle, el) {
+        const input = document.getElementById('collection-input');
+        const isActive = el.classList.contains('bg-primary');
+
+        document.querySelectorAll('.collection-filter').forEach(f => {
+            f.classList.remove('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
+            const img = f.querySelector('img');
+            if (img) img.classList.remove('brightness-125');
+            f.querySelector('p').classList.remove('text-white');
+            f.querySelector('p').classList.add('text-gray-300');
+        });
+
+        if (isActive) {
+            input.value = "";
+        } else {
+            input.value = handle;
+            el.classList.add('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
+            const img = el.querySelector('img');
+            if (img) img.classList.add('brightness-125');
+            el.querySelector('p').classList.remove('text-gray-300');
+            el.querySelector('p').classList.add('text-white');
+        }
+
+        // Trigger HTMX via the hidden input
+        htmx.trigger(input, 'change');
     }
 
     function clearFilterVisuals() {
         const rarityInput = document.getElementById('rarity-input');
         if (rarityInput) rarityInput.value = '';
+        const collectionInput = document.getElementById('collection-input');
+        if (collectionInput) collectionInput.value = '';
 
         // Reset price slider visually
         const slider = document.getElementById('price-slider');
         if (slider) {
-            slider.value = 10000000;
-            updatePriceDisplay(10000000);
+            slider.value = 50000;
+            updatePriceDisplay(50000);
         }
 
-        document.querySelectorAll('.rarity-filter').forEach(f => {
-            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
-            f.querySelector('p').classList.remove('text-primary');
+        document.querySelectorAll('.rarity-filter, .collection-filter').forEach(f => {
+            f.classList.remove('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
+            const img = f.querySelector('img');
+            if (img) img.classList.remove('brightness-125');
+            f.querySelector('p').classList.remove('text-white');
             f.querySelector('p').classList.add('text-gray-300');
         });
     }
@@ -214,8 +235,8 @@
     function resetFilters() {
         const slider = document.getElementById('price-slider');
         if (slider) {
-            slider.value = 10000000;
-            updatePriceDisplay(10000000);
+            slider.value = 50000;
+            updatePriceDisplay(50000);
         }
         const searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
@@ -223,11 +244,19 @@
         const rarityInput = document.getElementById('rarity-input');
         if (rarityInput) rarityInput.value = '';
 
-        document.querySelectorAll('.rarity-filter').forEach(f => {
-            f.classList.remove('bg-primary/20', 'border-primary/40', 'holographic-glow');
-            f.querySelector('p').classList.remove('text-primary');
+        const collectionInput = document.getElementById('collection-input');
+        if (collectionInput) collectionInput.value = '';
+
+        document.querySelectorAll('.rarity-filter, .collection-filter').forEach(f => {
+            f.classList.remove('bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]');
+            const img = f.querySelector('img');
+            if (img) img.classList.remove('brightness-125');
+            f.querySelector('p').classList.remove('text-white');
             f.querySelector('p').classList.add('text-gray-300');
         });
+
+        // Trigger fresh filter
+        htmx.trigger(document.getElementById('collection-input'), 'change');
     }
 
     // Cart Drawer Logic

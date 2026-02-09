@@ -14,7 +14,8 @@ async def poll_shopify_vault():
         try:
             print("\n[PULSE] Shopify Vault Sync: Initiating Heartbeat...")
             products = await client.get_products()
-            print(f"[PULSE] Shopify Vault Sync: SUCCESS ({len(products)} units verified)")
+            collections = await client.get_collections()
+            print(f"[PULSE] Shopify Vault Sync: SUCCESS ({len(products)} units, {len(collections)} collections verified)")
         except Exception as e:
             print(f"[PULSE] Shopify Vault Sync: ERROR - {e}")
         

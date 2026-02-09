@@ -1,12 +1,12 @@
 {% for product in products %}
 <div
-    class="flex flex-col group obsidian-glass p-2 rounded-2xl vault-card-outline transition-all duration-300 hover:scale-[1.02] hover:border-primary/50 shadow-lg">
+    class="flex flex-col group obsidian-glass p-2 rounded-2xl vault-card-outline transition-all duration-150 hover:scale-[1.02] hover:border-primary/50 shadow-lg">
     <!-- Modal Trigger Area (Image) -->
     <div class="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer" hx-get="/product/{{ product.id }}"
         hx-target="#modal-container" hx-swap="innerHTML">
         <img alt="{{ product.title }}"
-            class="w-full h-full object-cover rounded-xl transition-transform duration-500 group-hover:scale-110"
-            src="{{ product.image }}" />
+            class="w-full h-full object-cover rounded-xl transition-transform duration-200 group-hover:scale-110"
+            src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400" loading="lazy" />
         <div
             class="absolute top-3 left-3 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-black text-white border border-white/10 uppercase tracking-widest">
             {{ product.badge }}
@@ -67,4 +67,10 @@
     <span class="material-symbols-outlined text-gray-600 text-4xl mb-2">search_off</span>
     <p class="text-gray-400 text-sm">No cards found in the vault.</p>
 </div>
+{% endif %}
+
+{% if collections or svr_active_rarity %}
+{% set oob = true %}
+{% include "partials/collection_filters.html" %}
+{% include "partials/rarity_filters.html" %}
 {% endif %}
