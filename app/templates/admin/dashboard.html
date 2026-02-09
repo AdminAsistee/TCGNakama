@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Collector Intelligence Dashboard</title>
+    <!-- Common Styles -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "glass": "rgba(255, 255, 255, 0.03)",
+                        "glass-border": "rgba(255, 255, 255, 0.1)",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                        "obsidian-black": "#000000",
+                        "teal-accent": "#00f2ea",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    boxShadow: {
+                        'neon-blue': '0 0 10px rgba(0, 240, 255, 0.3), 0 0 20px rgba(0, 240, 255, 0.1)',
+                        'teal-glow': '0 0 15px rgba(0, 242, 234, 0.15), inset 0 0 10px rgba(0, 242, 234, 0.05)',
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .obsidian-hub-card {
+            background-color: #000000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-grid {
+            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .iridescent-text {
+            background: linear-gradient(90deg, #00f0ff, #bc13fe, #00f0ff);
+            background-size: 200% auto;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            animation: shine 3s linear infinite;
+        }
+
+        @keyframes shine {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        .whale-glow {
+            box-shadow: inset 0 0 15px rgba(188, 19, 254, 0.15), 0 0 10px rgba(188, 19, 254, 0.05);
+            border-left: 2px solid #bc13fe;
+        }
+
+        /* Hide spin buttons for number input */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display text-white selection:bg-primary selection:text-white pb-24">
+    <header class="sticky top-0 z-50 glass-panel border-b border-glass-border">
+        <div class="flex items-center p-4 justify-between h-16">
+            <button
+                class="text-white/80 hover:text-white transition-colors flex items-center justify-center rounded-lg active:bg-white/10 p-2 -ml-2">
+                <span class="material-symbols-outlined text-[28px]">menu</span>
+            </button>
+            <h1
+                class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                Collector Intelligence
+            </h1>
+            {% if oauth_connected %}
+            {% endif %}
+            <a href="/admin/logout"
+                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors ml-2">
+                <span class="material-symbols-outlined text-sm">logout</span>
+                Logout
+            </a>
+        </div>
+    </header>
+    <main class="flex flex-col gap-6 p-4">
+        <!-- Search Bar -->
+        <form method="get" action="/admin" class="mb-6">
+            <div class="relative group">
+                <div
+                    class="absolute -inset-0.5 bg-gradient-to-r from-neon-blue to-neon-purple rounded-lg blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200">
+                </div>
+                <div class="relative flex items-center bg-surface-dark rounded-lg p-2 border border-white/10">
+                    <span class="material-symbols-outlined text-white/50 ml-2">search</span>
+                    <input type="text" name="query" value="{{ current_query or '' }}"
+                        placeholder="Search Vault Assets..."
+                        class="bg-transparent border-none text-white placeholder-white/30 focus:ring-0 w-full ml-2 font-mono text-sm" />
+                    <button type="submit"
+                        class="text-neon-blue text-xs font-bold uppercase tracking-wider px-3 hover:text-white transition-colors">Scan</button>
+                    {% if current_query or current_rarity %}
+                    <a href="/admin"
+                        class="text-white/40 text-xs font-bold uppercase tracking-wider px-3 hover:text-white transition-colors border-l border-white/10 ml-1">Clear</a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+
+        <section>
+            <div class="flex items-center justify-between mb-3 px-1">
+                <h2 class="text-xs font-bold tracking-[0.2em] text-white/50 uppercase">Global Collector List</h2>
+                <div class="flex items-center gap-1">
+                    <span
+                        class="block w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse shadow-[0_0_5px_#0bda5e]"></span>
+                    <span class="text-[10px] text-neon-green font-mono uppercase">Live: {{ live_count|default('842')
+                        }}</span>
+                    <!-- Force Sync Button -->
+                    <form action="/admin/sync" method="post" class="ml-2 flex items-center">
+                        <button type="submit"
+                            class="text-[9px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-1.5 py-0.5 rounded hover:bg-neon-blue/10 transition-colors flex items-center gap-1"
+                            title="Force Sync">
+                            <span class="material-symbols-outlined text-[10px]">sync</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Global Presence Chips -->
+            <div class="mb-5">
+                <h3 class="text-[10px] text-white/40 uppercase tracking-widest mb-2 pl-1 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">public</span>
+                    Global Presence
+                    <span class="px-1 py-0.5 rounded bg-white/10 text-[8px] text-white/60 font-bold">SOON</span>
+                </h3>
+                <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-2 opacity-60 grayscale-[0.3]">
+                    <div
+                        class="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-lg p-3 min-w-[140px] relative overflow-hidden flex-shrink-0 group hover:border-neon-blue/40 transition-colors">
+                        <div
+                            class="absolute top-0 right-0 px-1.5 py-0.5 bg-neon-gold/10 rounded-bl-lg border-b border-l border-neon-gold/20">
+                            <span class="text-[8px] text-neon-gold font-bold uppercase">Top ASV</span>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2 mt-1">
+                            <span class="text-xl shadow-lg rounded-sm">🇯🇵</span>
+                            <span class="text-xs font-bold text-white">Tokyo, JP</span>
+                        </div>
+                        <div class="space-y-0.5">
+                            <div class="text-[9px] text-white/60 uppercase tracking-wider">Regional Prem.</div>
+                            <div class="text-sm font-mono text-neon-blue font-bold">¥142,000</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Leaderboard (Whale Watch) -->
+            <div class="glass-panel rounded-xl p-0 overflow-hidden border-t border-t-white/10">
+                <div
+                    class="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center backdrop-blur-md sticky top-0 z-10">
+                    <h3 class="text-[10px] font-bold tracking-widest text-white uppercase flex items-center gap-2">
+                        <span class="material-symbols-outlined text-neon-purple text-sm">leaderboard</span>
+                        Active Leaderboard
+                        <span class="px-1 py-0.5 rounded bg-white/10 text-[8px] text-white/60 font-bold">SOON</span>
+                    </h3>
+                    <div class="flex gap-2">
+                        <span class="text-[9px] text-white/40 uppercase">Top 10 Active</span>
+                    </div>
+                </div>
+                <div class="max-h-[340px] overflow-y-auto scrollbar-hide opacity-60">
+                    <div
+                        class="p-3 border-b border-white/5 bg-gradient-to-r from-neon-purple/10 via-neon-purple/5 to-transparent relative group whale-glow transition-all duration-300">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <span class="text-2xl drop-shadow-md">🇯🇵</span>
+                                    <div class="absolute -bottom-1 -right-1 bg-background-dark rounded-full p-0.5">
+                                        <span
+                                            class="material-symbols-outlined text-neon-gold text-[10px]">workspace_premium</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-white flex items-center gap-1 iridescent-text">
+                                        Mock User VIP
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-[9px] text-white/50 font-mono">LTV:</span>
+                                        <span class="text-[9px] text-neon-purple font-mono font-bold">¥4,250,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">Cart Value</div>
+                                <div
+                                    class="text-sm font-mono text-white font-bold drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                                    ¥{{ cart_value_vip|default('1,245,000') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Obsidian Sales Hub (The Financials) -->
+        <section class="mt-4 mb-4">
+            <div class="flex items-center justify-between mb-4 px-1">
+                <h2 class="text-xs font-bold tracking-[0.2em] text-white/50 uppercase flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">hub</span>
+                    Obsidian Sales Hub
+                </h2>
+                <div class="flex items-center bg-obsidian-black border border-white/10 rounded-full p-1 relative">
+                    <div class="absolute inset-0 rounded-full shadow-[0_0_10px_rgba(188,19,254,0.1)]"></div>
+                    <button
+                        class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-neon-purple text-white shadow-[0_0_8px_rgba(188,19,254,0.5)] z-10 transition-all">¥</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 auto-rows-min">
+                <!-- Daily Gross -->
+                <div
+                    class="col-span-2 obsidian-hub-card rounded-xl p-4 shadow-teal-glow border-l-2 border-l-teal-accent group relative">
+                    <div class="flex justify-between items-start mb-2 relative z-10">
+                        <div>
+                            <h3 class="text-[10px] text-teal-accent uppercase tracking-widest font-bold mb-1">Total
+                                Inventory Value</h3>
+                            <div class="text-2xl font-mono text-white font-bold drop-shadow-[0_0_8px_rgba(0,242,234,0.5)]"
+                                id="total-value-display">
+                                ¥{{ total_value|default('4,200,500') }}
+                            </div>
+                            <div id="value-change-indicator"
+                                class="text-[10px] font-mono mt-1 opacity-0 transition-opacity">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+                        <span class="material-symbols-outlined text-teal-accent/50">show_chart</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vault Operations Ledger (Dynamic Grid) -->
+        <section class="mb-20">
+            <div class="flex items-center gap-3 mb-3 px-1">
+                <h2 class="text-xs font-bold tracking-[0.2em] text-white/50 uppercase">Vault Operations Ledger</h2>
+                {% if oauth_connected %}
+                <div class="flex items-center gap-1 text-neon-green text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 bg-neon-green/10 rounded-full border border-neon-green/20"
+                    title="Shopify Admin API is connected">
+                    <span class="material-symbols-outlined text-[10px]">cloud_done</span>
+                    Synced
+                </div>
+                {% else %}
+                <a href="/oauth/authorize"
+                    class="flex items-center gap-1 text-neon-gold text-[9px] uppercase tracking-wider font-bold border border-neon-gold/30 px-2 py-0.5 rounded-full hover:bg-neon-gold/10 transition-colors animate-pulse"
+                    title="Connect to Shopify Admin API to enable order tracking">
+                    <span class="material-symbols-outlined text-[10px]">cloud_off</span>
+                    Connect Shopify
+                </a>
+                {% endif %}
+            </div>
+            <div class="flex items-center justify-end mb-3 px-1">
+                <div class="flex gap-2">
+                    <button onclick="toggleColumn('stock')" id="toggle-stock"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-blue/20 text-neon-blue border-neon-blue/40 hover:bg-neon-blue/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">inventory_2</span> Stock
+                    </button>
+                    <button onclick="toggleColumn('age')" id="toggle-age"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-purple/20 text-neon-purple border-neon-purple/40 hover:bg-neon-purple/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">schedule</span> Age
+                    </button>
+                    <button onclick="toggleColumn('value')" id="toggle-value"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-green/20 text-neon-green border-neon-green/40 hover:bg-neon-green/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">attach_money</span> Value
+                    </button>
+                    <button onclick="toggleColumn('cost')" id="toggle-cost"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-gold/20 text-neon-gold border-neon-gold/40 hover:bg-neon-gold/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">payments</span> Cost
+                    </button>
+                    <button onclick="toggleColumn('sell')" id="toggle-sell"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-white/10 text-white/40 border-white/20 hover:bg-white/20">
+                        <span class="material-symbols-outlined text-[10px] align-middle">sell</span> Sell
+                    </button>
+                    <button onclick="toggleColumn('gl')" id="toggle-gl"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-white/10 text-white/60 border-white/20 hover:bg-white/20">
+                        <span class="material-symbols-outlined text-[10px] align-middle">trending_up</span> G/L
+                    </button>
+                    <button onclick="toggleColumn('grade')" id="toggle-grade"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-purple/20 text-neon-purple border-neon-purple/40 hover:bg-neon-purple/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">grade</span> Grade
+                    </button>
+                </div>
+            </div>
+            <div class="glass-panel rounded-xl overflow-hidden overflow-x-auto ring-1 ring-white/10 shadow-lg">
+                <table class="w-full text-left border-collapse min-w-[400px]" id="vault-table">
+                    <thead>
+                        <tr
+                            class="border-b border-white/10 text-[10px] text-white/40 uppercase tracking-wider bg-black/40">
+                            <th class="p-3 font-medium w-10">#</th>
+                            <th class="p-3 font-medium">Asset</th>
+                            <th class="p-3 font-medium" data-col="stock">Stock</th>
+                            <th class="p-3 font-medium" data-col="age">Age</th>
+                            <th class="p-3 font-medium text-right" data-col="value">Value (¥)</th>
+                            <th class="p-3 font-medium text-right" data-col="cost">Buy Price</th>
+                            <th class="p-3 font-medium text-right" data-col="sell">Sell Price</th>
+                            <th class="p-3 font-medium text-right" data-col="gl">G/L (%)</th>
+                            <th class="p-3 font-medium text-center" data-col="grade">Grade</th>
+                            <th class="p-3 font-medium text-right">Edit in Shopify</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-xs font-mono text-white/80">
+                        {% for product in products %}
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                            <td class="p-3 text-white/30 text-center">{{ loop.index }}</td>
+                            <td class="p-3 border-r border-white/10">
+                                <div class="flex items-center gap-3">
+                                    {% if product.featuredImage %}
+                                    <img src="{{ product.featuredImage.url }}"
+                                        class="w-8 h-8 rounded border border-white/10 object-cover" />
+                                    {% else %}
+                                    <div
+                                        class="w-8 h-8 rounded border border-white/10 bg-white/5 flex items-center justify-center">
+                                        <span class="material-symbols-outlined text-xs text-white/30">image</span>
+                                    </div>
+                                    {% endif %}
+                                    <div class="flex flex-col">
+                                        <span class="whitespace-nowrap font-sans font-bold text-white text-sm">{{
+                                            product.title }}</span>
+                                        <span class="text-[10px] text-white/40 uppercase">{{ product.productType
+                                            }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-3 font-bold text-neon-blue" data-col="stock">{{ product.totalInventory }}</td>
+                            <td class="p-3 text-neon-purple font-bold" data-col="age">
+                                {% if product.days_in_vault is not none %}
+                                {% if product.days_in_vault == 0 %}
+                                Today
+                                {% elif product.days_in_vault == 1 %}
+                                1 Day
+                                {% else %}
+                                {{ product.days_in_vault }} Days
+                                {% endif %}
+                                {% else %}
+                                --
+                                {% endif %}
+                            </td>
+                            <td class="p-3 text-right font-bold text-white" data-col="value">¥{{ product.price|int }}
+                            </td>
+                            <td class="p-3 text-right" data-col="cost">
+                                <div class="flex items-center justify-end gap-1">
+                                    <span class="text-white/40 font-bold text-sm">¥</span>
+                                    <input type="number" id="cost-{{ product.id }}"
+                                        value="{{ '{:.1f}'.format(product.buy_price) if product.buy_price else '' }}"
+                                        placeholder="--" step="0.1"
+                                        class="w-20 bg-transparent border-b border-white/20 text-right text-neon-gold font-bold text-sm focus:outline-none focus:border-neon-gold transition-colors placeholder-white/20"
+                                        onchange="saveCost('{{ product.id }}', this.value)" />
+                                </div>
+                            </td>
+                            <td class="p-3 text-right font-bold text-white/30" data-col="sell">
+                                N/A
+                            </td>
+                            <td class="p-3 text-right font-bold text-white/30" data-col="gl">
+                                N/A
+                            </td>
+                            <td class="p-3 text-center" data-col="grade">
+                                <select id="grade-{{ product.id }}" onchange="saveGrade('{{ product.id }}', this.value)"
+                                    class="bg-transparent border border-white/20 rounded px-2 py-1 text-sm font-bold focus:outline-none focus:border-neon-purple transition-colors cursor-pointer
+                                        {% if product.grade == 'S' %}text-neon-gold{% elif product.grade == 'A' %}text-neon-green{% elif product.grade == 'B' %}text-neon-blue{% elif product.grade == 'C' %}text-white/60{% else %}text-white/30{% endif %}">
+                                    <option value="" {% if not product.grade %}selected{% endif %}
+                                        class="bg-surface-dark text-white/30">--</option>
+                                    <option value="S" {% if product.grade=='S' %}selected{% endif %}
+                                        class="bg-surface-dark text-neon-gold">S</option>
+                                    <option value="A" {% if product.grade=='A' %}selected{% endif %}
+                                        class="bg-surface-dark text-neon-green">A</option>
+                                    <option value="B" {% if product.grade=='B' %}selected{% endif %}
+                                        class="bg-surface-dark text-neon-blue">B</option>
+                                    <option value="C" {% if product.grade=='C' %}selected{% endif %}
+                                        class="bg-surface-dark text-white/60">C</option>
+                                </select>
+                            </td>
+                            <td class="p-3 text-right">
+                                <a href="https://admin.shopify.com/store/tcg-nakama-2/products" target="_blank"
+                                    class="text-[10px] uppercase tracking-wider text-neon-gold border border-neon-gold/20 px-2 py-1 rounded hover:bg-neon-gold/10 transition-colors">
+                                    Edit
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="p-8 text-center text-white/30 italic">No assets detected in sector.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    <!-- Bottom Nav -->
+    <nav
+        class="fixed bottom-0 left-0 right-0 glass-panel border-t border-glass-border pb-safe pt-2 px-6 z-50 rounded-t-2xl">
+        <div class="flex justify-between items-center h-16 max-w-md mx-auto">
+            <button onclick="window.location.href='/admin'"
+                class="flex flex-col items-center gap-1 text-primary group transition-colors">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(37,123,244,0.8)] transition-all">grid_view</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Vault</span>
+            </button>
+            <button onclick="window.location.href='/admin/analytics'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">monitoring</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Analytics</span>
+            </button>
+            <button
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group relative">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">settings</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Settings</span>
+                <span
+                    class="absolute -top-1 -right-2 text-[8px] bg-neon-purple text-black font-bold px-1 rounded-sm">SOON</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        function toggleColumn(colName) {
+            const cells = document.querySelectorAll(`[data-col="${colName}"]`);
+            const btn = document.getElementById(`toggle-${colName}`);
+
+            cells.forEach(cell => {
+                if (cell.style.display === 'none') {
+                    cell.style.display = '';
+                } else {
+                    cell.style.display = 'none';
+                }
+            });
+
+            // Toggle button opacity to indicate state
+            if (btn) {
+                if (btn.classList.contains('opacity-40')) {
+                    btn.classList.remove('opacity-40');
+                } else {
+                    btn.classList.add('opacity-40');
+                }
+            }
+        }
+
+        // Save buy price to backend
+        async function saveCost(productId, value) {
+            const buyPrice = parseFloat(value);
+            if (isNaN(buyPrice) || buyPrice < 0) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/cost', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        buy_price: buyPrice
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Flash green border briefly to indicate save
+                    const input = document.getElementById(`cost-${productId}`);
+                    if (input) {
+                        input.style.borderColor = '#4ade80';
+                        setTimeout(() => {
+                            input.style.borderColor = '';
+                        }, 1000);
+                    }
+                    // Reload page to recalculate G/L
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Failed to save cost:', error);
+            }
+        }
+
+        // Save grade to backend
+        async function saveGrade(productId, grade) {
+            try {
+                const response = await fetch('/admin/grade', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        grade: grade
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const select = document.getElementById(`grade-${productId}`);
+                    if (select) {
+                        // Update color based on grade
+                        select.className = select.className.replace(/text-\S+/g, '');
+                        if (grade === 'S') {
+                            select.classList.add('text-neon-gold');
+                        } else if (grade === 'A') {
+                            select.classList.add('text-neon-green');
+                        } else if (grade === 'B') {
+                            select.classList.add('text-neon-blue');
+                        } else if (grade === 'C') {
+                            select.classList.add('text-white/60');
+                        } else {
+                            select.classList.add('text-white/30');
+                        }
+                        // Flash border
+                        select.style.borderColor = '#bc13fe';
+                        setTimeout(() => {
+                            select.style.borderColor = '';
+                        }, 1000);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to save grade:', error);
+            }
+        }
+
+        // Track inventory value changes
+        (function () {
+            const currentValueText = '{{ total_value }}';
+            const currentValue = parseInt(currentValueText.replace(/,/g, ''));
+
+            if (!isNaN(currentValue)) {
+                const lastValue = localStorage.getItem('lastInventoryValue');
+                const lastDate = localStorage.getItem('lastInventoryDate');
+                const today = new Date().toDateString();
+
+                const indicator = document.getElementById('value-change-indicator');
+
+                if (lastValue && lastDate !== today) {
+                    const prev = parseInt(lastValue);
+                    const change = currentValue - prev;
+                    const percentChange = ((change / prev) * 100).toFixed(1);
+
+                    let arrow = '';
+                    let color = '';
+
+                    if (change > 0) {
+                        arrow = '↑';
+                        color = 'text-green-400';
+                    } else if (change < 0) {
+                        arrow = '↓';
+                        color = 'text-red-400';
+                    } else {
+                        arrow = '→';
+                        color = 'text-white/40';
+                    }
+
+                    indicator.innerHTML = `<span class="${color}">${arrow} ${percentChange}% vs Last Snapshot</span>`;
+                    indicator.classList.remove('opacity-0');
+                    indicator.classList.add('opacity-100');
+                }
+
+                // Update snapshot
+                localStorage.setItem('lastInventoryValue', currentValue);
+                localStorage.setItem('lastInventoryDate', today);
+            }
+        })();
+    </script>
+</body>
+
+</html>

@@ -71,6 +71,23 @@ class ShopifyClient:
             elif tag_lower.startswith("number:"):
                 card_number = tag.split(":")[1].strip()
 
+        # DEBUG: Log the first variant to see what Shopify is sending
+        if variants:
+            v0 = variants[0]["node"]
+            print(f"[DEBUG] Product: {node['title']} | Variant 0: ID={v0.get('id')} | Avail={v0.get('availableForSale')} | Qty={v0.get('quantityAvailable')}")
+
+        # Calculate total inventory from all variants
+        total_inventory = 0
+        for edge in variants:
+            v_node = edge.get("node", {})
+            qty = v_node.get("quantityAvailable")
+            # If any variant is tracked (not None), we add it. 
+            # If it's None, it usually means "untracked" (unlimited).
+            # For this dashboard, let's treat None as 0 for summing, 
+            # or we could flag it. Let's stick to 0 for now as per previous fix.
+            if qty is not None:
+                total_inventory += qty
+
         return {
             "id": node["id"],
             "safe_id": node["id"].split("/")[-1],
@@ -83,7 +100,8 @@ class ShopifyClient:
             "badge": rarity.upper(),
             "badge_color": "bg-primary" if rarity == "Common" else "bg-green-500",
             "card_number": card_number,
-            "card_number": card_number,
+            "totalInventory": total_inventory,
+            "createdAt": node.get("createdAt"),
             "status": "Sync" if variant.get("availableForSale") else "Sold Out",
             "images": [img["node"]["url"] for img in node.get("images", {}).get("edges", [])] if node.get("images", {}).get("edges") else ([node.get("featuredImage", {}).get("url")] if node.get("featuredImage") else ["https://images.pokemontcg.io/bg.jpg"])
         }
@@ -111,6 +129,7 @@ class ShopifyClient:
                 title
                 tags
                 handle
+                createdAt
                 featuredImage {
                   url
                 }
@@ -121,11 +140,12 @@ class ShopifyClient:
                     }
                   }
                 }
-                variants(first: 1) {
+                variants(first: 10) {
                   edges {
                     node {
                       id
                       availableForSale
+                      quantityAvailable
                       price {
                         amount
                         currencyCode
@@ -144,15 +164,16 @@ class ShopifyClient:
             products = [self._map_product(edge["node"]) for edge in data["products"]["edges"]]
             
             # Fallback/Development: Include mock products if Shopify is empty or for local testing visibility
-            if not products and not query and not rarity:
-                from app.utils.mock_data import MOCK_PRODUCTS
-                products = MOCK_PRODUCTS + products
-                print(f"Shopify empty, injected {len(MOCK_PRODUCTS)} mock products for visibility")
+            # if not products and not query and not rarity:
+            #     from app.utils.mock_data import MOCK_PRODUCTS
+            #     products = MOCK_PRODUCTS + products
+            #     print(f"Shopify empty, injected {len(MOCK_PRODUCTS)} mock products for visibility")
             
             print(f"Successfully fetched {len(products)} products")
         except Exception as e:
-            print(f"Error fetching products from Shopify: {e}")
-            raise
+            print(f"Error fetching products from Shopify: {e}. Falling back to mock data.")
+            from app.utils.mock_data import MOCK_PRODUCTS
+            products = MOCK_PRODUCTS
             
         # Post-fetch refining (ensures perfect consistency across Shopify & Mock)
         if query:

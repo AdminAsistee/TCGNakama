@@ -147,6 +147,9 @@
     <footer class="mt-16 pb-24 px-8 text-center">
         <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2024 TCG Nakama</p>
         <p class="text-[9px] text-gray-700 mt-2 uppercase tracking-widest">Premium Collector Marketplace</p>
+        <a href="/admin"
+            class="inline-block mt-6 text-[10px] text-gray-500 hover:text-white uppercase tracking-widest px-3 py-1.5 border border-gray-700 rounded hover:border-primary hover:bg-primary/10 transition-all">🔐
+            Merchant Login</a>
     </footer>
 
 </main>
@@ -236,6 +239,19 @@
     document.body.addEventListener('htmx:afterOnLoad', (evt) => {
         if (evt.detail.target.id === 'cart-drawer-container') {
             console.log("DEBUG: Cart Drawer content loaded via HTMX");
+        }
+        // Track search queries for analytics
+        if (evt.detail.target.id === 'product-grid') {
+            const searchInput = document.getElementById('search-input');
+            const query = searchInput ? searchInput.value.trim() : '';
+            if (query.length >= 2) {
+                const productCount = document.querySelectorAll('#product-grid > div').length;
+                fetch('/api/track-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, results_count: productCount })
+                }).catch(() => { }); // Silently ignore errors
+            }
         }
     });
 
