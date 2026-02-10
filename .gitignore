@@ -158,3 +158,4 @@ cookies.txt
 test_cookies.txt
 index_dump.html
 health_check.py
+app/data/*.db
