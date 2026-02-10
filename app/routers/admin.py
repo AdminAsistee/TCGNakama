@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.dependencies import get_shopify_client, ShopifyClient
 from app.routers.oauth import get_admin_token
 from app import cost_db
+from app.database import get_db
+from app.models import Banner
+from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from collections import Counter
@@ -11,6 +14,9 @@ from itertools import combinations
 import secrets
 import httpx
 import os
+from pathlib import Path
+from PIL import Image
+import hashlib
 
 
 # Session secret for signing cookies
@@ -118,7 +124,6 @@ def verify_session(request: Request) -> str:
     
     # For simplicity, we'll validate by checking if it matches our pattern
     # and verify it was signed with our secret
-    import hashlib
     stored_email = os.getenv("ADMIN_EMAIL", "admin@tcgnakama.com")
     expected_hash = hashlib.sha256(f"{stored_email}{SESSION_SECRET}".encode()).hexdigest()[:32]
     
@@ -135,7 +140,6 @@ async def get_admin_session(request: Request) -> str:
         raise HTTPException(status_code=302, headers={"Location": "/admin/login"})
     
     stored_email = os.getenv("ADMIN_EMAIL", "admin@tcgnakama.com")
-    import hashlib
     expected_hash = hashlib.sha256(f"{stored_email}{SESSION_SECRET}".encode()).hexdigest()[:32]
     
     if session_token != expected_hash:
@@ -152,6 +156,25 @@ class CostUpdate(BaseModel):
 class GradeUpdate(BaseModel):
     product_id: str
     grade: str
+
+
+class BannerCreate(BaseModel):
+    title: str
+    subtitle: str
+    cta_label: str
+    cta_link: str
+    gradient: str
+    is_active: bool = True
+
+
+class BannerUpdate(BaseModel):
+    title: str | None = None
+    subtitle: str | None = None
+    cta_label: str | None = None
+    cta_link: str | None = None
+    gradient: str | None = None
+    is_active: bool | None = None
+    display_order: int | None = None
 
 
 # Login page
@@ -169,7 +192,6 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     
     if email == correct_email and password == correct_password:
         # Create session token
-        import hashlib
         session_token = hashlib.sha256(f"{email}{SESSION_SECRET}".encode()).hexdigest()[:32]
         
         response = RedirectResponse(url="/admin", status_code=303)
@@ -186,16 +208,6 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
             "request": request,
             "error": "Invalid email or password"
         })
-
-
-class CostUpdate(BaseModel):
-    product_id: str
-    buy_price: float
-
-
-class GradeUpdate(BaseModel):
-    product_id: str
-    grade: str
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -391,3 +403,251 @@ async def logout():
     response.delete_cookie(key="admin_session")
     return response
 
+
+# ============= BANNER MANAGEMENT ENDPOINTS =============
+
+@router.get("/settings", response_class=HTMLResponse)
+async def admin_settings(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Admin settings page with banner management."""
+    banners_query = db.query(Banner).order_by(Banner.display_order).all()
+    
+    # Convert SQLAlchemy models to dictionaries for JSON serialization in template
+    banners = []
+    for banner in banners_query:
+        banners.append({
+            'id': banner.id,
+            'title': banner.title,
+            'subtitle': banner.subtitle,
+            'cta_label': banner.cta_label,
+            'cta_link': banner.cta_link,
+            'gradient': banner.gradient,
+            'image_path': banner.image_path,
+            'is_active': banner.is_active,
+            'display_order': banner.display_order
+        })
+    
+    # Available gradient options for dropdown
+    gradient_options = [
+        "from-red-900 via-orange-900 to-amber-900",
+        "from-violet-900 via-purple-900 to-indigo-900",
+        "from-sky-900 via-cyan-900 to-teal-900",
+        "from-emerald-900 via-green-900 to-lime-900",
+        "from-pink-900 via-rose-900 to-red-900",
+        "from-yellow-900 via-amber-900 to-orange-900",
+        "from-blue-900 via-indigo-900 to-purple-900",
+    ]
+    
+    return templates.TemplateResponse("admin/settings.html", {
+        "request": request,
+        "banners": banners,
+        "gradient_options": gradient_options
+    })
+
+
+@router.post("/banners/upload")
+async def upload_banner_image(
+    file: UploadFile = File(...),
+    admin: str = Depends(get_admin_session)
+):
+    """Upload a banner image."""
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        return JSONResponse(
+            {"success": False, "error": "Invalid file type. Only JPEG, PNG, and WebP are allowed."},
+            status_code=400
+        )
+    
+    try:
+        # Create banners directory if it doesn't exist
+        banner_dir = Path("app/static/banners")
+        banner_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = int(datetime.now().timestamp())
+        file_ext = Path(file.filename).suffix
+        filename = f"banner_{timestamp}{file_ext}"
+        filepath = banner_dir / filename
+        
+        # Save uploaded file
+        contents = await file.read()
+        
+        # Open with Pillow to validate and optionally resize
+        img = Image.open(io.BytesIO(contents))
+        
+        # Resize if too large (recommended: 1920x600px)
+        max_width = 1920
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Save optimized image
+        img.save(filepath, quality=85, optimize=True)
+        
+        # Return relative path
+        relative_path = f"/static/banners/{filename}"
+        
+        return JSONResponse({
+            "success": True,
+            "image_path": relative_path,
+            "filename": filename
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+@router.post("/banners")
+async def create_banner(
+    title: str = Form(...),
+    subtitle: str = Form(...),
+    cta_label: str = Form(...),
+    cta_link: str = Form(...),
+    gradient: str = Form(...),
+    image_path: str | None = Form(None),
+    is_active: bool = Form(True),
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Create a new banner."""
+    try:
+        # Get max display_order
+        max_order = db.query(Banner).count()
+        
+        banner = Banner(
+            title=title,
+            subtitle=subtitle,
+            cta_label=cta_label,
+            cta_link=cta_link,
+            gradient=gradient,
+            image_path=image_path if image_path else None,
+            display_order=max_order + 1,
+            is_active=is_active
+        )
+        
+        db.add(banner)
+        db.commit()
+        
+        return RedirectResponse(url="/admin/settings", status_code=303)
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+@router.post("/banners/{banner_id}")
+async def update_banner(
+    banner_id: int,
+    title: str = Form(None),
+    subtitle: str = Form(None),
+    cta_label: str = Form(None),
+    cta_link: str = Form(None),
+    gradient: str = Form(None),
+    image_path: str = Form(None),
+    is_active: bool = Form(None),
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Update an existing banner."""
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    
+    if title is not None:
+        banner.title = title
+    if subtitle is not None:
+        banner.subtitle = subtitle
+    if cta_label is not None:
+        banner.cta_label = cta_label
+    if cta_link is not None:
+        banner.cta_link = cta_link
+    if gradient is not None:
+        banner.gradient = gradient
+    if image_path is not None:
+        banner.image_path = image_path if image_path else None
+    if is_active is not None:
+        banner.is_active = is_active
+    
+    banner.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return RedirectResponse(url="/admin/settings", status_code=303)
+
+
+@router.post("/banners/{banner_id}/toggle")
+async def toggle_banner(
+    banner_id: int,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Toggle banner active status."""
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    
+    banner.is_active = not banner.is_active
+    banner.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return JSONResponse({"success": True, "is_active": banner.is_active})
+
+
+@router.delete("/banners/{banner_id}")
+async def delete_banner(
+    banner_id: int,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Delete a banner."""
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    
+    # Delete image file if exists
+    if banner.image_path:
+        try:
+            file_path = Path(f"app{banner.image_path}")
+            if file_path.exists():
+                file_path.unlink()
+        except Exception as e:
+            print(f"Error deleting image file: {e}")
+    
+    db.delete(banner)
+    db.commit()
+    
+    return JSONResponse({"success": True})
+
+
+@router.post("/banners/reorder")
+async def reorder_banners(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Reorder banners based on new order array."""
+    data = await request.json()
+    banner_ids = data.get("banner_ids", [])
+    
+    for index, banner_id in enumerate(banner_ids):
+        banner = db.query(Banner).filter(Banner.id == banner_id).first()
+        if banner:
+            banner.display_order = index + 1
+            banner.updated_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return JSONResponse({"success": True})
+
+
+# Add missing import for io
+import io

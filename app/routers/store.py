@@ -2,26 +2,74 @@ from fastapi import APIRouter, Request, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.dependencies import get_shopify_client, ShopifyClient
+from app.database import get_db
+from app.models import Banner
+from sqlalchemy.orm import Session
 from urllib.parse import quote, unquote
 from typing import Optional
+from datetime import datetime, timezone
+import random
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+
+
+
+def _calc_listed_ago(product: dict) -> str:
+    """Calculate human-readable time since product was listed."""
+    created = product.get('createdAt', '')
+    if not created:
+        return "Recently"
+    try:
+        created_dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+        delta = datetime.now(timezone.utc) - created_dt
+        minutes = int(delta.total_seconds() / 60)
+        if minutes < 1:
+            return "Just now"
+        elif minutes < 60:
+            return f"{minutes}m ago"
+        elif minutes < 1440:
+            return f"{minutes // 60}h ago"
+        else:
+            return f"{minutes // 1440}d ago"
+    except Exception:
+        return "Recently"
+
+
 @router.get("/", response_class=HTMLResponse)
 async def read_root(
     request: Request,
-    client: ShopifyClient = Depends(get_shopify_client)
+    client: ShopifyClient = Depends(get_shopify_client),
+    db: Session = Depends(get_db)
 ):
     from app.dependencies import SHOPIFY_STORE_URL
     products = await client.get_products()
     collections = await client.get_collections()
     
-    # DEBUG: Check for duplicate variant IDs
-    v_ids = [p.get('variant_id') for p in products]
-    print(f"DEBUG: read_root | Products Count: {len(products)} | Unique Variant IDs: {len(set(v_ids))}")
-    if len(v_ids) != len(set(v_ids)):
-        print(f"WARNING: DUPLICATE VARIANT IDS DETECTED: {v_ids}")
+    # Add time-since-listed to each product
+    for p in products:
+        p['listed_ago'] = _calc_listed_ago(p)
+    
+    # Fresh Pulls: newest 6 products (sorted by createdAt desc)
+    fresh_pulls = sorted(products, key=lambda x: x.get('createdAt', ''), reverse=True)[:6]
+    
+    # What's Hot: top 6 highest priced products with growth indicators
+    hot_picks = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:6]
+    for hp in hot_picks:
+        hp['growth'] = round(random.uniform(1.5, 5.5), 1)
+        hp['hype_pct'] = random.randint(60, 95)
+    
+    # Featured collection for hero banner
+    featured_collection = collections[0] if collections else None
+    
+    # Fetch active banners from database
+    banners = db.query(Banner).filter(
+        Banner.is_active == True
+    ).order_by(Banner.display_order).all()
+    
+    # Convert to dict format for template
+    banner_dicts = [b.to_dict() for b in banners]
 
     cart_id_raw = request.cookies.get("cart_id")
     cart_id = unquote(cart_id_raw) if cart_id_raw else None
@@ -37,6 +85,10 @@ async def read_root(
     return templates.TemplateResponse("index.html", {
         "request": request, 
         "products": products,
+        "fresh_pulls": fresh_pulls,
+        "hot_picks": hot_picks,
+        "banners": banner_dicts,
+        "featured_collection": featured_collection,
         "collections": collections,
         "shopify_url": SHOPIFY_STORE_URL,
         "cart_count": cart_count,

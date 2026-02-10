@@ -24,6 +24,58 @@ async def poll_shopify_vault():
 
 @app.on_event("startup")
 async def startup_event():
+    # Initialize database
+    from app.database import init_db, SessionLocal
+    from app.models import Banner
+    
+    init_db()
+    print("[STARTUP] Database tables initialized")
+    
+    # Seed default banners if none exist
+    db = SessionLocal()
+    try:
+        banner_count = db.query(Banner).count()
+        if banner_count == 0:
+            print("[STARTUP] Seeding default banners...")
+            default_banners = [
+                Banner(
+                    title="One Piece: Four Emperors",
+                    subtitle="The ultimate pirate cards have arrived",
+                    cta_label="Shop One Piece",
+                    cta_link="/",
+                    gradient="from-red-900 via-orange-900 to-amber-900",
+                    image_path=None,
+                    display_order=1,
+                    is_active=True
+                ),
+                Banner(
+                    title="Pokémon Scarlet & Violet",
+                    subtitle="Explore the latest expansion — chase the illustrators",
+                    cta_label="Shop Pokémon",
+                    cta_link="/",
+                    gradient="from-violet-900 via-purple-900 to-indigo-900",
+                    image_path=None,
+                    display_order=2,
+                    is_active=True
+                ),
+                Banner(
+                    title="One Piece: Romance Dawn",
+                    subtitle="Where the legend began — Romance Dawn collection",
+                    cta_label="Shop Romance Dawn",
+                    cta_link="/",
+                    gradient="from-sky-900 via-cyan-900 to-teal-900",
+                    image_path=None,
+                    display_order=3,
+                    is_active=True
+                ),
+            ]
+            db.add_all(default_banners)
+            db.commit()
+            print(f"[STARTUP] Seeded {len(default_banners)} default banners")
+    finally:
+        db.close()
+    
+    # Start background Shopify sync
     asyncio.create_task(poll_shopify_vault())
     
     # Email report scheduler (DISABLED - enable when ready)
