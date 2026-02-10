@@ -1,200 +1,131 @@
 """
 Local Cost Database
 Stores buy prices and grades for products. Falls back to Shopify cost if available in future.
+Supports SQLite (local) and PostgreSQL (production).
 """
 
-import sqlite3
 import os
+from datetime import datetime
 from pathlib import Path
+from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, Text, select
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-# Database path
-DB_DIR = Path(__file__).parent / "data"
-DB_PATH = DB_DIR / "costs.db"
+# Database configuration
+db_url = os.getenv("DATABASE_URL", "")
+if not db_url:
+    # Default local path
+    db_dir = Path(__file__).parent / "data"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    db_url = f"sqlite:///{db_dir}/costs.db"
 
+# Fix for Render/DigitalOcean PostgreSQL URLs which might use "postgres://" instead of "postgresql://"
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(db_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Models
+class ProductCost(Base):
+    __tablename__ = "product_costs"
+    product_id = Column(String, primary_key=True)
+    buy_price = Column(Float, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ProductGrade(Base):
+    __tablename__ = "product_grades"
+    product_id = Column(String, primary_key=True)
+    grade = Column(String, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SearchLog(Base):
+    __tablename__ = "search_logs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    query = Column(String, nullable=False)
+    results_count = Column(Integer, default=0)
+    searched_at = Column(DateTime, default=datetime.utcnow)
 
 def init_db():
     """Initialize the database and create tables if they don't exist."""
-    DB_DIR.mkdir(parents=True, exist_ok=True)
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS product_costs (
-            product_id TEXT PRIMARY KEY,
-            buy_price REAL NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS product_grades (
-            product_id TEXT PRIMARY KEY,
-            grade TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS search_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            query TEXT NOT NULL,
-            results_count INTEGER DEFAULT 0,
-            searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    conn.commit()
-    conn.close()
-
+    Base.metadata.create_all(bind=engine)
 
 def get_cost(product_id: str) -> float | None:
     """Get the buy price for a product."""
-    if not DB_PATH.exists():
-        return None
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT buy_price FROM product_costs WHERE product_id = ?",
-        (product_id,)
-    )
-    result = cursor.fetchone()
-    conn.close()
-    
-    return result[0] if result else None
-
+    with SessionLocal() as session:
+        cost = session.query(ProductCost).filter(ProductCost.product_id == product_id).first()
+        return cost.buy_price if cost else None
 
 def set_cost(product_id: str, buy_price: float) -> bool:
     """Set or update the buy price for a product."""
-    init_db()  # Ensure DB exists
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        INSERT INTO product_costs (product_id, buy_price, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(product_id) DO UPDATE SET
-            buy_price = excluded.buy_price,
-            updated_at = CURRENT_TIMESTAMP
-    """, (product_id, buy_price))
-    
-    conn.commit()
-    conn.close()
+    with SessionLocal() as session:
+        # Use upsert logic
+        cost = session.query(ProductCost).filter(ProductCost.product_id == product_id).first()
+        if cost:
+            cost.buy_price = buy_price
+        else:
+            cost = ProductCost(product_id=product_id, buy_price=buy_price)
+            session.add(cost)
+        session.commit()
     return True
-
 
 def get_all_costs() -> dict:
     """Get all product costs as a dictionary."""
-    if not DB_PATH.exists():
-        return {}
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT product_id, buy_price FROM product_costs")
-    results = cursor.fetchall()
-    conn.close()
-    
-    return {row[0]: row[1] for row in results}
+    with SessionLocal() as session:
+        costs = session.query(ProductCost).all()
+        return {c.product_id: c.buy_price for c in costs}
 
-
-# Grade functions
 def get_grade(product_id: str) -> str | None:
     """Get the grade for a product."""
-    if not DB_PATH.exists():
-        return None
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT grade FROM product_grades WHERE product_id = ?",
-        (product_id,)
-    )
-    result = cursor.fetchone()
-    conn.close()
-    
-    return result[0] if result else None
-
+    with SessionLocal() as session:
+        grade = session.query(ProductGrade).filter(ProductGrade.product_id == product_id).first()
+        return grade.grade if grade else None
 
 def set_grade(product_id: str, grade: str) -> bool:
     """Set or update the grade for a product."""
-    init_db()  # Ensure DB exists
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        INSERT INTO product_grades (product_id, grade, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(product_id) DO UPDATE SET
-            grade = excluded.grade,
-            updated_at = CURRENT_TIMESTAMP
-    """, (product_id, grade))
-    
-    conn.commit()
-    conn.close()
+    with SessionLocal() as session:
+        item = session.query(ProductGrade).filter(ProductGrade.product_id == product_id).first()
+        if item:
+            item.grade = grade
+        else:
+            item = ProductGrade(product_id=product_id, grade=grade)
+            session.add(item)
+        session.commit()
     return True
-
 
 def get_all_grades() -> dict:
     """Get all product grades as a dictionary."""
-    if not DB_PATH.exists():
-        return {}
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT product_id, grade FROM product_grades")
-    results = cursor.fetchall()
-    conn.close()
-    
-    return {row[0]: row[1] for row in results}
+    with SessionLocal() as session:
+        grades = session.query(ProductGrade).all()
+        return {g.product_id: g.grade for g in grades}
 
-
-# Search logging functions
 def log_search(query: str, results_count: int = 0) -> bool:
     """Log a search query to the database."""
-    init_db()
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        INSERT INTO search_logs (query, results_count)
-        VALUES (?, ?)
-    """, (query.lower().strip(), results_count))
-    
-    conn.commit()
-    conn.close()
+    with SessionLocal() as session:
+        log = SearchLog(query=query.lower().strip(), results_count=results_count)
+        session.add(log)
+        session.commit()
     return True
-
 
 def get_trending_searches(days: int = 30, limit: int = 10) -> list:
     """Get the most popular search queries from the last N days."""
-    if not DB_PATH.exists():
-        return []
+    from sqlalchemy import func
+    from datetime import timedelta
     
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    threshold = datetime.utcnow() - timedelta(days=days)
     
-    cursor.execute("""
-        SELECT query, COUNT(*) as count
-        FROM search_logs
-        WHERE searched_at >= datetime('now', ?)
-        GROUP BY query
-        ORDER BY count DESC
-        LIMIT ?
-    """, (f'-{days} days', limit))
-    
-    results = cursor.fetchall()
-    conn.close()
-    
-    return [{"query": row[0], "count": row[1]} for row in results]
-
+    with SessionLocal() as session:
+        results = session.query(
+            SearchLog.query, 
+            func.count(SearchLog.id).label('count')
+        ).filter(SearchLog.searched_at >= threshold)\
+         .group_by(SearchLog.query)\
+         .order_by(func.count(SearchLog.id).desc())\
+         .limit(limit)\
+         .all()
+        
+        return [{"query": row[0], "count": row[1]} for row in results]
 
 # Initialize DB on module load
 init_db()
