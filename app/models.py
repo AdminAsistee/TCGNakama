@@ -31,8 +31,11 @@ class Banner(Base):
             if self.image_path.startswith(('http://', 'https://')):
                 # External URL, use as-is
                 image_url = self.image_path
+            elif self.image_path.startswith('/static/'):
+                # Already has /static/ prefix, use as-is
+                image_url = self.image_path
             else:
-                # Local file, prefix with /static/
+                # Local file without /static/, add prefix
                 image_url = f"/static/{self.image_path.lstrip('/')}"
         
         return {
