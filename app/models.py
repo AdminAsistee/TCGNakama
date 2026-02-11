@@ -25,13 +25,23 @@ class Banner(Base):
     
     def to_dict(self):
         """Convert banner to dictionary for template rendering."""
+        # Handle image path - if it's a local file, prefix with /static/
+        image_url = None
+        if self.image_path:
+            if self.image_path.startswith(('http://', 'https://')):
+                # External URL, use as-is
+                image_url = self.image_path
+            else:
+                # Local file, prefix with /static/
+                image_url = f"/static/{self.image_path.lstrip('/')}"
+        
         return {
             "id": self.id,
             "title": self.title,
             "subtitle": self.subtitle,
             "cta_label": self.cta_label,
             "cta_link": self.cta_link,
-            "image": self.image_path,
+            "image": image_url,
             "gradient": self.gradient,
             "display_order": self.display_order,
             "is_active": self.is_active,
