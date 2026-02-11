@@ -132,8 +132,13 @@
                 <span class="text-[9px] font-black uppercase tracking-[0.1em] text-danger-red">Disconnected</span>
             </div>
             {% endif %}
+            <a href="/" target="_blank"
+                class="flex items-center gap-1 text-primary text-[10px] uppercase tracking-wider font-bold border border-primary/30 px-2 py-1 rounded hover:bg-primary/10 transition-colors ml-auto">
+                <span class="material-symbols-outlined text-sm">storefront</span>
+                Marketplace
+            </a>
             <a href="/admin/logout"
-                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors ml-auto">
+                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
                 <span class="material-symbols-outlined text-sm">logout</span>
                 Logout
             </a>
@@ -334,6 +339,34 @@
                 </a>
                 {% endif %}
             </div>
+
+            <!-- Search Bar -->
+            <div class="mb-4">
+                <form method="GET" action="/admin" class="relative">
+                    <div class="relative">
+                        <span
+                            class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
+                        <input type="text" name="query" value="{{ current_query or '' }}"
+                            placeholder="Search cards by name..."
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl pl-12 pr-28 py-3 text-sm text-white placeholder-white/40 focus:ring-2 focus:ring-neon-blue focus:border-neon-blue/50 outline-none transition-all" />
+                        {% if current_query %}
+                        <a href="/admin"
+                            class="absolute right-24 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-lg">close</span>
+                        </a>
+                        {% endif %}
+                        <button type="submit"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-neon-blue/20 hover:bg-neon-blue/30 text-neon-blue border border-neon-blue/40 px-4 py-1.5 rounded-lg text-xs uppercase tracking-wider font-semibold transition-colors">
+                            Search
+                        </button>
+                    </div>
+                    <!-- Preserve rarity filter if present -->
+                    {% if current_rarity %}
+                    <input type="hidden" name="rarity" value="{{ current_rarity }}">
+                    {% endif %}
+                </form>
+            </div>
+
             <div class="flex items-center justify-end mb-3 px-1">
                 <div class="flex gap-2">
                     <button onclick="toggleColumn('stock')" id="toggle-stock"
@@ -380,7 +413,7 @@
                             <th class="p-3 font-medium text-right" data-col="sell">Sell Price</th>
                             <th class="p-3 font-medium text-right" data-col="gl">G/L (%)</th>
                             <th class="p-3 font-medium text-center" data-col="grade">Grade</th>
-                            <th class="p-3 font-medium text-right">Edit in Shopify</th>
+                            <th class="p-3 font-medium text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="text-xs font-mono text-white/80">
@@ -455,10 +488,21 @@
                                 </select>
                             </td>
                             <td class="p-3 text-right">
-                                <a href="https://admin.shopify.com/store/tcg-nakama-2/products" target="_blank"
-                                    class="text-[10px] uppercase tracking-wider text-neon-gold border border-neon-gold/20 px-2 py-1 rounded hover:bg-neon-gold/10 transition-colors">
-                                    Edit
-                                </a>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="/admin/edit-card/{{ product.id }}"
+                                        class="text-[10px] uppercase tracking-wider text-neon-gold border border-neon-gold/20 px-2 py-1 rounded hover:bg-neon-gold/10 transition-colors">
+                                        Edit
+                                    </a>
+                                    <form method="POST" action="/admin/delete-card"
+                                        onsubmit="return confirm('Are you sure you want to delete this card? This action cannot be undone.');"
+                                        class="inline">
+                                        <input type="hidden" name="product_id" value="{{ product.id }}">
+                                        <button type="submit"
+                                            class="text-[10px] uppercase tracking-wider text-danger-red border border-danger-red/20 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         {% else %}
@@ -470,6 +514,62 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Controls -->
+            {% if total_pages > 1 %}
+            <div class="glass-panel rounded-xl p-4 mt-4 flex items-center justify-between">
+                <div class="text-xs text-white/60">
+                    Showing page {{ current_page }} of {{ total_pages }} ({{ total_products }} total cards)
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Previous Button -->
+                    {% if current_page > 1 %}
+                    <a href="?page={{ current_page - 1 }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
+                        class="text-[10px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded hover:bg-neon-blue/10 transition-colors">
+                        ← Prev
+                    </a>
+                    {% else %}
+                    <button disabled
+                        class="text-[10px] uppercase tracking-wider text-white/20 border border-white/10 px-3 py-1.5 rounded cursor-not-allowed">
+                        ← Prev
+                    </button>
+                    {% endif %}
+
+                    <!-- Page Numbers -->
+                    <div class="flex items-center gap-1">
+                        {% for page_num in range(1, total_pages + 1) %}
+                        {% if page_num == current_page %}
+                        <span
+                            class="text-[10px] font-bold text-neon-gold border border-neon-gold/40 bg-neon-gold/10 px-2.5 py-1 rounded">
+                            {{ page_num }}
+                        </span>
+                        {% elif page_num <= 3 or page_num> total_pages - 3 or (page_num >= current_page - 1 and page_num
+                            <= current_page + 1) %} <a
+                                href="?page={{ page_num }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
+                                class="text-[10px] text-white/60 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1 rounded transition-colors">
+                                {{ page_num }}
+                                </a>
+                                {% elif page_num == 4 or page_num == total_pages - 3 %}
+                                <span class="text-white/30 px-1">...</span>
+                                {% endif %}
+                                {% endfor %}
+                    </div>
+
+                    <!-- Next Button -->
+                    {% if current_page < total_pages %} <a
+                        href="?page={{ current_page + 1 }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
+                        class="text-[10px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded hover:bg-neon-blue/10 transition-colors">
+                        Next →
+                        </a>
+                        {% else %}
+                        <button disabled
+                            class="text-[10px] uppercase tracking-wider text-white/20 border border-white/10 px-3 py-1.5 rounded cursor-not-allowed">
+                            Next →
+                        </button>
+                        {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </section>
     </main>
     <!-- Bottom Nav -->

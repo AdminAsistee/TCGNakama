@@ -42,7 +42,7 @@
                     class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
                     placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/search"
                     hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-indicator="#search-loading"
-                    hx-include="#rarity-input, #price-slider, #collection-input" hx-on:input="clearFilterVisuals()" />
+                    hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
                 <div class="flex items-center pr-4 gap-2">
                     <div id="search-loading" class="htmx-indicator">
                         <span class="material-symbols-outlined text-primary text-sm animate-spin">sync</span>
@@ -212,19 +212,16 @@
         <!-- Filter Stickies -->
         <div
             class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
-            <div class="flex gap-3 overflow-x-auto hide-scrollbar items-center">
+            <form id="filter-form" hx-get="/filter" hx-target="#product-grid" hx-indicator="#grid-loading"
+                hx-trigger="change" hx-include="#search-input"
+                class="flex gap-3 overflow-x-auto hide-scrollbar items-center">
                 <!-- Hidden Inputs for Additive Filtering -->
-                <input type="hidden" name="rarity" id="rarity-input" value="" hx-get="/filter" hx-target="#product-grid"
-                    hx-swap="innerHTML" hx-trigger="change"
-                    hx-include="#search-input, #collection-input, #price-slider" />
-
-                <input type="hidden" name="collection" id="collection-input" value="" hx-get="/filter"
-                    hx-target="#product-grid" hx-swap="innerHTML" hx-trigger="change"
-                    hx-include="#search-input, #rarity-input, #price-slider" />
-
-                <input type="hidden" name="max_price" id="price-slider" value="" hx-get="/filter"
-                    hx-target="#product-grid" hx-swap="innerHTML" hx-trigger="change"
-                    hx-include="#search-input, #rarity-input, #collection-input" />
+                <input type="hidden" name="rarity" id="rarity-input" value="" />
+                <input type="hidden" name="collection" id="collection-input" value="" />
+                <input type="hidden" name="condition" id="condition-input" value="" hx-get="/products"
+                    hx-target="#product-grid" hx-swap="outerHTML"
+                    hx-include="[name='rarity'], [name='collection'], [name='condition'], [name='min_price'], [name='max_price']" />
+                <input type="hidden" name="max_price" id="price-slider" value="" />
 
                 <!-- Price Filter Component -->
                 {% include "partials/price_filter.html" %}
@@ -238,13 +235,20 @@
 
                 <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
 
+                <!-- Condition Filters -->
+                <div id="condition-filters-container">
+                    {% include "partials/condition_filters.html" %}
+                </div>
+
+                <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
+
                 <!-- Reset Button -->
                 <div class="flex flex-col items-center gap-1 cursor-pointer hover:opacity-75 transition-opacity"
                     onclick="resetFilters()">
                     <span class="material-symbols-outlined text-gray-400 text-sm">restart_alt</span>
                     <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Reset</p>
                 </div>
-            </div>
+            </form>
 
             <!-- Collection Filters -->
             {% set oob = false %}
@@ -252,14 +256,18 @@
         </div>
 
         <div class="py-6">
-            <div class="flex items-center justify-between mb-6 px-1">
-                <h3 class="text-sm font-bold uppercase tracking-[0.25em] text-gray-400">All Cards</h3>
-                <span class="text-[10px] font-black text-gray-600 uppercase tracking-wider">{{ products|length }} in
-                    vault</span>
-            </div>
+
 
             <div id="product-grid"
-                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
+                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8 relative">
+                <!-- Loading Overlay -->
+                <div id="grid-loading"
+                    class="htmx-indicator absolute inset-0 bg-background-dark/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <span class="material-symbols-outlined text-primary text-4xl animate-spin">sync</span>
+                        <p class="text-sm text-gray-400 font-medium">Loading cards...</p>
+                    </div>
+                </div>
                 {% include "partials/product_grid.html" %}
             </div>
         </div>
@@ -375,17 +383,25 @@
     function setActiveFilter(rarity, el) {
         const input = document.getElementById('rarity-input');
         const current = input.value;
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
 
         if (current === rarity) {
             input.value = '';
-            el.classList.remove('ring-2', 'ring-primary', 'bg-primary/10');
+            el.classList.remove(...activeClasses);
+            el.classList.add(...inactiveClasses);
         } else {
-            // Remove ring from all rarity buttons
             document.querySelectorAll('[data-rarity-btn]').forEach(b => {
-                b.classList.remove('ring-2', 'ring-primary', 'bg-primary/10');
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
             });
             input.value = rarity;
-            el.classList.add('ring-2', 'ring-primary', 'bg-primary/10');
+            el.classList.add(...activeClasses);
+            el.classList.remove(...inactiveClasses);
+        }
+
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger(input, 'change');
         }
         input.dispatchEvent(new Event('change'));
     }
@@ -393,44 +409,77 @@
     function setActiveCollection(handle, el) {
         const input = document.getElementById('collection-input');
         const current = input.value;
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
 
         if (current === handle) {
             input.value = '';
-            el.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'text-white');
+            el.classList.remove(...activeClasses);
+            el.classList.add(...inactiveClasses);
         } else {
             document.querySelectorAll('[data-collection-btn]').forEach(b => {
-                b.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'text-white');
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
             });
             input.value = handle;
-            el.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'text-white');
+            el.classList.add(...activeClasses);
+            el.classList.remove(...inactiveClasses);
+        }
+
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger(input, 'change');
         }
         input.dispatchEvent(new Event('change'));
     }
 
     function clearFilterVisuals() {
-        document.querySelectorAll('[data-rarity-btn]').forEach(b => {
-            b.classList.remove('ring-2', 'ring-primary', 'bg-primary/10');
-        });
-        document.querySelectorAll('[data-collection-btn]').forEach(b => {
-            b.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'text-white');
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
+
+        document.querySelectorAll('[data-rarity-btn], [data-collection-btn]').forEach(b => {
+            b.classList.remove(...activeClasses);
+            b.classList.add(...inactiveClasses);
         });
 
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
+        const conditionInput = document.getElementById('condition-input');
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
+        if (conditionInput) conditionInput.value = '';
+    }
+
+    function setConditionFilter(condition, element) {
+        const conditionInput = document.getElementById('condition-input');
+        if (!conditionInput) return;
+
+        // Toggle: if clicking the same condition, clear it
+        if (conditionInput.value === condition) {
+            conditionInput.value = '';
+        } else {
+            conditionInput.value = condition;
+        }
+
+        // Trigger HTMX update
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger(conditionInput, 'change');
+        } else {
+            conditionInput.dispatchEvent(new Event('change'));
+        }
     }
 
     function resetFilters() {
         const searchInput = document.getElementById('search-input');
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
+        const conditionInput = document.getElementById('condition-input');
         const priceSlider = document.getElementById('price-slider');
         const mainPriceSlider = document.getElementById('main-price-slider');
 
         if (searchInput) searchInput.value = '';
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
+        if (conditionInput) conditionInput.value = '';
         if (priceSlider) priceSlider.value = '';
         if (mainPriceSlider) {
             mainPriceSlider.value = 30000;
@@ -440,8 +489,13 @@
 
         clearFilterVisuals();
 
+        // Trigger update
         if (rarityInput) {
-            rarityInput.dispatchEvent(new Event('change'));
+            if (typeof htmx !== 'undefined') {
+                htmx.trigger(rarityInput, 'change');
+            } else {
+                rarityInput.dispatchEvent(new Event('change'));
+            }
         }
     }
 

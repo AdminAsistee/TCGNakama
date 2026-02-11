@@ -222,11 +222,12 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
 
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("", response_class=HTMLResponse)
 async def admin_dashboard(
     request: Request,
-    query: str = None,
-    rarity: str = None,
+    query: Optional[str] = None,
+    rarity: Optional[str] = None,
+    page: int = 1,
     admin: str = Depends(get_admin_session),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
@@ -279,16 +280,34 @@ async def admin_dashboard(
     
     # Check OAuth connection status
     oauth_connected = bool(get_admin_token())
+    
+    # Pagination logic
+    items_per_page = 20
+    total_products = len(products)
+    total_pages = (total_products + items_per_page - 1) // items_per_page  # Ceiling division
+    
+    # Ensure page is within valid range
+    page = max(1, min(page, total_pages if total_pages > 0 else 1))
+    
+    # Calculate start and end indices
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    
+    # Slice products for current page
+    paginated_products = products[start_idx:end_idx]
 
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "total_value": format_yen(total_value),
         "live_count": live_count,
         "cart_value_vip": format_yen(cart_value_vip),
-        "products": products,
+        "products": paginated_products,
         "current_query": query,
         "current_rarity": rarity,
-        "oauth_connected": oauth_connected
+        "oauth_connected": oauth_connected,
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_products": total_products
     })
 
 
@@ -433,6 +452,109 @@ async def add_card_page(
     })
 
 
+@router.get("/add-card/success")
+async def add_card_success(
+    request: Request,
+    admin: str = Depends(get_admin_session)
+):
+    """Display success page after adding a card."""
+    return templates.TemplateResponse("admin/add_card_success.html", {
+        "request": request
+    })
+
+
+@router.get("/edit-card/{product_id:path}", response_class=HTMLResponse)
+async def edit_card_page(
+    request: Request,
+    product_id: str,
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Show the add card form pre-populated with existing product data for editing."""
+    # Fetch product data
+    product = await client.get_product(product_id)
+    
+    if not product:
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": f"Product not found: {product_id}",
+            "categories": []
+        })
+    
+    # Fetch collections for dropdowns
+    admin_token = get_admin_token()
+    categories = []
+    if admin_token:
+        try:
+            categories = await client.get_collections(admin_token)
+        except Exception as e:
+            print(f"Error fetching categories: {e}")
+    
+    if not categories:
+        categories = ["Pokémon", "One Piece", "Magic: TG", "Yu-Gi-Oh!"]
+    
+    # Get vendor from product data
+    vendor = product.get("vendor", "TCG Nakama")
+    
+    # Extract metadata from tags
+    condition = "Booster Pack"  # default
+    rarity = product.get("rarity", "Common")  # default from _map_product
+    set_name = product.get("set", "")  # default from _map_product
+    card_number = product.get("card_number", "")  # default from _map_product
+    
+    # Get collections - already extracted by _map_product
+    product_collections = product.get("collections", [])
+    
+    print(f"[DEBUG] Product tags: {product.get('tags', [])}")
+    try:
+        print(f"[DEBUG] Product vendor: {vendor}".encode('ascii', 'backslashreplace').decode())
+    except:
+        print("[DEBUG] Product vendor: <contains special characters>")
+    print(f"[DEBUG] Product collections from Shopify: {product_collections}")
+    print(f"[DEBUG] Product images raw: {product.get('images', [])}")
+    
+    # Extract values from tags (these override the defaults from _map_product)
+    for tag in product.get("tags", []):
+        if tag.startswith("Condition:"):
+            condition = tag.replace("Condition:", "").strip()
+        elif tag.startswith("Rarity:"):
+            rarity = tag.replace("Rarity:", "").strip()
+        elif tag.startswith("Set:"):
+            set_name = tag.replace("Set:", "").strip()
+        elif tag.startswith("Number:"):
+            card_number = tag.replace("Number:", "").strip()
+    
+    # Extract image URLs - images are already in the correct format from _map_product
+    image_urls = product.get("images", [])
+    
+    # Store extracted values in product dict for template access
+    product["vendor"] = vendor
+    product["condition"] = condition
+    product["rarity"] = rarity
+    product["set"] = set_name
+    product["card_number"] = card_number
+    product["image_urls"] = image_urls
+    
+    # Fetch buy_price from local database
+    from app import cost_db
+    buy_price = cost_db.get_cost(product_id)
+    product["buy_price"] = buy_price
+    
+    try:
+        print(f"[DEBUG] Extracted - Vendor: {vendor}, Condition: {condition}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Collections: {product_collections}, Images: {len(image_urls)}, Buy Price: {buy_price}".encode('ascii', 'backslashreplace').decode())
+    except:
+        print(f"[DEBUG] Extracted - Condition: {condition}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Collections: {product_collections}, Images: {len(image_urls)}, Buy Price: {buy_price}")
+    
+    return templates.TemplateResponse("admin/add_card.html", {
+        "request": request,
+        "edit_mode": True,
+        "product": product,
+        "categories": categories,
+        "vendor": vendor,
+        "product_collections": product_collections
+    })
+
+
 @router.post("/add-card")
 async def add_card(
     request: Request,
@@ -440,7 +562,8 @@ async def add_card(
     client: ShopifyClient = Depends(get_shopify_client),
     name: str = Form(...),
     price: float = Form(...),
-    category: str = Form(...),
+    collections: List[str] = Form([]),
+    vendor: str = Form("TCG Nakama"),
     set_name: str = Form(...),
     card_number: str = Form(...),
     rarity: str = Form(...),
@@ -497,15 +620,19 @@ async def add_card(
         f"Condition: {condition}"
     ]
     
+    # Convert newlines to HTML breaks for description
+    description_html = description.replace('\n', '<br>').replace('\r', '') if description else ""
+    
     product_data = {
         "title": name,
-        "description": description,
+        "description": description_html,
         "price": price,
-        "vendor": "TCG Nakama",
-        "product_type": category,
+        "vendor": vendor,
+        "product_type": collections[0] if collections else "Trading Card",
         "tags": tags,
         "quantity": stock,
-        "images": all_images
+        "images": all_images,
+        "collections": collections
     }
 
     try:
@@ -517,13 +644,205 @@ async def add_card(
         if buy_price is not None:
             cost_db.set_cost(shopify_product_id, buy_price)
             
-        return RedirectResponse(url="/admin?success=Card added successfully", status_code=303)
+        return RedirectResponse(url="/admin/add-card/success", status_code=303)
     except Exception as e:
         print(f"[ERROR] Failed to add card: {str(e).encode('ascii', 'backslashreplace').decode()}")
         return templates.TemplateResponse("admin/add_card.html", {
             "request": request,
             "error": f"Failed to add card: {str(e)}"
         })
+
+
+@router.post("/update-card")
+async def update_card(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client),
+    product_id: str = Form(...),
+    variant_id: str = Form(...),
+    name: str = Form(...),
+    price: float = Form(...),
+    set_name: str = Form(...),
+    rarity: str = Form(...),
+    card_number: str = Form(...),
+    vendor: str = Form(...),
+    condition: str = Form(...),
+    description: str = Form(""),
+    stock: int = Form(1),
+    collections: List[str] = Form([]),
+    image_urls: List[str] = Form([]),
+    image_files: List[UploadFile] = File([]),
+    buy_price: Optional[float] = Form(None)
+):
+    """Process the edit card form and update product in Shopify."""
+    admin_token = get_admin_token()
+    if not admin_token:
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": "Shopify Admin API not connected."
+        })
+    
+    # Separate existing Shopify images from new images
+    # existing_images_to_keep: Shopify CDN URLs that are still in the form (user didn't delete them)
+    # new_images_to_add: New uploaded files or external URLs
+    existing_images_to_keep = []
+    new_images_to_add = []
+    
+    for url in image_urls:
+        url_stripped = url.strip()
+        if url_stripped:
+            if 'cdn.shopify.com' in url_stripped:
+                # This is an existing Shopify image that user wants to keep
+                existing_images_to_keep.append(url_stripped)
+            else:
+                # This is a new external URL
+                new_images_to_add.append(url_stripped)
+    
+    # Process file uploads
+    for file in image_files:
+        if file.filename:
+            try:
+                content = await file.read()
+                if len(content) > 0:
+                    # 1. Create staged upload
+                    target = await client.staged_uploads_create(
+                        admin_token=admin_token,
+                        filename=file.filename,
+                        mime_type=file.content_type,
+                        file_size=str(len(content))
+                    )
+                    
+                    # 2. Upload file
+                    resource_url = await client.upload_file_to_staged_target(
+                        target=target,
+                        file_content=content,
+                        mime_type=file.content_type
+                    )
+                    new_images_to_add.append(resource_url)
+                    print(f"[DEBUG] Uploaded file {file.filename}, resource URL: {resource_url}")
+            except Exception as upload_err:
+                print(f"[ERROR] Failed to upload {file.filename}: {upload_err}")
+    
+    print(f"[DEBUG] Updating product {product_id}")
+    print(f"[DEBUG] Existing images to KEEP (from form): {existing_images_to_keep}")
+    print(f"[DEBUG] NEW images to ADD: {new_images_to_add}")
+    print(f"[DEBUG] Collections: {collections}")
+    
+    # Prepare tags - ONLY include Set, Rarity, Number, Condition
+    # Do NOT include vendor or collections as they have their own fields
+    tags = [
+        f"Set: {set_name}",
+        f"Rarity: {rarity.capitalize()}",
+        f"Number: {card_number}",
+        f"Condition: {condition}"
+    ]
+    
+    description_html = description.replace('\n', '<br>')
+    
+    # Update product with separate lists for existing vs new images
+    success = await client.update_product(
+        product_id=product_id,
+        title=name,
+        description=description_html,
+        price=price,
+        tags=tags,
+        vendor=vendor,
+        images_to_keep=existing_images_to_keep,
+        images_to_add=new_images_to_add,
+        collections=collections if collections else None
+    )
+    
+    if not success:
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": "Failed to update product"
+        })
+    
+    # Update inventory
+    try:
+        # First, get the inventory_item_id from the variant
+        variant_query = f"""
+        query {{
+          productVariant(id: "{variant_id}") {{
+            inventoryItem {{
+              id
+            }}
+          }}
+        }}
+        """
+        
+        shop_url = os.getenv("SHOPIFY_STORE_URL", "").rstrip("/")
+        admin_url = f"{shop_url}/admin/api/2024-01/graphql.json"
+        headers = {"X-Shopify-Access-Token": admin_token, "Content-Type": "application/json"}
+        
+        import httpx
+        async with httpx.AsyncClient() as http_client:
+            variant_response = await http_client.post(admin_url, json={"query": variant_query}, headers=headers)
+            variant_data = variant_response.json()
+            
+            if variant_data.get("data", {}).get("productVariant", {}).get("inventoryItem"):
+                inventory_item_id = variant_data["data"]["productVariant"]["inventoryItem"]["id"]
+                await client._update_inventory(admin_token, inventory_item_id, stock)
+            else:
+                print(f"[ERROR] Could not get inventory_item_id from variant")
+    except Exception as e:
+        print(f"[ERROR] Failed to update inventory: {e}")
+    
+    # Update buy_price in local database
+    if buy_price is not None:
+        from app import cost_db
+        cost_db.set_cost(product_id, buy_price)
+        print(f"[DEBUG] Updated buy_price to {buy_price} for product {product_id}")
+    
+    # Redirect to success page with product info
+    from urllib.parse import quote
+    return RedirectResponse(url=f"/admin/edit-success?product_id={quote(product_id)}&product_name={quote(name)}", status_code=303)
+
+
+@router.get("/edit-success", response_class=HTMLResponse)
+async def edit_success(
+    request: Request,
+    product_id: str,
+    product_name: str,
+    admin: str = Depends(get_admin_session)
+):
+    """Display success page after editing a card."""
+    return templates.TemplateResponse("admin/edit_success.html", {
+        "request": request,
+        "product_id": product_id,
+        "product_name": product_name
+    })
+
+
+@router.post("/delete-card")
+async def delete_card(
+    request: Request,
+    product_id: str = Form(...),
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Delete a card from Shopify and local database."""
+    print(f"[DEBUG] Deleting product: {product_id}")
+    
+    # Delete from Shopify
+    success = await client.delete_product(product_id)
+    
+    if success:
+        # Delete buy_price from local database
+        from app import cost_db
+        try:
+            # Note: cost_db might not have a delete method, so we'll set it to None or 0
+            cost_db.set_cost(product_id, 0)
+            print(f"[DEBUG] Cleared buy_price for product {product_id}")
+        except Exception as e:
+            print(f"[WARNING] Could not clear buy_price: {e}")
+        
+        print(f"[SUCCESS] Product {product_id} deleted successfully")
+    else:
+        print(f"[ERROR] Failed to delete product {product_id}")
+    
+    # Redirect back to dashboard
+    return RedirectResponse(url="/admin", status_code=303)
 
 
 @router.get("/logout")

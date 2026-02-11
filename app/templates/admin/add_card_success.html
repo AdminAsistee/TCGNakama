@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<body class="bg-gradient-to-br from-surface-dark via-surface to-surface-dark min-h-screen text-white">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-surface-dark/80 backdrop-blur-md border-b border-white/10">
+        <div class="flex items-center justify-between p-4">
+            <a href="/admin"
+                class="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
+                <span class="material-symbols-outlined text-[28px]">home</span>
+            </a>
+            <h1
+                class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                Card Added Successfully
+            </h1>
+            <div class="w-10"></div> <!-- Spacer for balance -->
+        </div>
+    </header>
+
+    <main class="flex flex-col items-center justify-center gap-8 p-8 max-w-2xl mx-auto min-h-[calc(100vh-200px)]">
+        <!-- Success Icon -->
+        <div class="relative">
+            <div class="absolute inset-0 bg-green-500/20 blur-3xl rounded-full"></div>
+            <div class="relative glass-panel rounded-full p-8 border-2 border-green-500/50">
+                <span class="material-symbols-outlined text-green-400 text-[80px]">check_circle</span>
+            </div>
+        </div>
+
+        <!-- Success Message -->
+        <div class="text-center space-y-3">
+            <h2 class="text-2xl font-bold text-white">Card Added Successfully!</h2>
+            <p class="text-white/60">Your card has been added to Shopify and is now live.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+            <a href="/admin/add-card"
+                class="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-primary hover:bg-primary/80 rounded-xl font-bold transition-all shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined">add</span>
+                <span>Add Another Card</span>
+            </a>
+            <a href="/admin"
+                class="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-white/10 hover:bg-white/20 rounded-xl font-bold transition-all border border-white/10">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Go to Dashboard</span>
+            </a>
+        </div>
+    </main>
+</body>
+{% endblock %}

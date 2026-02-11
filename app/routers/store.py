@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.dependencies import get_shopify_client, ShopifyClient
 from app.database import get_db
+from typing import Optional, Union
 from app.models import Banner
 from sqlalchemy.orm import Session
 from urllib.parse import quote, unquote
@@ -118,16 +119,21 @@ async def read_root(
 @router.get("/search", response_class=HTMLResponse)
 async def search_products(
     request: Request,
-    q: Optional[str] = None,
-    collection: Optional[str] = None,
-    rarity: Optional[str] = None,
+    q: str = Query(default=""),
+    collection: str = Query(default=""),
+    rarity: str = Query(default=""),
     max_price: Optional[float] = None,
     page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
+    # Convert empty strings to None
+    q = q.strip() if q and q.strip() else None
+    rarity = rarity.strip() if rarity and rarity.strip() else None
+    collection = collection.strip() if collection and collection.strip() else None
+    
     # Normalize for templates
-    svr_active_collection = collection.strip().lower() if collection else None
-    svr_active_rarity = rarity.strip().lower() if rarity else None
+    svr_active_collection = collection.lower() if collection else None
+    svr_active_rarity = rarity.lower() if rarity else None
 
     # Apply filters during search
     if collection or rarity or max_price:
@@ -168,17 +174,36 @@ async def search_products(
 @router.get("/filter", response_class=HTMLResponse)
 async def filter_products(
     request: Request,
-    q: Optional[str] = None,
-    rarity: Optional[str] = None,
-    collection: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
+    q: str = Query(default=""),
+    rarity: str = Query(default=""),
+    collection: str = Query(default=""),
+    condition: str = Query(default=""),
+    min_price: Union[str, float, None] = Query(default=None),
+    max_price: Union[str, float, None] = Query(default=None),
     page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
+    # Convert empty strings to None
+    q = q.strip() if q and q.strip() else None
+    rarity = rarity.strip() if rarity and rarity.strip() else None
+    collection = collection.strip() if collection and collection.strip() else None
+    condition = condition.strip() if condition and condition.strip() else None
+    
+    # Convert price parameters
+    if isinstance(min_price, str) and not min_price.strip():
+        min_price = None
+    elif isinstance(min_price, str):
+        min_price = float(min_price)
+    
+    if isinstance(max_price, str) and not max_price.strip():
+        max_price = None
+    elif isinstance(max_price, str):
+        max_price = float(max_price)
+    
     # Normalize for templates
-    svr_active_collection = collection.strip().lower() if collection else None
-    svr_active_rarity = rarity.strip().lower() if rarity else None
+    svr_active_collection = collection.lower() if collection else None
+    svr_active_rarity = rarity.lower() if rarity else None
+    svr_active_condition = condition if condition else None
 
     if collection:
         products = await client.get_collection_products(handle=collection)
@@ -187,12 +212,17 @@ async def filter_products(
             products = [p for p in products if q.lower() in p['title'].lower()]
         if rarity:
             products = [p for p in products if p['rarity'].lower() == rarity.lower()]
+        if condition:
+            products = [p for p in products if f"Condition: {condition}" in p.get('tags', [])]
         if min_price:
             products = [p for p in products if p['price'] >= min_price]
         if max_price:
             products = [p for p in products if p['price'] <= max_price]
     else:
         products = await client.get_products(query=q, rarity=rarity, min_price=min_price, max_price=max_price)
+        # Apply condition filter to general products
+        if condition:
+            products = [p for p in products if f"Condition: {condition}" in p.get('tags', [])]
     
     collections = await client.get_collections()
 
@@ -204,13 +234,14 @@ async def filter_products(
     end = start + PAGE_SIZE
     paginated_products = products[start:end]
 
-    print(f"[DEBUG] Filter | collection: {svr_active_collection}, rarity: {svr_active_rarity}, page: {page}")
+    print(f"[DEBUG] Filter | q: {q}, rarity: {svr_active_rarity}, collection: {svr_active_collection}, condition: {svr_active_condition}, max_price: {max_price}")
     return templates.TemplateResponse("partials/product_grid.html", {
         "request": request, 
         "products": paginated_products,
         "collections": collections,
         "svr_active_collection": svr_active_collection,
         "svr_active_rarity": svr_active_rarity,
+        "svr_active_condition": svr_active_condition,
         "current_page": page,
         "total_pages": total_pages,
         "total_products": total_products

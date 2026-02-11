@@ -1,3 +1,9 @@
+<!-- Card Count Header -->
+<div class="flex items-center justify-between mb-6 px-1 col-span-full">
+    <h3 class="text-sm font-bold uppercase tracking-[0.25em] text-gray-400">All Cards</h3>
+    <span class="text-[10px] font-black text-gray-600 uppercase tracking-wider">{{ products|length }} in vault</span>
+</div>
+
 {% for product in products %}
 <div
     class="flex flex-col group bg-surface rounded-xl border border-vault-border overflow-hidden transition-all duration-150 hover:scale-[1.02] hover:border-primary/30 shadow-lg">
@@ -28,84 +34,65 @@
                 <div class="flex items-center gap-1">
                     <span
                         class="w-1 h-1 rounded-full {{ 'bg-neon-green' if product.status == 'Sync' else 'bg-primary' }}"></span>
-                    <span class="text-[7px] text-gray-500 uppercase font-black">{{ product.status }}</span>
+                    <span
+                        class="text-[8px] font-black uppercase tracking-wider {{ 'text-neon-green' if product.status == 'Sync' else 'text-primary' }}">{{
+                        product.status }}</span>
                 </div>
             </div>
-            <p class="text-[9px] text-gray-500 font-medium tracking-tight">{{ product.rarity }} • {{ product.set }}</p>
+            <p class="text-[10px] text-gray-400 mt-1">{{ product.set }}</p>
         </div>
 
-        <div class="flex items-center justify-between pt-1">
-            <span class="text-sm font-black text-primary">¥{{ "{:,.0f}".format(product.price) }}</span>
-
-            <!-- Quick Add Controls -->
-            <div class="flex items-center gap-2">
-                <div class="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 h-7">
-                    <button onclick="updateQty('grid-qty-{{ product.safe_id }}', -1); event.stopPropagation();"
-                        class="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
-                        <span class="material-symbols-outlined text-[11px]">remove</span>
-                    </button>
-                    <span id="grid-qty-{{ product.safe_id }}" class="w-5 text-center text-[10px] font-black">1</span>
-                    <button onclick="updateQty('grid-qty-{{ product.safe_id }}', 1); event.stopPropagation();"
-                        class="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
-                        <span class="material-symbols-outlined text-[11px]">add</span>
-                    </button>
-                </div>
-
-                <button
-                    onclick="handleCartAction('{{ product.variant_id }}', 'add', event, 'grid-qty-{{ product.safe_id }}')"
-                    class="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-90 transition-all">
-                    <span class="material-symbols-outlined text-sm">add_shopping_cart</span>
-                </button>
+        <div class="flex items-center justify-between pt-2">
+            <div>
+                <p class="text-xs font-black text-white">¥{{ "{:,}".format(product.price|int) }}</p>
             </div>
+            <button hx-post="/cart/add?variant_id={{ product.variant_id }}&quantity=1" hx-target="#cart-drawer"
+                hx-swap="innerHTML" hx-on:click="openCartDrawer()"
+                class="px-3 py-1.5 bg-primary hover:bg-primary/80 text-white text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 shadow-sm">
+                <span class="material-symbols-outlined text-sm">add_shopping_cart</span>
+                <span>Add</span>
+            </button>
         </div>
     </div>
 </div>
 {% endfor %}
 
-<!-- Pagination Controls -->
+<!-- Pagination -->
 {% if total_pages > 1 %}
-<div class="col-span-full flex items-center justify-center gap-4 mt-12 py-6 border-t border-white/5">
-    <button
-        class="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest transition-all {{ 'opacity-30 cursor-not-allowed' if current_page <= 1 else 'hover:bg-white/10 hover:border-primary/50 text-white' }}"
-        {% if current_page> 1 %}
-        hx-get="/filter?page={{ current_page - 1 }}"
-        hx-target="#product-grid"
-        hx-include="#search-input, #rarity-input, #price-slider, #collection-input"
-        {% else %}
-        disabled
-        {% endif %}>
-        <span class="material-symbols-outlined text-sm">chevron_left</span>
-        Prev
+<div class="col-span-full flex justify-center items-center gap-2 mt-8">
+    {% if current_page > 1 %}
+    <button hx-get="/filter?page={{ current_page - 1 }}" hx-target="#product-grid" hx-swap="innerHTML"
+        class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-xs rounded border border-white/10 transition-colors">
+        Previous
     </button>
+    {% endif %}
 
-    <div class="flex items-center gap-2">
-        <span class="text-[10px] font-black text-primary uppercase tracking-widest">Page</span>
-        <span
-            class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-black text-white shadow-[0_0_15px_rgba(244,37,209,0.3)]">
-            {{ current_page }}
-        </span>
-        <span class="text-[10px] font-black text-gray-600 uppercase tracking-widest">of {{ total_pages }}</span>
-    </div>
+    <span class="text-xs text-gray-400">Page {{ current_page }} of {{ total_pages }}</span>
 
-    <button
-        class="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest transition-all {{ 'opacity-30 cursor-not-allowed' if current_page >= total_pages else 'hover:bg-white/10 hover:border-primary/50 text-white' }}"
-        {% if current_page < total_pages %} hx-get="/filter?page={{ current_page + 1 }}" hx-target="#product-grid"
-        hx-include="#search-input, #rarity-input, #price-slider, #collection-input" {% else %} disabled {% endif %}>
+    {% if current_page < total_pages %} <button hx-get="/filter?page={{ current_page + 1 }}" hx-target="#product-grid"
+        hx-swap="innerHTML"
+        class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-xs rounded border border-white/10 transition-colors">
         Next
-        <span class="material-symbols-outlined text-sm">chevron_right</span>
+        </button>
+        {% endif %}
+</div>
+{% endif %}
+
+<!-- No Results Message -->
+{% if products|length == 0 %}
+<div class="col-span-full text-center py-12">
+    <span class="material-symbols-outlined text-6xl text-gray-600">search_off</span>
+    <p class="text-gray-400 mt-4">No cards found matching your filters.</p>
+    <button onclick="resetFilters()"
+        class="mt-4 px-4 py-2 bg-primary hover:bg-primary/80 text-white text-sm font-bold rounded-md transition-colors">
+        Reset Filters
     </button>
 </div>
 {% endif %}
 
-{% if not products %}
-<div class="col-span-full text-center py-12">
-    <span class="material-symbols-outlined text-gray-600 text-4xl mb-2">search_off</span>
-    <p class="text-gray-400 text-sm">No cards found in the vault.</p>
-</div>
-{% endif %}
-
-{% if request.headers.get('HX-Request') and (collections or svr_active_rarity) %}
+{% if request.headers.get('HX-Request') and (collections or svr_active_rarity or svr_active_condition) %}
 {% set oob = true %}
 {% include "partials/collection_filters.html" %}
 {% include "partials/rarity_filters.html" %}
+{% include "partials/condition_filters.html" %}
 {% endif %}

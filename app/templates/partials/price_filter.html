@@ -23,6 +23,10 @@
         }
 
         // Trigger HTMX filter
-        hiddenInput.dispatchEvent(new Event('change'));
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger(hiddenInput, 'change');
+        } else {
+            hiddenInput.dispatchEvent(new Event('change'));
+        }
     }
 </script>

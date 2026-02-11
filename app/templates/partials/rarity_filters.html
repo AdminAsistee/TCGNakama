@@ -3,7 +3,7 @@
     {% for r in rarities %}
     {% set is_active = (svr_active_rarity and svr_active_rarity|trim|lower == r|trim|lower) %}
     <div class="rarity-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border px-4 cursor-pointer transition-all duration-75 {{ 'bg-primary border-primary shadow-[0_0_20px_rgba(244,37,209,0.5)]' if is_active else 'bg-white/5 border-white/10 hover:bg-white/10' }}"
-        onclick="setActiveFilter('{{ r }}', this)">
+        data-rarity-btn="{{ r }}" onclick="setActiveFilter('{{ r }}', this)">
         <p
             class="text-[10px] font-bold uppercase whitespace-nowrap {{ 'text-white' if is_active else 'text-gray-300' }}">
             {{ r }}

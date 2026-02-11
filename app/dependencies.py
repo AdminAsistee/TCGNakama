@@ -61,6 +61,7 @@ class ShopifyClient:
         card_set = "Unknown Set"
         rarity = "Common"
         card_number = "#000"
+        condition = None
         
         for tag in tags:
             tag_lower = tag.lower()
@@ -75,6 +76,8 @@ class ShopifyClient:
                     rarity = val
                 elif key == "number":
                     card_number = val
+                elif key == "condition":
+                    condition = val
 
         # DEBUG: Log the first variant to see what Shopify is sending
         if variants:
@@ -100,6 +103,7 @@ class ShopifyClient:
             "title": node["title"],
             "set": card_set,
             "rarity": rarity,
+            "condition": condition,
             "price": float(variant.get("price", {}).get("amount", 0)),
             "image": node.get("featuredImage", {}).get("url") if node.get("featuredImage") else "https://images.pokemontcg.io/bg.jpg",
             "badge": rarity.upper(),
@@ -108,7 +112,10 @@ class ShopifyClient:
             "totalInventory": total_inventory,
             "createdAt": node.get("createdAt"),
             "status": "Sync" if variant.get("availableForSale") else "Sold Out",
-            "images": [img["node"]["url"] for img in node.get("images", {}).get("edges", [])] if node.get("images", {}).get("edges") else ([node.get("featuredImage", {}).get("url")] if node.get("featuredImage") else ["https://images.pokemontcg.io/bg.jpg"])
+            "tags": node.get("tags", []),
+            "images": [img["node"]["url"] for img in node.get("images", {}).get("edges", [])] if node.get("images", {}).get("edges") else ([node.get("featuredImage", {}).get("url")] if node.get("featuredImage") else ["https://images.pokemontcg.io/bg.jpg"]),
+            "vendor": node.get("vendor", "TCG Nakama"),
+            "collections": [coll["node"]["title"] for coll in node.get("collections", {}).get("edges", [])] if node.get("collections", {}).get("edges") else []
         }
 
     async def get_products(self, query: Optional[str] = None, rarity: Optional[str] = None, min_price: Optional[float] = None, max_price: Optional[float] = None) -> List[dict]:
@@ -293,9 +300,11 @@ class ShopifyClient:
           product(id: $id) {
             id
             title
+            descriptionHtml
             tags
             handle
-            handle
+            vendor
+            totalInventory
             featuredImage { url }
             images(first: 10) {
               edges {
@@ -304,11 +313,19 @@ class ShopifyClient:
                 }
               }
             }
-            variants(first: 1) {
+            collections(first: 10) {
+              edges {
+                node {
+                  title
+                }
+              }
+            }
+            variants(first: 10) {
               edges {
                 node {
                   id
                   price { amount currencyCode }
+                  availableForSale
                 }
               }
             }
@@ -316,8 +333,33 @@ class ShopifyClient:
         }
         """
         try:
+            print(f"[DEBUG] Fetching product with ID: {product_id}")
             data = await self._query(gql_query, {"id": product_id})
-            return self._map_product(data["product"])
+            
+            # Check if product exists in response
+            if not data or not data.get("product"):
+                print(f"[ERROR] Product not found in Shopify response for ID: {product_id}")
+                print(f"[DEBUG] Response data: {data}")
+                return None
+            
+            
+            # Debug: Check what collections data looks like
+            print(f"[DEBUG] Raw collections from GraphQL: {data['product'].get('collections', {})}")
+            
+            product = self._map_product(data["product"])
+            # Add description for editing - convert HTML to plain text with newlines
+            description_html = data["product"].get("descriptionHtml", "")
+            # Convert <br> tags to newlines for textarea display
+            description_plain = description_html.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+            # Remove any other HTML tags (simple approach)
+            import re
+            description_plain = re.sub(r'<[^>]+>', '', description_plain)
+            product["description"] = description_plain
+            # Add inventory quantity from product totalInventory
+            product["inventory_quantity"] = data["product"].get("totalInventory", 0)
+            
+            print(f"[DEBUG] Successfully fetched product: {product.get('title')}")
+            return product
         except Exception as e:
             print(f"Error fetching product: {e}")
             return None
@@ -818,7 +860,7 @@ class ShopifyClient:
                 "title": product_data["title"],
                 "descriptionHtml": product_data.get("description", ""),
                 "vendor": product_data.get("vendor", "TCG Nakama"),
-                "productType": product_data.get("product_type", "Trading Card"),
+                "productType": "Collectible Cards",
                 "tags": product_data.get("tags", [])
             }
         }
@@ -861,11 +903,11 @@ class ShopifyClient:
             variant_id = product["variants"]["edges"][0]["node"]["id"]
             inventory_item_id = product["variants"]["edges"][0]["node"]["inventoryItem"]["id"]
 
-            # 2. Update the default variant price and sku (since we couldn't do it in step 1)
+            # 2. Update the default variant price
             variant_mutation = """
-            mutation productVariantUpdate($input: ProductVariantInput!) {
-              productVariantUpdate(input: $input) {
-                productVariant {
+            mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+              productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                productVariants {
                   id
                   price
                 }
@@ -877,11 +919,13 @@ class ShopifyClient:
             }
             """
             variant_vars = {
-                "input": {
-                    "id": variant_id,
-                    "price": str(product_data["price"]),
-                    "sku": product_data.get("sku", "")
-                }
+                "productId": product["id"],
+                "variants": [
+                    {
+                        "id": variant_id,
+                        "price": str(product_data["price"])
+                    }
+                ]
             }
             
             var_resp = await client.post(
@@ -892,18 +936,234 @@ class ShopifyClient:
             var_data = var_resp.json()
             if "errors" in var_data:
                 print(f"Warning: Failed to update variant price: {var_data['errors']}")
-            elif var_data.get("data", {}).get("productVariantUpdate", {}).get("userErrors"):
-                print(f"Warning: Shopify User Error updating variant: {var_data['data']['productVariantUpdate']['userErrors']}")
+            elif var_data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors"):
+                print(f"Warning: Shopify User Error updating variant: {var_data['data']['productVariantsBulkUpdate']['userErrors']}")
+
+            # 2.5. Enable inventory tracking on the inventory item
+            inventory_item_mutation = """
+            mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+              inventoryItemUpdate(id: $id, input: $input) {
+                inventoryItem {
+                  id
+                  tracked
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+            inventory_item_vars = {
+                "id": inventory_item_id,
+                "input": {
+                    "tracked": True
+                }
+            }
+            
+            inv_item_resp = await client.post(
+                admin_url,
+                json={"query": inventory_item_mutation, "variables": inventory_item_vars},
+                headers=headers
+            )
+            inv_item_data = inv_item_resp.json()
+            if "errors" in inv_item_data:
+                print(f"Warning: Failed to enable inventory tracking: {inv_item_data['errors']}")
+            elif inv_item_data.get("data", {}).get("inventoryItemUpdate", {}).get("userErrors"):
+                print(f"Warning: Shopify User Error enabling tracking: {inv_item_data['data']['inventoryItemUpdate']['userErrors']}")
+            else:
+                print(f"[DEBUG] Inventory tracking enabled on inventory item")
 
             # 3. Update inventory if quantity > 0
             quantity = product_data.get("quantity", 1)
             if quantity > 0:
                 await self._update_inventory(admin_token, inventory_item_id, quantity)
 
+            # 4. Assign product to selected collections
+            collections = product_data.get("collections", [])
+            if collections:
+                await self._assign_to_collections(admin_token, product["id"], collections)
+
+            # 5. Publish to all sales channels
+            await self._publish_to_all_channels(admin_token, product["id"])
+
             return product
         except Exception as e:
             print(f"Error creating product: {str(e).encode('ascii', 'backslashreplace').decode()}")
             raise
+
+    async def _publish_to_all_channels(self, admin_token: str, product_id: str):
+        """Publish a product to all available sales channels."""
+        admin_url = f"{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}/graphql.json"
+        headers = {
+            "X-Shopify-Access-Token": admin_token,
+            "Content-Type": "application/json",
+        }
+        
+        try:
+            # First, get all publication IDs (sales channels)
+            publications_query = """
+            query {
+              publications(first: 10) {
+                edges {
+                  node {
+                    id
+                    name
+                  }
+                }
+              }
+            }
+            """
+            
+            client = self.get_client()
+            pub_res = await client.post(admin_url, json={"query": publications_query}, headers=headers)
+            pub_res.raise_for_status()
+            pub_data = pub_res.json()
+            
+            if "errors" in pub_data:
+                print(f"Error fetching publications: {pub_data['errors']}")
+                return
+            
+            publication_ids = []
+            for edge in pub_data.get("data", {}).get("publications", {}).get("edges", []):
+                node = edge["node"]
+                publication_ids.append(node["id"])
+                print(f"[DEBUG] Found sales channel: {node['name']}")
+            
+            if not publication_ids:
+                print("[WARNING] No sales channels found")
+                return
+            
+            # Publish to all channels
+            publish_mutation = """
+            mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+              publishablePublish(id: $id, input: $input) {
+                publishable {
+                  availablePublicationsCount {
+                    count
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+            
+            publish_input = [{"publicationId": pub_id} for pub_id in publication_ids]
+            publish_vars = {
+                "id": product_id,
+                "input": publish_input
+            }
+            
+            publish_res = await client.post(
+                admin_url,
+                json={"query": publish_mutation, "variables": publish_vars},
+                headers=headers
+            )
+            publish_res.raise_for_status()
+            publish_data = publish_res.json()
+            
+            if "errors" in publish_data:
+                print(f"Error publishing to sales channels: {publish_data['errors']}")
+            else:
+                result = publish_data.get("data", {}).get("publishablePublish", {})
+                if result.get("userErrors"):
+                    print(f"User errors publishing: {result['userErrors']}")
+                else:
+                    count = result.get("publishable", {}).get("availablePublicationsCount", {}).get("count", 0)
+                    print(f"[SUCCESS] Product published to {len(publication_ids)} sales channels")
+                    
+        except Exception as e:
+            print(f"Exception publishing to sales channels: {str(e).encode('ascii', 'backslashreplace').decode()}")
+
+    async def _assign_to_collections(self, admin_token: str, product_id: str, collection_titles: List[str]):
+        """Assign a product to multiple collections by their titles."""
+        admin_url = f"{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}/graphql.json"
+        headers = {
+            "X-Shopify-Access-Token": admin_token,
+            "Content-Type": "application/json",
+        }
+        
+        try:
+            # First, fetch all collections to get their IDs
+            collections_query = """
+            query {
+              collections(first: 250) {
+                edges {
+                  node {
+                    id
+                    title
+                  }
+                }
+              }
+            }
+            """
+            
+            client = self.get_client()
+            coll_res = await client.post(admin_url, json={"query": collections_query}, headers=headers)
+            coll_res.raise_for_status()
+            coll_data = coll_res.json()
+            
+            if "errors" in coll_data:
+                print(f"Error fetching collections for assignment: {coll_data['errors']}")
+                return
+            
+            # Build a map of title -> ID
+            collection_map = {}
+            for edge in coll_data.get("data", {}).get("collections", {}).get("edges", []):
+                node = edge["node"]
+                collection_map[node["title"]] = node["id"]
+            
+            # Get collection IDs for the selected titles
+            collection_ids = [collection_map[title] for title in collection_titles if title in collection_map]
+            
+            if not collection_ids:
+                print(f"[WARNING] No matching collections found for: {collection_titles}")
+                return
+            
+            # Assign product to collections
+            for collection_id in collection_ids:
+                assign_mutation = """
+                mutation collectionAddProducts($id: ID!, $productIds: [ID!]!) {
+                  collectionAddProducts(id: $id, productIds: $productIds) {
+                    collection {
+                      id
+                      title
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }
+                """
+                assign_vars = {
+                    "id": collection_id,
+                    "productIds": [product_id]
+                }
+                
+                assign_res = await client.post(
+                    admin_url,
+                    json={"query": assign_mutation, "variables": assign_vars},
+                    headers=headers
+                )
+                assign_res.raise_for_status()
+                assign_data = assign_res.json()
+                
+                if "errors" in assign_data:
+                    print(f"Error assigning to collection: {assign_data['errors']}")
+                else:
+                    result = assign_data.get("data", {}).get("collectionAddProducts", {})
+                    if result.get("userErrors"):
+                        print(f"User errors assigning to collection: {result['userErrors']}")
+                    else:
+                        coll_title = result.get("collection", {}).get("title", "Unknown")
+                        print(f"[SUCCESS] Product assigned to collection: {coll_title}")
+                        
+        except Exception as e:
+            print(f"Exception assigning to collections: {str(e).encode('ascii', 'backslashreplace').decode()}")
 
     async def _update_inventory(self, admin_token: str, inventory_item_id: str, quantity: int):
         """Update inventory levels for a product variant."""
@@ -917,49 +1177,512 @@ class ShopifyClient:
         location_query = "{ locations(first: 1) { edges { node { id } } } }"
         client = self.get_client()
         
-        loc_res = await client.post(admin_url, json={"query": location_query}, headers=headers)
-        loc_data = loc_res.json()
-        if not loc_data.get("data", {}).get("locations", {}).get("edges"):
-            print("No locations found, skipping inventory update")
-            return
+        try:
+            loc_res = await client.post(admin_url, json={"query": location_query}, headers=headers)
+            loc_res.raise_for_status()
+            loc_data = loc_res.json()
+            
+            if "errors" in loc_data:
+                print(f"Error fetching locations: {loc_data['errors']}")
+                return
+                
+            if not loc_data.get("data", {}).get("locations", {}).get("edges"):
+                print("No locations found, skipping inventory update")
+                return
 
-        location_id = loc_data["data"]["locations"]["edges"][0]["node"]["id"]
+            location_id = loc_data["data"]["locations"]["edges"][0]["node"]["id"]
+            print(f"[DEBUG] Setting inventory: item={inventory_item_id}, location={location_id}, quantity={quantity}")
 
-        # Now set the level
-        inventory_mutation = """
-        mutation inventorySet($input: InventorySetQuantitiesInput!) {
-          inventorySetQuantities(input: $input) {
-            inventoryLevels {
-              id
-              available
+            # Step 1: Activate inventory tracking for this item at this location
+            activate_mutation = """
+            mutation inventoryActivate($inventoryItemId: ID!, $locationId: ID!) {
+              inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+                inventoryLevel {
+                  id
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
             }
-            userErrors {
+            """
+            activate_vars = {
+                "inventoryItemId": inventory_item_id,
+                "locationId": location_id
+            }
+            
+            activate_res = await client.post(
+                admin_url,
+                json={"query": activate_mutation, "variables": activate_vars},
+                headers=headers
+            )
+            activate_res.raise_for_status()
+            activate_data = activate_res.json()
+            
+            if "errors" in activate_data:
+                print(f"Error activating inventory tracking: {activate_data['errors']}")
+                # Continue anyway - it might already be activated
+            else:
+                activate_result = activate_data.get("data", {}).get("inventoryActivate", {})
+                if activate_result.get("userErrors"):
+                    print(f"User errors activating inventory: {activate_result['userErrors']}")
+                else:
+                    print(f"[DEBUG] Inventory tracking activated")
+
+            # Step 2: Set the inventory level
+            inventory_mutation = """
+            mutation inventorySetOnHandQuantities($input: InventorySetOnHandQuantitiesInput!) {
+              inventorySetOnHandQuantities(input: $input) {
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """
+            inventory_vars = {
+                "input": {
+                    "reason": "correction",
+                    "setQuantities": [
+                        {
+                            "inventoryItemId": inventory_item_id,
+                            "locationId": location_id,
+                            "quantity": quantity
+                        }
+                    ]
+                }
+            }
+
+            inv_res = await client.post(
+                admin_url,
+                json={"query": inventory_mutation, "variables": inventory_vars},
+                headers=headers
+            )
+            inv_res.raise_for_status()
+            inv_data = inv_res.json()
+            
+            if "errors" in inv_data:
+                print(f"Error updating inventory: {inv_data['errors']}")
+                return
+                
+            result = inv_data.get("data", {}).get("inventorySetOnHandQuantities", {})
+            if result.get("userErrors"):
+                print(f"Shopify User Error updating inventory: {result['userErrors']}")
+                return
+                
+            # Success if no errors
+            print(f"[SUCCESS] Inventory updated to {quantity} units")
+                
+        except Exception as e:
+            print(f"Exception updating inventory: {str(e).encode('ascii', 'backslashreplace').decode()}")
+
+    async def update_product(self, product_id: str, title: str = None, description: str = None, 
+                            price: float = None, tags: list = None, vendor: str = None,
+                            images_to_keep: list = None, images_to_add: list = None, collections: list = None) -> bool:
+        """Update product information in Shopify.
+        
+        Args:
+            images_to_keep: List of existing Shopify CDN URLs that should be kept
+            images_to_add: List of new image URLs to add (uploaded files or external URLs)
+        """
+        token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+        if not token:
+            print("[ERROR] No SHOPIFY_ADMIN_TOKEN found")
+            return False
+        
+        shop_url = os.getenv("SHOPIFY_STORE_URL", "").rstrip("/")
+        admin_url = f"{shop_url}/admin/api/2024-01/graphql.json"
+        headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
+        
+        # Build input object with only provided fields
+        input_fields = []
+        if title is not None:
+            input_fields.append(f'title: "{title}"')
+        if description is not None:
+            # Escape quotes in description
+            escaped_desc = description.replace('"', '\\"').replace('\n', '\\n')
+            input_fields.append(f'descriptionHtml: "{escaped_desc}"')
+        if vendor is not None:
+            input_fields.append(f'vendor: "{vendor}"')
+        if tags is not None:
+            tags_str = ', '.join([f'"{tag}"' for tag in tags])
+            input_fields.append(f'tags: [{tags_str}]')
+        
+        # Note: Images and collections require separate mutations in Shopify
+        # We'll handle them after the main product update
+        
+        input_str = ', '.join(input_fields)
+        
+        mutation = f"""
+        mutation {{
+          productUpdate(input: {{
+            id: "{product_id}",
+            {input_str}
+          }}) {{
+            product {{
+              id
+              title
+            }}
+            userErrors {{
               field
               message
-            }
-          }
-        }
+            }}
+          }}
+        }}
         """
-        inventory_vars = {
-            "input": {
-                "name": "available",
-                "reason": "correction",
-                "quantities": [
-                    {
-                        "inventoryItemId": inventory_item_id,
-                        "locationId": location_id,
-                        "quantity": quantity
-                    }
-                ]
-            }
-        }
+        
+        client = self.get_client()
+        try:
+            response = await client.post(admin_url, json={"query": mutation}, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            if "errors" in data:
+                print(f"[ERROR] GraphQL errors: {data['errors']}")
+                return False
+            
+            user_errors = data.get("data", {}).get("productUpdate", {}).get("userErrors", [])
+            if user_errors:
+                print(f"[ERROR] User errors updating product: {user_errors}")
+                return False
+            
+            # Update variant price if provided
+            if price is not None:
+                print(f"[DEBUG] Updating price to: {price}")
+                # Get variant ID first
+                product_data = await self.get_product(product_id)
+                if product_data and product_data.get("variant_id"):
+                    variant_id = product_data["variant_id"]
+                    print(f"[DEBUG] Found variant ID: {variant_id}")
+                    price_mutation = f"""
+                    mutation {{
+                      productVariantsBulkUpdate(productId: "{product_id}", variants: [{{
+                        id: "{variant_id}",
+                        price: "{price}"
+                      }}]) {{
+                        productVariants {{
+                          id
+                          price
+                        }}
+                        userErrors {{
+                          field
+                          message
+                        }}
+                      }}
+                    }}
+                    """
+                    price_response = await client.post(admin_url, json={"query": price_mutation}, headers=headers)
+                    price_response.raise_for_status()
+                    price_data = price_response.json()
+                    
+                    print(f"[DEBUG] Price update response: {price_data}")
+                    
+                    price_errors = price_data.get("data", {}).get("productVariantsBulkUpdate", {}).get("userErrors", [])
+                    if price_errors:
+                        print(f"[ERROR] User errors updating price: {price_errors}")
+                        return False
+                    else:
+                        print(f"[SUCCESS] Price updated to {price}")
+                else:
+                    print(f"[ERROR] Could not get variant_id for price update")
+            
+            # Update images with smart deletion and addition
+            if images_to_keep is not None or images_to_add is not None:
+                try:
+                    # Step 1: Get existing images from Shopify
+                    product_query = f"""
+                    query {{
+                      product(id: "{product_id}") {{
+                        media(first: 50) {{
+                          edges {{
+                            node {{
+                              ... on MediaImage {{
+                                id
+                                image {{
+                                  url
+                                }}
+                              }}
+                            }}
+                          }}
+                        }}
+                      }}
+                    }}
+                    """
+                    
+                    query_response = await client.post(admin_url, json={"query": product_query}, headers=headers)
+                    query_response.raise_for_status()
+                    query_data = query_response.json()
+                    
+                    existing_images = {}  # {url: id}
+                    media_edges = query_data.get("data", {}).get("product", {}).get("media", {}).get("edges", [])
+                    for edge in media_edges:
+                        node = edge.get("node", {})
+                        if node.get("id") and node.get("image", {}).get("url"):
+                            # Extract base URL without query parameters for comparison
+                            url = node["image"]["url"].split('?')[0]
+                            existing_images[url] = node["id"]
+                    
+                    print(f"[DEBUG] Found {len(existing_images)} existing images in Shopify")
+                    
+                    # Step 2: Determine which images to delete
+                    images_to_keep = images_to_keep or []
+                    images_to_delete_ids = []
+                    
+                    for url, image_id in existing_images.items():
+                        # Check if this URL is in the keep list (compare base URLs)
+                        should_keep = False
+                        for keep_url in images_to_keep:
+                            keep_url_base = keep_url.split('?')[0]
+                            if url == keep_url_base or keep_url_base in url:
+                                should_keep = True
+                                break
+                        
+                        if not should_keep:
+                            images_to_delete_ids.append(image_id)
+                    
+                    print(f"[DEBUG] Images to KEEP: {len(images_to_keep)}")
+                    print(f"[DEBUG] Images to DELETE: {len(images_to_delete_ids)}")
+                    
+                    # Step 3: Delete images that are not in the keep list
+                    if images_to_delete_ids:
+                        delete_mutation = f"""
+                        mutation {{
+                          productDeleteMedia(productId: "{product_id}", mediaIds: {str(images_to_delete_ids).replace("'", '"')}) {{
+                            deletedMediaIds
+                            deletedProductImageIds
+                            userErrors {{
+                              field
+                              message
+                            }}
+                          }}
+                        }}
+                        """
+                        
+                        delete_response = await client.post(admin_url, json={"query": delete_mutation}, headers=headers)
+                        delete_response.raise_for_status()
+                        delete_data = delete_response.json()
+                        
+                        delete_errors = delete_data.get("data", {}).get("productDeleteMedia", {}).get("userErrors", [])
+                        if delete_errors:
+                            print(f"[WARNING] Errors deleting images: {delete_errors}")
+                        else:
+                            print(f"[SUCCESS] Deleted {len(images_to_delete_ids)} images")
+                    
+                    # Step 4: Add new images
+                    images_to_add = images_to_add or []
+                    if images_to_add:
+                        images_input = []
+                        for img_url in images_to_add:
+                            images_input.append(f'{{ originalSource: "{img_url}", mediaContentType: IMAGE }}')
+                        
+                        images_str = ', '.join(images_input)
+                        images_mutation = f"""
+                        mutation {{
+                          productCreateMedia(productId: "{product_id}", media: [{images_str}]) {{
+                            media {{
+                              ... on MediaImage {{
+                                id
+                                image {{
+                                  url
+                                }}
+                              }}
+                            }}
+                            mediaUserErrors {{
+                              field
+                              message
+                            }}
+                          }}
+                        }}
+                        """
+                        
+                        print(f"[DEBUG] Adding {len(images_to_add)} new images")
+                        
+                        images_response = await client.post(admin_url, json={"query": images_mutation}, headers=headers)
+                        images_response.raise_for_status()
+                        images_data = images_response.json()
+                        
+                        print(f"[DEBUG] Images response: {images_data}")
+                        
+                        images_errors = images_data.get("data", {}).get("productCreateMedia", {}).get("mediaUserErrors", [])
+                        if images_errors:
+                            print(f"[WARNING] Errors adding new images: {images_errors}")
+                        else:
+                            print(f"[SUCCESS] Added {len(images_to_add)} new images")
+                        
+                except Exception as e:
+                    print(f"[WARNING] Failed to update images: {str(e).encode('ascii', 'backslashreplace').decode()}")
+            
+            # Update collections if provided
+            if collections is not None and len(collections) > 0:
+                print(f"[DEBUG] Updating collections: {collections}")
+                
+                try:
+                    # Step 1: Get collection IDs from titles
+                    collection_ids = []
+                    for collection_title in collections:
+                        collection_query = f"""
+                        query {{
+                          collections(first: 10, query: "title:'{collection_title}'") {{
+                            edges {{
+                              node {{
+                                id
+                                title
+                              }}
+                            }}
+                          }}
+                        }}
+                        """
+                        
+                        coll_response = await client.post(admin_url, json={"query": collection_query}, headers=headers)
+                        coll_response.raise_for_status()
+                        coll_data = coll_response.json()
+                        
+                        coll_edges = coll_data.get("data", {}).get("collections", {}).get("edges", [])
+                        if coll_edges:
+                            collection_id = coll_edges[0]["node"]["id"]
+                            collection_ids.append(collection_id)
+                            print(f"[DEBUG] Found collection '{collection_title}' with ID: {collection_id}")
+                        else:
+                            print(f"[WARNING] Collection '{collection_title}' not found in Shopify")
+                    
+                    # Step 2: Remove product from all collections first
+                    # Get all current collections
+                    current_colls_query = f"""
+                    query {{
+                      product(id: "{product_id}") {{
+                        collections(first: 50) {{
+                          edges {{
+                            node {{
+                              id
+                            }}
+                          }}
+                        }}
+                      }}
+                    }}
+                    """
+                    
+                    curr_coll_response = await client.post(admin_url, json={"query": current_colls_query}, headers=headers)
+                    curr_coll_response.raise_for_status()
+                    curr_coll_data = curr_coll_response.json()
+                    
+                    current_collection_ids = []
+                    curr_edges = curr_coll_data.get("data", {}).get("product", {}).get("collections", {}).get("edges", [])
+                    for edge in curr_edges:
+                        current_collection_ids.append(edge["node"]["id"])
+                    
+                    # Remove from current collections
+                    for coll_id in current_collection_ids:
+                        remove_mutation = f"""
+                        mutation {{
+                          collectionRemoveProducts(id: "{coll_id}", productIds: ["{product_id}"]) {{
+                            userErrors {{
+                              field
+                              message
+                            }}
+                          }}
+                        }}
+                        """
+                        
+                        await client.post(admin_url, json={"query": remove_mutation}, headers=headers)
+                    
+                    if current_collection_ids:
+                        print(f"[DEBUG] Removed product from {len(current_collection_ids)} existing collections")
+                    
+                    # Step 3: Add product to new collections
+                    for collection_id in collection_ids:
+                        add_mutation = f"""
+                        mutation {{
+                          collectionAddProducts(id: "{collection_id}", productIds: ["{product_id}"]) {{
+                            userErrors {{
+                              field
+                              message
+                            }}
+                          }}
+                        }}
+                        """
+                        
+                        add_response = await client.post(admin_url, json={"query": add_mutation}, headers=headers)
+                        add_response.raise_for_status()
+                        add_data = add_response.json()
+                        
+                        add_errors = add_data.get("data", {}).get("collectionAddProducts", {}).get("userErrors", [])
+                        if add_errors:
+                            print(f"[WARNING] Errors adding to collection: {add_errors}")
+                        else:
+                            print(f"[SUCCESS] Added product to collection {collection_id}")
+                    
+                    if collection_ids:
+                        print(f"[SUCCESS] Collections updated successfully")
+                        
+                except Exception as e:
+                    print(f"[WARNING] Failed to update collections: {str(e).encode('ascii', 'backslashreplace').decode()}")
+            
+            print(f"[SUCCESS] Product updated successfully")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Exception updating product: {str(e).encode('ascii', 'backslashreplace').decode()}")
+            return False
+    
+    async def delete_product(self, product_id: str) -> bool:
+        """Delete a product from Shopify.
+        
+        Args:
+            product_id: The Shopify product ID (e.g., gid://shopify/Product/123)
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+        if not token:
+            print("[ERROR] No SHOPIFY_ADMIN_TOKEN found")
+            return False
+        
+        shop_url = os.getenv("SHOPIFY_STORE_URL", "").rstrip("/")
+        admin_url = f"{shop_url}/admin/api/2024-01/graphql.json"
+        headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
+        
+        mutation = f"""
+        mutation {{
+          productDelete(input: {{id: "{product_id}"}}) {{
+            deletedProductId
+            userErrors {{
+              field
+              message
+            }}
+          }}
+        }}
+        """
+        
+        client = self.get_client()
+        try:
+            print(f"[DEBUG] Deleting product: {product_id}")
+            response = await client.post(admin_url, json={"query": mutation}, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            if "errors" in data:
+                print(f"[ERROR] GraphQL errors: {data['errors']}")
+                return False
+            
+            user_errors = data.get("data", {}).get("productDelete", {}).get("userErrors", [])
+            if user_errors:
+                print(f"[ERROR] User errors deleting product: {user_errors}")
+                return False
+            
+            deleted_id = data.get("data", {}).get("productDelete", {}).get("deletedProductId")
+            if deleted_id:
+                print(f"[SUCCESS] Product deleted: {deleted_id}")
+                return True
+            else:
+                print("[ERROR] Product deletion did not return deletedProductId")
+                return False
+                
+        except Exception as e:
+            print(f"[ERROR] Exception deleting product: {str(e).encode('ascii', 'backslashreplace').decode()}")
+            return False
 
-        # Since 2024-01 uses inventorySetQuantities
-        await client.post(
-            admin_url,
-            json={"query": inventory_mutation, "variables": inventory_vars},
-            headers=headers
-        )
 
 def get_shopify_client() -> ShopifyClient:
     return ShopifyClient()

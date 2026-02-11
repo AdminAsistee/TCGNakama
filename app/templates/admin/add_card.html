@@ -81,7 +81,7 @@
             </button>
             <h1
                 class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                Add New Card
+                {% if edit_mode %}Edit Card{% else %}Add New Card{% endif %}
             </h1>
             <div class="w-10"></div> <!-- Spacer for balance -->
         </div>
@@ -95,14 +95,41 @@
         </div>
         {% endif %}
 
-        <form action="/admin/add-card" method="POST" enctype="multipart/form-data" class="flex flex-col gap-8">
+        <!-- Loading Overlay -->
+        <div id="loading-overlay"
+            class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+            <div
+                class="glass-panel rounded-2xl p-8 border border-white/10 flex flex-col items-center gap-6 max-w-sm mx-4">
+                <div class="relative w-20 h-20">
+                    <div class="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                    <div
+                        class="absolute inset-0 border-4 border-transparent border-t-primary rounded-full animate-spin">
+                    </div>
+                </div>
+                <div class="text-center space-y-2">
+                    <h3 class="text-lg font-bold text-white">{% if edit_mode %}Updating{% else %}Adding{% endif %}
+                        Card...</h3>
+                    <p class="text-sm text-white/60">Please wait while we process your card</p>
+                </div>
+            </div>
+        </div>
+
+        <form action="{% if edit_mode %}/admin/update-card{% else %}/admin/add-card{% endif %}" method="POST"
+            enctype="multipart/form-data" class="flex flex-col gap-8" onsubmit="return showLoading()">
+            {% if edit_mode %}
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+            <input type="hidden" name="variant_id" value="{{ product.variant_id }}">
+            {% endif %}
             <!-- Asset Section -->
             <section class="glass-panel rounded-2xl p-6 border border-white/10">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Card Assets</h2>
+                    <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Card Assets <span
+                            class="text-red-400">*</span></h2>
                     <span
                         class="text-[10px] text-neon-blue font-bold uppercase tracking-wider bg-neon-blue/10 px-2 py-0.5 rounded border border-neon-blue/20">Sources</span>
                 </div>
+
+                <p id="image-error" class="text-xs text-red-400 hidden mb-3">Please upload at least one image</p>
 
                 <div class="space-y-6">
                     <!-- Image Previews Container -->
@@ -143,7 +170,12 @@
                                 <input name="image_urls"
                                     class="flex-1 bg-surface-dark border border-white/10 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-white/20"
                                     placeholder="https://example.com/card-image.jpg" type="url"
-                                    oninput="updatePreviews()" />
+                                    oninput="updatePreviews()"
+                                    value="{% if edit_mode and product.image_urls and product.image_urls|length > 0 %}{{ product.image_urls[0] }}{% endif %}" />
+                                <button type="button" onclick="this.parentElement.remove(); updatePreviews();"
+                                    class="text-danger-red hover:bg-danger-red/10 p-2 rounded-lg transition-colors">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -157,32 +189,51 @@
                     <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-white/50 mb-2">Core Identity</h3>
 
                     <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Card Name</label>
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Card Name <span
+                                class="text-red-400">*</span></label>
                         <input name="name" required
                             class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary border-transparent outline-none transition-all placeholder:text-white/20"
-                            placeholder="e.g. Charizard GX" type="text" />
+                            placeholder="e.g. Charizard GX" type="text"
+                            value="{{ product.title if edit_mode else '' }}" />
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Description
+                            (Optional)</label>
+                        <textarea name="description" rows="4" style="white-space: pre-wrap;"
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary outline-none transition-all resize-none placeholder:text-white/20"
+                            placeholder="Add a description for this card...">{{ product.description if edit_mode else '' }}</textarea>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Sell Price
-                                (¥)</label>
+                                (¥) <span class="text-red-400">*</span></label>
                             <div class="relative">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-white/40">¥</span>
                                 <input name="price" required
                                     class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 pl-8 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-                                    placeholder="0" type="number" />
+                                    placeholder="0" type="number" value="{{ product.price if edit_mode else '' }}" />
                             </div>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <label
-                                class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Category</label>
-                            <select name="category"
-                                class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary outline-none appearance-none transition-all text-white">
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Collections
+                                <span class="text-red-400">*</span></label>
+                            <div
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 space-y-2 max-h-48 overflow-y-auto">
                                 {% for cat in categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
+                                <label
+                                    class="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
+                                    <input type="checkbox" name="collections" value="{{ cat }}" {% if edit_mode and
+                                        product_collections and cat in product_collections %}checked{% endif %}
+                                        class="w-4 h-4 rounded border-white/20 bg-surface-dark text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0 focus:ring-offset-surface-dark collection-checkbox">
+                                    <span class="text-sm text-white">{{ cat }}</span>
+                                </label>
                                 {% endfor %}
-                            </select>
+                            </div>
+                            <p class="text-xs text-white/30">Select at least one collection</p>
+                            <p id="collection-error" class="text-xs text-red-400 hidden">Please select at least one
+                                collection</p>
                         </div>
                     </div>
                 </div>
@@ -192,40 +243,65 @@
                     <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-white/50 mb-2">TCG Parameters</h3>
 
                     <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Set Name</label>
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Vendor <span
+                                class="text-red-400">*</span></label>
+                        <input name="vendor" required
+                            value="{% if edit_mode and vendor %}{{ vendor }}{% else %}TCG Nakama{% endif %}"
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                            placeholder="e.g. TCG Nakama" type="text" />
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Set Name <span
+                                class="text-red-400">*</span></label>
                         <input name="set_name" required
                             class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-                            placeholder="e.g. VSTAR Universe" type="text" />
+                            placeholder="e.g. VSTAR Universe" type="text"
+                            value="{{ product.set if edit_mode else '' }}" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="flex flex-col gap-2">
-                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Card #</label>
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Card # <span
+                                    class="text-red-400">*</span></label>
                             <input name="card_number" required
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-                                placeholder="210/172" type="text" />
+                                placeholder="210/172" type="text"
+                                value="{{ product.card_number if edit_mode else '' }}" />
                         </div>
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Rarity</label>
                             <select name="rarity"
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
-                                <option value="common">Common</option>
-                                <option value="uncommon">Uncommon</option>
-                                <option value="rare">Rare</option>
-                                <option value="epic">Epic</option>
-                                <option value="ultra rare">Ultra Rare</option>
+                                <option value="Common" {% if edit_mode and product.rarity|lower=='common' %}selected{%
+                                    endif %}>Common</option>
+                                <option value="Uncommon" {% if edit_mode and product.rarity|lower=='uncommon'
+                                    %}selected{% endif %}>Uncommon</option>
+                                <option value="Rare" {% if edit_mode and product.rarity|lower=='rare' %}selected{% endif
+                                    %}>
+                                    Rare</option>
+                                <option value="Epic" {% if edit_mode and product.rarity|lower=='epic' %}selected{% endif
+                                    %}>
+                                    Epic</option>
+                                <option value="Ultra Rare" {% if edit_mode and product.rarity|lower=='ultra rare'
+                                    %}selected{% endif %}>Ultra Rare</option>
                             </select>
                         </div>
                     </div>
 
                     <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Condition</label>
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Condition <span
+                                class="text-red-400">*</span></label>
                         <select name="condition" required
                             class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
-                            <option value="Booster Pack">Booster Pack</option>
-                            <option value="Slab">Slab</option>
-                            <option value="Raw">Raw</option>
-                            <option value="Toploader">Toploader</option>
+                            <option value="Booster Pack" {% if edit_mode and product.condition=='Booster Pack'
+                                %}selected{% endif %}>Booster Pack</option>
+                            <option value="Slab" {% if edit_mode and product.condition=='Slab' %}selected{% endif %}>
+                                Slab</option>
+                            <option value="Raw" {% if edit_mode and product.condition=='Raw' %}selected{% endif %}>Raw
+                            </option>
+                            <option value="Toploader" {% if edit_mode and product.condition=='Toploader' %}selected{%
+                                endif %}>Toploader</option>
                         </select>
                     </div>
                 </div>
@@ -243,7 +319,8 @@
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-white/40">¥</span>
                                 <input name="buy_price"
                                     class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 pl-8 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-                                    placeholder="--" type="number" step="0.1" />
+                                    placeholder="--" type="number" step="0.1"
+                                    value="{% if edit_mode and product.buy_price %}{{ product.buy_price }}{% endif %}" />
                             </div>
                         </div>
                     </div>
@@ -256,8 +333,10 @@
                                 <span class="material-symbols-outlined">remove</span>
                             </button>
                             <div class="flex-1 text-center">
-                                <span id="stock-display" class="text-2xl font-mono font-bold text-white">1</span>
-                                <input type="hidden" name="stock" id="stock-input" value="1">
+                                <span id="stock-display" class="text-2xl font-mono font-bold text-white">{{
+                                    product.inventory_quantity if edit_mode else 1 }}</span>
+                                <input type="hidden" name="stock" id="stock-input"
+                                    value="{{ product.inventory_quantity if edit_mode else 1 }}">
                             </div>
                             <button type="button" onclick="updateStock(1)"
                                 class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-neon-blue hover:bg-white/10 transition-colors">
@@ -347,31 +426,125 @@
 
             // Handle URL previews
             const urlInputs = document.getElementsByName('image_urls');
-            urlInputs.forEach(input => {
-                if (input.value && input.value.match(/\.(jpeg|jpg|gif|png|webp)$/) != null || input.value.startsWith('http')) {
-                    addPreviewItem(input.value, container);
+            urlInputs.forEach((input, index) => {
+                if (input.value && (input.value.match(/\.(jpeg|jpg|gif|png|webp)$/) != null || input.value.startsWith('http'))) {
+                    addPreviewItem(input.value, container, 'url', index);
                 }
             });
 
             // Handle File previews
             const fileInput = document.getElementById('file-input');
             if (fileInput.files) {
-                Array.from(fileInput.files).forEach(file => {
+                Array.from(fileInput.files).forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = function (e) {
-                        addPreviewItem(e.target.result, container);
+                        addPreviewItem(e.target.result, container, 'file', index);
                     };
                     reader.readAsDataURL(file);
                 });
             }
         }
 
-        function addPreviewItem(src, container) {
+        function addPreviewItem(src, container, type, index) {
             const div = document.createElement('div');
-            div.className = 'flex-none w-24 aspect-[3/4] rounded-lg border border-white/10 bg-white/5 overflow-hidden snap-start';
-            div.innerHTML = `<img src="${src}" class="w-full h-full object-cover" onerror="this.src='https://images.pokemontcg.io/bg.jpg'">`;
+            div.className = 'flex-none w-24 aspect-[3/4] rounded-lg border border-white/10 bg-white/5 overflow-hidden snap-start relative group';
+            div.innerHTML = `
+                <img src="${src}" class="w-full h-full object-cover" onerror="this.src='https://images.pokemontcg.io/bg.jpg'">
+                <button type="button" 
+                    onclick="deletePreviewImage('${type}', ${index})" 
+                    class="absolute top-1 right-1 bg-danger-red/80 hover:bg-danger-red text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                </button>
+            `;
             container.appendChild(div);
         }
+
+        function deletePreviewImage(type, index) {
+            if (type === 'url') {
+                // Remove the URL input field
+                const urlInputs = document.getElementsByName('image_urls');
+                if (urlInputs[index]) {
+                    urlInputs[index].parentElement.remove();
+                    updatePreviews();
+                }
+            } else if (type === 'file') {
+                // For files, we need to clear the file input and recreate it without this file
+                const fileInput = document.getElementById('file-input');
+                const dt = new DataTransfer();
+                const files = Array.from(fileInput.files);
+
+                files.forEach((file, i) => {
+                    if (i !== index) {
+                        dt.items.add(file);
+                    }
+                });
+
+                fileInput.files = dt.files;
+                updatePreviews();
+            }
+        }
+
+        function showLoading() {
+            // Validate at least one collection is selected
+            const checkboxes = document.querySelectorAll('.collection-checkbox');
+            const isChecked = Array.from(checkboxes).some(cb => cb.checked);
+
+            if (!isChecked) {
+                document.getElementById('collection-error').classList.remove('hidden');
+                return false;
+            }
+
+            // Validate at least one image is provided
+            const fileInput = document.getElementById('file-input');
+            const urlInputs = document.getElementsByName('image_urls');
+            const hasFiles = fileInput.files && fileInput.files.length > 0;
+            const hasUrls = Array.from(urlInputs).some(input => input.value.trim() !== '');
+
+            if (!hasFiles && !hasUrls) {
+                document.getElementById('image-error').classList.remove('hidden');
+                document.getElementById('collection-error').classList.add('hidden');
+                return false;
+            }
+
+            document.getElementById('image-error').classList.add('hidden');
+
+            document.getElementById('collection-error').classList.add('hidden');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            document.getElementById('loading-overlay').classList.add('flex');
+            return true;
+        }
+
+        // Initialize previews and additional URL fields on page load for edit mode
+        document.addEventListener('DOMContentLoaded', function () {
+            {% if edit_mode and product.image_urls and product.image_urls | length > 1 %}
+            const container = document.getElementById('url-fields-container');
+            const imageUrls = {{ product.image_urls| tojson
+        }};
+
+        // Add additional URL fields for remaining images (first one is already in HTML)
+        for (let i = 1; i < imageUrls.length; i++) {
+            const div = document.createElement('div');
+            div.className = 'flex gap-2';
+            div.innerHTML = `
+                    <input name="image_urls" 
+                        class="flex-1 bg-surface-dark border border-white/10 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-white/20" 
+                        placeholder="https://example.com/card-image.jpg" 
+                        type="url" 
+                        oninput="updatePreviews()" 
+                        value="${imageUrls[i]}" />
+                    <button type="button" onclick="this.parentElement.remove(); updatePreviews();" class="text-danger-red hover:bg-danger-red/10 p-2 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
+                `;
+            container.appendChild(div);
+        }
+        {% endif %}
+
+        // Trigger preview update on page load for edit mode
+        {% if edit_mode %}
+        updatePreviews();
+        {% endif %}
+        });
     </script>
 
 </html>
