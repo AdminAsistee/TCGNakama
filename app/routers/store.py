@@ -381,3 +381,37 @@ async def clear_cart(
         await client.clear_cart(cart_id)
         
     return await get_cart_drawer(request, client)
+
+
+@router.post("/refresh", response_class=HTMLResponse)
+async def refresh_products(
+    request: Request,
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Manually trigger Shopify sync and return updated product grid."""
+    from app.background_tasks import sync_shopify_products
+    
+    try:
+        # Trigger sync
+        await sync_shopify_products()
+        
+        # Fetch fresh products
+        products = await client.get_products()
+        
+        # Add time-since-listed to each product
+        for p in products:
+            p['listed_ago'] = _calc_listed_ago(p)
+        
+        # Return updated product grid
+        return templates.TemplateResponse("partials/product_grid.html", {
+            "request": request,
+            "products": products
+        })
+    except Exception as e:
+        print(f"[ERROR] Refresh failed: {e}")
+        # Return error message in product grid format
+        return templates.TemplateResponse("partials/product_grid.html", {
+            "request": request,
+            "products": [],
+            "error": "Failed to refresh products. Please try again."
+        })

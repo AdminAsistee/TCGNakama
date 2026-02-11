@@ -5,25 +5,11 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from app.dependencies import get_shopify_client
+from app.background_tasks import start_background_tasks, stop_background_tasks, get_sync_status
 
 load_dotenv(override=True)
 
 app = FastAPI(title="TCG Nakama")
-
-# Background Polling Task
-async def poll_shopify_vault():
-    client = get_shopify_client()
-    while True:
-        try:
-            print("\n[PULSE] Shopify Vault Sync: Initiating Heartbeat...")
-            products = await client.get_products()
-            collections = await client.get_collections()
-            print(f"[PULSE] Shopify Vault Sync: SUCCESS ({len(products)} units, {len(collections)} collections verified)")
-        except Exception as e:
-            print(f"[PULSE] Shopify Vault Sync: ERROR - {e}")
-        
-        # Wait 10 minutes
-        await asyncio.sleep(600)
 
 @app.on_event("startup")
 async def startup_event():
@@ -78,13 +64,19 @@ async def startup_event():
     finally:
         db.close()
     
-    # Start background Shopify sync
-    asyncio.create_task(poll_shopify_vault())
+    # Start background Shopify sync (30-minute polling)
+    start_background_tasks()
     
     # Email report scheduler (DISABLED - enable when ready)
     # from app.scheduler import start_scheduler
     # start_scheduler()
     # print("[STARTUP] Daily email report scheduler initialized")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean shutdown of background tasks."""
+    await stop_background_tasks()
+    print("[SHUTDOWN] Application shutdown complete")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

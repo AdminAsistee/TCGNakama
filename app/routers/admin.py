@@ -845,6 +845,30 @@ async def delete_card(
     return RedirectResponse(url="/admin", status_code=303)
 
 
+@router.post("/refresh")
+async def refresh_shopify(
+    admin: str = Depends(get_admin_session)
+):
+    """Manually trigger Shopify product sync."""
+    from app.background_tasks import sync_shopify_products, get_sync_status
+    
+    try:
+        # Trigger sync
+        await sync_shopify_products()
+        status = get_sync_status()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Products synced successfully",
+            "last_sync": status["last_sync"]
+        })
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+
 @router.get("/logout")
 async def logout():
     """Clear session cookie and redirect to marketplace."""

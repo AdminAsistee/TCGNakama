@@ -367,6 +367,18 @@
                 </form>
             </div>
 
+            <!-- Refresh Button -->
+            <div class="mb-4 flex items-center justify-between">
+                <div class="text-xs text-white/60" id="sync-status">
+                    <!-- Sync status will appear here -->
+                </div>
+                <button onclick="refreshShopifySync()" id="refresh-btn"
+                    class="flex items-center gap-2 bg-neon-green/20 hover:bg-neon-green/30 text-neon-green border border-neon-green/40 px-4 py-2 rounded-lg text-xs uppercase tracking-wider font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-sm" id="refresh-icon">sync</span>
+                    <span id="refresh-text">Sync Shopify</span>
+                </button>
+            </div>
+
             <div class="flex items-center justify-end mb-3 px-1">
                 <div class="flex gap-2">
                     <button onclick="toggleColumn('stock')" id="toggle-stock"
@@ -751,6 +763,60 @@
                 localStorage.setItem('lastInventoryDate', today);
             }
         })();
+
+        // Refresh Shopify Sync
+        async function refreshShopifySync() {
+            const btn = document.getElementById('refresh-btn');
+            const icon = document.getElementById('refresh-icon');
+            const text = document.getElementById('refresh-text');
+            const status = document.getElementById('sync-status');
+
+            // Disable button and show loading state
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            icon.classList.add('animate-spin');
+            text.textContent = 'Syncing...';
+            status.textContent = 'Fetching latest products from Shopify...';
+
+            try {
+                const response = await fetch('/admin/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.textContent = '✓ Sync successful! Reloading...';
+                    status.classList.add('text-neon-green');
+
+                    // Reload page after short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || 'Sync failed');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                status.textContent = '✗ Sync failed: ' + error.message;
+                status.classList.add('text-danger-red');
+
+                // Re-enable button
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                icon.classList.remove('animate-spin');
+                text.textContent = 'Sync Shopify';
+
+                // Clear error after 5 seconds
+                setTimeout(() => {
+                    status.textContent = '';
+                    status.classList.remove('text-danger-red');
+                }, 5000);
+            }
+        }
     </script>
 </body>
 
