@@ -33,11 +33,16 @@
             theme: {
                 extend: {
                     colors: {
-                        "primary": "#f425d1",
-                        "background-light": "#f8f5f8",
-                        "background-dark": "#0a0a0a",
-                        "vault-card": "#0f0a0f",
-                        "vault-border": "#211520"
+                        "primary": "#FFD700",
+                        "primary-dark": "#B8960F",
+                        "background-dark": "#0B1120",
+                        "surface": "#111827",
+                        "surface-light": "#1F2937",
+                        "vault-card": "#111827",
+                        "vault-border": "#1F2937",
+                        "neon-red": "#EF4444",
+                        "neon-green": "#22C55E",
+                        "accent-blue": "#3B82F6"
                     },
                     fontFamily: {
                         "display": ["Space Grotesk", "sans-serif"]
@@ -59,7 +64,7 @@
             scroll-behavior: smooth;
         }
         .holographic-glow {
-            box-shadow: 0 0 15px rgba(244, 37, 209, 0.3);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
@@ -69,13 +74,32 @@
             scrollbar-width: none;
         }
         .vault-card-outline {
-            border: 1px solid rgba(244, 37, 209, 0.15);
+            border: 1px solid rgba(255, 215, 0, 0.1);
         }
         .obsidian-glass {
-            background: rgba(15, 10, 15, 0.7);
+            background: rgba(17, 24, 39, 0.8);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(244, 37, 209, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(244, 37, 209, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+        }
+        .glass-hero {
+            background: rgba(11, 17, 32, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gold-glow {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), 0 0 60px rgba(255, 215, 0, 0.1);
+        }
+        .hype-bar {
+            background: linear-gradient(90deg, #EF4444 0%, #EF4444 var(--hype), transparent var(--hype));
+            height: 3px;
+        }
+        .live-pulse {
+            animation: pulse-live 2s infinite;
+        }
+        @keyframes pulse-live {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         .htmx-indicator {
             display: none;
@@ -85,6 +109,9 @@
         }
         .htmx-request.htmx-indicator {
             display: inline-block;
+        }
+        .mini-graph {
+            filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.4));
         }
     </style>
     <script>
@@ -98,21 +125,20 @@
 
         async function handleCartAction(variantId, action, event, qtySourceId) {
             if (event) event.preventDefault();
-            if (event) event.stopPropagation(); // Prevent modal opening if on grid
+            if (event) event.stopPropagation();
             if (!variantId) return;
 
             const qty = qtySourceId ? (parseInt(document.getElementById(qtySourceId).innerText) || 1) : 1;
             const btn = event.currentTarget;
             const originalContent = btn.innerHTML;
 
-            // OPTIMISTIC UI: Update cart count immediately
             const cartCount = document.getElementById('cart-count');
             let originalCount = 0;
             if (cartCount) {
                 originalCount = parseInt(cartCount.innerText) || 0;
                 cartCount.innerText = originalCount + qty;
-                cartCount.classList.add('scale-125', 'text-green-400');
-                setTimeout(() => cartCount.classList.remove('scale-125', 'text-green-400'), 500);
+                cartCount.classList.add('scale-125');
+                setTimeout(() => cartCount.classList.remove('scale-125'), 500);
             }
 
             if (action === 'buy') {
@@ -127,13 +153,12 @@
                 });
                 const data = await response.json();
 
-                // Final sync with server count
                 if (cartCount) cartCount.innerText = data.total_quantity;
 
                 if (action === 'buy' && data.checkout_url) {
                     window.location.href = data.checkout_url;
                 } else if (action === 'add') {
-                    btn.innerHTML = '<span class="material-symbols-outlined text-green-500 scale-125">check_circle</span>';
+                    btn.innerHTML = '<span class="material-symbols-outlined text-neon-green scale-125">check_circle</span>';
                     setTimeout(() => {
                         btn.innerHTML = originalContent;
                         btn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
@@ -141,9 +166,8 @@
                 }
             } catch (err) {
                 console.error("Cart error:", err);
-                // Revert optimistic count on error
                 if (cartCount) cartCount.innerText = originalCount;
-                btn.innerHTML = '<span class="material-symbols-outlined text-red-500">error</span>';
+                btn.innerHTML = '<span class="material-symbols-outlined text-neon-red">error</span>';
                 setTimeout(() => {
                     btn.innerHTML = originalContent;
                     btn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');

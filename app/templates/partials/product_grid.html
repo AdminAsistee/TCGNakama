@@ -1,11 +1,11 @@
 {% for product in products %}
 <div
-    class="flex flex-col group obsidian-glass p-2 rounded-2xl vault-card-outline transition-all duration-150 hover:scale-[1.02] hover:border-primary/50 shadow-lg">
+    class="flex flex-col group bg-surface rounded-xl border border-vault-border overflow-hidden transition-all duration-150 hover:scale-[1.02] hover:border-primary/30 shadow-lg">
     <!-- Modal Trigger Area (Image) -->
-    <div class="relative aspect-[3/4] rounded-xl overflow-hidden cursor-pointer" hx-get="/product/{{ product.id }}"
+    <div class="relative aspect-[3/4] overflow-hidden cursor-pointer" hx-get="/product/{{ product.id }}"
         hx-target="#modal-container" hx-swap="innerHTML">
         <img alt="{{ product.title }}"
-            class="w-full h-full object-cover rounded-xl transition-transform duration-200 group-hover:scale-110"
+            class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
             src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400" loading="lazy" />
         <div
             class="absolute top-3 left-3 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-black text-white border border-white/10 uppercase tracking-widest">
@@ -14,20 +14,20 @@
         {% if product.status == 'Sync' %}
         <div
             class="absolute top-12 left-3 px-2 py-1 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-bold text-white border border-white/10 flex items-center gap-1 shadow-sm">
-            <span class="material-symbols-outlined text-[10px] text-green-400">check_circle</span>
+            <span class="material-symbols-outlined text-[10px] text-neon-green">check_circle</span>
             <span>In Stock</span>
         </div>
         {% endif %}
     </div>
 
     <!-- Info & Action Area -->
-    <div class="mt-4 px-1 space-y-3">
+    <div class="mt-3 px-2 pb-3 space-y-2">
         <div hx-get="/product/{{ product.id }}" hx-target="#modal-container" hx-swap="innerHTML" class="cursor-pointer">
             <div class="flex items-center justify-between">
                 <h4 class="text-xs font-bold truncate pr-2 text-white/90">{{ product.title }}</h4>
                 <div class="flex items-center gap-1">
                     <span
-                        class="w-1 h-1 rounded-full {{ 'bg-green-500' if product.status == 'Sync' else 'bg-primary' }}"></span>
+                        class="w-1 h-1 rounded-full {{ 'bg-neon-green' if product.status == 'Sync' else 'bg-primary' }}"></span>
                     <span class="text-[7px] text-gray-500 uppercase font-black">{{ product.status }}</span>
                 </div>
             </div>
@@ -39,21 +39,21 @@
 
             <!-- Quick Add Controls -->
             <div class="flex items-center gap-2">
-                <div class="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 h-8">
+                <div class="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 h-7">
                     <button onclick="updateQty('grid-qty-{{ product.safe_id }}', -1); event.stopPropagation();"
-                        class="w-6 h-6 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
-                        <span class="material-symbols-outlined text-[12px]">remove</span>
+                        class="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
+                        <span class="material-symbols-outlined text-[11px]">remove</span>
                     </button>
-                    <span id="grid-qty-{{ product.safe_id }}" class="w-6 text-center text-[10px] font-black">1</span>
+                    <span id="grid-qty-{{ product.safe_id }}" class="w-5 text-center text-[10px] font-black">1</span>
                     <button onclick="updateQty('grid-qty-{{ product.safe_id }}', 1); event.stopPropagation();"
-                        class="w-6 h-6 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
-                        <span class="material-symbols-outlined text-[12px]">add</span>
+                        class="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors">
+                        <span class="material-symbols-outlined text-[11px]">add</span>
                     </button>
                 </div>
 
                 <button
                     onclick="handleCartAction('{{ product.variant_id }}', 'add', event, 'grid-qty-{{ product.safe_id }}')"
-                    class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-90 transition-all">
+                    class="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-90 transition-all">
                     <span class="material-symbols-outlined text-sm">add_shopping_cart</span>
                 </button>
             </div>
