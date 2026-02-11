@@ -212,16 +212,24 @@
         <!-- Filter Stickies -->
         <div
             class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
-            <div class="flex gap-3 overflow-x-auto hide-scrollbar">
-                <!-- Hidden Rarity Input for Additive Filtering -->
+            <div class="flex gap-3 overflow-x-auto hide-scrollbar items-center">
+                <!-- Hidden Inputs for Additive Filtering -->
                 <input type="hidden" name="rarity" id="rarity-input" value="" hx-get="/filter" hx-target="#product-grid"
-                    hx-swap="innerHTML" hx-trigger="change" hx-include="#search-input, #collection-input" />
+                    hx-swap="innerHTML" hx-trigger="change"
+                    hx-include="#search-input, #collection-input, #price-slider" />
+
                 <input type="hidden" name="collection" id="collection-input" value="" hx-get="/filter"
                     hx-target="#product-grid" hx-swap="innerHTML" hx-trigger="change"
-                    hx-include="#search-input, #rarity-input" />
+                    hx-include="#search-input, #rarity-input, #price-slider" />
+
                 <input type="hidden" name="max_price" id="price-slider" value="" hx-get="/filter"
-                    hx-target="#product-grid" hx-swap="innerHTML"
+                    hx-target="#product-grid" hx-swap="innerHTML" hx-trigger="change"
                     hx-include="#search-input, #rarity-input, #collection-input" />
+
+                <!-- Price Filter Component -->
+                {% include "partials/price_filter.html" %}
+
+                <div class="w-px h-8 bg-white/10 shrink-0 mx-2"></div>
 
                 <!-- Rarity Filters -->
                 <div id="rarity-filters-container">
@@ -418,13 +426,16 @@
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
         const priceSlider = document.getElementById('price-slider');
+        const mainPriceSlider = document.getElementById('main-price-slider');
 
         if (searchInput) searchInput.value = '';
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
-        if (priceSlider) {
-            priceSlider.value = '';
-            updatePriceDisplay(priceSlider.max);
+        if (priceSlider) priceSlider.value = '';
+        if (mainPriceSlider) {
+            mainPriceSlider.value = 30000;
+            const display = document.getElementById('price-display');
+            if (display) display.textContent = "¥30,000+";
         }
 
         clearFilterVisuals();

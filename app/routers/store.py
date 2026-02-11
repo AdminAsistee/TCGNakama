@@ -121,6 +121,7 @@ async def search_products(
     q: Optional[str] = None,
     collection: Optional[str] = None,
     rarity: Optional[str] = None,
+    max_price: Optional[float] = None,
     page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
@@ -129,14 +130,16 @@ async def search_products(
     svr_active_rarity = rarity.strip().lower() if rarity else None
 
     # Apply filters during search
-    if collection or rarity:
-        products = await client.get_products(query=q, rarity=rarity)
+    if collection or rarity or max_price:
+        products = await client.get_products(query=q, rarity=rarity, max_price=max_price)
         if collection:
             products = await client.get_collection_products(handle=collection)
             if q:
                 products = [p for p in products if q.lower() in p['title'].lower()]
             if rarity:
                 products = [p for p in products if p['rarity'].lower() == rarity.lower()]
+            if max_price:
+                products = [p for p in products if p['price'] <= max_price]
     else:
         products = await client.get_products(query=q)
 

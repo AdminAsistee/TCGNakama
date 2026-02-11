@@ -106,6 +106,20 @@
     {% else %}
     console.warn("Cart Drawer rendered but items list is EMPTY.");
     {% endif %}
+    // Close animation
+    window.closeCartDrawer = function () {
+        const drawer = document.getElementById('cart-drawer');
+        const backdrop = document.getElementById('cart-drawer-backdrop');
+        if (drawer) drawer.classList.add('translate-x-full');
+        if (backdrop) backdrop.classList.add('opacity-0', 'pointer-events-none');
+
+        // Remove from DOM after animation completes
+        setTimeout(() => {
+            const container = document.getElementById('cart-drawer-container');
+            if (container) container.innerHTML = '';
+        }, 300);
+    };
+
     // Reveal animation
     setTimeout(() => {
         const drawer = document.getElementById('cart-drawer');

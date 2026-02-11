@@ -1,0 +1,28 @@
+<div id="price-filter-container" class="flex flex-col gap-1 px-1 min-w-[160px] cursor-pointer group">
+    <div class="flex items-center justify-between">
+        <p class="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Price Under</p>
+        <p id="price-display" class="text-[10px] font-black text-primary">¥30,000+</p>
+    </div>
+    <input type="range" id="main-price-slider" min="0" max="30000" step="500" value="30000"
+        class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/20 transition-all"
+        oninput="syncPriceAndFilter(this.value)">
+</div>
+
+<script>
+    function syncPriceAndFilter(val) {
+        const display = document.getElementById('price-display');
+        const hiddenInput = document.getElementById('price-slider');
+
+        // Update display logic
+        if (parseInt(val) >= 30000) {
+            display.textContent = "¥30,000+";
+            hiddenInput.value = ""; // No limit
+        } else {
+            display.textContent = `¥${parseInt(val).toLocaleString()}`;
+            hiddenInput.value = val;
+        }
+
+        // Trigger HTMX filter
+        hiddenInput.dispatchEvent(new Event('change'));
+    }
+</script>

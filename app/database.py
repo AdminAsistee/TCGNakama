@@ -8,6 +8,10 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tcg_nakama.db")
 
+# Fix for DigitalOcean/Render PostgreSQL URLs (postgres:// -> postgresql://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # SQLAlchemy setup
 engine = create_engine(
     DATABASE_URL,
