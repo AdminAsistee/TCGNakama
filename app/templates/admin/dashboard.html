@@ -100,7 +100,9 @@
         }
 
         input[type=number] {
+            -webkit-appearance: none;
             -moz-appearance: textfield;
+            appearance: none;
         }
     </style>
 </head>
@@ -118,15 +120,52 @@
                 Collector Intelligence
             </h1>
             {% if oauth_connected %}
+            <div
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neon-green/10 border border-neon-green/20">
+                <div class="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse shadow-[0_0_8px_#0bda5e]"></div>
+                <span class="text-[9px] font-black uppercase tracking-[0.1em] text-neon-green">Shopify Connected</span>
+            </div>
+            {% else %}
+            <div
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-danger-red/10 border border-danger-red/20">
+                <div class="w-1.5 h-1.5 rounded-full bg-danger-red animate-pulse shadow-[0_0_8px_#ff2a6d]"></div>
+                <span class="text-[9px] font-black uppercase tracking-[0.1em] text-danger-red">Disconnected</span>
+            </div>
             {% endif %}
             <a href="/admin/logout"
-                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors ml-2">
+                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors ml-auto">
                 <span class="material-symbols-outlined text-sm">logout</span>
                 Logout
             </a>
         </div>
     </header>
     <main class="flex flex-col gap-6 p-4">
+        {% if not oauth_connected %}
+        <!-- Shopify Connection Warning -->
+        <div class="relative group mb-2">
+            <div
+                class="absolute -inset-0.5 bg-gradient-to-r from-danger-red to-neon-purple rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-1000">
+            </div>
+            <div
+                class="relative glass-panel rounded-xl p-4 border border-danger-red/20 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 rounded-full bg-danger-red/10 flex items-center justify-center border border-danger-red/30">
+                        <span class="material-symbols-outlined text-danger-red text-2xl">sync_problem</span>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-bold text-sm tracking-tight">Shopify Admin API Disconnected</h4>
+                        <p class="text-xs text-white/50 mt-1">Live inventory sync and card creation are currently
+                            disabled.</p>
+                    </div>
+                </div>
+                <a href="/oauth/authorize"
+                    class="w-full md:w-auto px-6 py-2.5 bg-danger-red text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-lg hover:bg-danger-red/80 transition-all text-center">
+                    Reconnect Shopify
+                </a>
+            </div>
+        </div>
+        {% endif %}
         <!-- Search Bar -->
         <form method="get" action="/admin" class="mb-6">
             <div class="relative group">
@@ -442,6 +481,12 @@
                 <span
                     class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(37,123,244,0.8)] transition-all">grid_view</span>
                 <span class="text-[10px] font-bold uppercase tracking-wider">Vault</span>
+            </button>
+            <button onclick="window.location.href='/admin/add-card'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">add_circle</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Add Card</span>
             </button>
             <button onclick="window.location.href='/admin/analytics'"
                 class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">

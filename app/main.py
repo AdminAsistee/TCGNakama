@@ -3,7 +3,10 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import store
 import os
 import asyncio
+from dotenv import load_dotenv
 from app.dependencies import get_shopify_client
+
+load_dotenv(override=True)
 
 app = FastAPI(title="TCG Nakama")
 

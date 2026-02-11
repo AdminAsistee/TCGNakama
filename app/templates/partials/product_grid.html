@@ -62,6 +62,41 @@
 </div>
 {% endfor %}
 
+<!-- Pagination Controls -->
+{% if total_pages > 1 %}
+<div class="col-span-full flex items-center justify-center gap-4 mt-12 py-6 border-t border-white/5">
+    <button
+        class="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest transition-all {{ 'opacity-30 cursor-not-allowed' if current_page <= 1 else 'hover:bg-white/10 hover:border-primary/50 text-white' }}"
+        {% if current_page> 1 %}
+        hx-get="/filter?page={{ current_page - 1 }}"
+        hx-target="#product-grid"
+        hx-include="#search-input, #rarity-input, #price-slider, #collection-input"
+        {% else %}
+        disabled
+        {% endif %}>
+        <span class="material-symbols-outlined text-sm">chevron_left</span>
+        Prev
+    </button>
+
+    <div class="flex items-center gap-2">
+        <span class="text-[10px] font-black text-primary uppercase tracking-widest">Page</span>
+        <span
+            class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-black text-white shadow-[0_0_15px_rgba(244,37,209,0.3)]">
+            {{ current_page }}
+        </span>
+        <span class="text-[10px] font-black text-gray-600 uppercase tracking-widest">of {{ total_pages }}</span>
+    </div>
+
+    <button
+        class="flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest transition-all {{ 'opacity-30 cursor-not-allowed' if current_page >= total_pages else 'hover:bg-white/10 hover:border-primary/50 text-white' }}"
+        {% if current_page < total_pages %} hx-get="/filter?page={{ current_page + 1 }}" hx-target="#product-grid"
+        hx-include="#search-input, #rarity-input, #price-slider, #collection-input" {% else %} disabled {% endif %}>
+        Next
+        <span class="material-symbols-outlined text-sm">chevron_right</span>
+    </button>
+</div>
+{% endif %}
+
 {% if not products %}
 <div class="col-span-full text-center py-12">
     <span class="material-symbols-outlined text-gray-600 text-4xl mb-2">search_off</span>
@@ -69,7 +104,7 @@
 </div>
 {% endif %}
 
-{% if collections or svr_active_rarity %}
+{% if request.headers.get('HX-Request') and (collections or svr_active_rarity) %}
 {% set oob = true %}
 {% include "partials/collection_filters.html" %}
 {% include "partials/rarity_filters.html" %}

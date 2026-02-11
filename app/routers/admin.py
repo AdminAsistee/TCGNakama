@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
+from typing import Optional, Any, List
+from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.dependencies import get_shopify_client, ShopifyClient
@@ -172,7 +173,16 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         import hashlib
         session_token = hashlib.sha256(f"{email}{SESSION_SECRET}".encode()).hexdigest()[:32]
         
-        response = RedirectResponse(url="/admin", status_code=303)
+        # Check if we have a valid Shopify token
+        admin_token = get_admin_token()
+        
+        # Determine redirect target
+        target_url = "/admin"
+        if not admin_token or not admin_token.startswith("shpat_"):
+            print("[DEBUG] No valid Admin Token found after login, redirecting to OAuth")
+            target_url = "/oauth/authorize"
+        
+        response = RedirectResponse(url=target_url, status_code=303)
         response.set_cookie(
             key="admin_session",
             value=session_token,
@@ -188,14 +198,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         })
 
 
-class CostUpdate(BaseModel):
-    product_id: str
-    buy_price: float
 
-
-class GradeUpdate(BaseModel):
-    product_id: str
-    grade: str
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -382,6 +385,124 @@ async def force_sync(request: Request, admin: str = Depends(get_admin_session), 
     
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/admin", status_code=303)
+
+
+@router.get("/add-card", response_class=HTMLResponse)
+async def add_card_page(
+    request: Request, 
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Show the add card form."""
+    admin_token = get_admin_token()
+    categories = []
+    if admin_token:
+        try:
+            categories = await client.get_collections(admin_token)
+        except Exception as e:
+            print(f"Error fetching categories: {e}")
+    
+    # Fallback to defaults if empty
+    if not categories:
+        categories = ["Pokémon", "One Piece", "Magic: TG", "Yu-Gi-Oh!"]
+        
+    return templates.TemplateResponse("admin/add_card.html", {
+        "request": request,
+        "categories": categories
+    })
+
+
+@router.post("/add-card")
+async def add_card(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client),
+    name: str = Form(...),
+    price: float = Form(...),
+    category: str = Form(...),
+    set_name: str = Form(...),
+    card_number: str = Form(...),
+    rarity: str = Form(...),
+    condition: str = Form(...),
+    description: str = Form(""),
+    stock: int = Form(1),
+    buy_price: Optional[float] = Form(None),
+    image_urls: List[str] = Form([]),
+    image_files: List[UploadFile] = File([])
+):
+    """Process the add card form and sync to Shopify."""
+    admin_token = get_admin_token()
+    if not admin_token:
+        # In a real app, we'd redirect to OAuth or show a better error
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": "Shopify Admin API not connected. Please connect Shopify first."
+        })
+
+    # Collect all image sources
+    all_images = [url for url in image_urls if url.strip()]
+    
+    print(f"[DEBUG] Attempting to add card. Token prefix: {admin_token[:10]}...")
+    
+    # Process file uploads
+    for file in image_files:
+        if file.filename:
+            try:
+                content = await file.read()
+                if len(content) > 0:
+                    # 1. Create staged upload
+                    target = await client.staged_uploads_create(
+                        admin_token=admin_token,
+                        filename=file.filename,
+                        mime_type=file.content_type,
+                        file_size=str(len(content))
+                    )
+                    
+                    # 2. Upload file
+                    resource_url = await client.upload_file_to_staged_target(
+                        target=target,
+                        file_content=content,
+                        mime_type=file.content_type
+                    )
+                    all_images.append(resource_url)
+            except Exception as upload_err:
+                print(f"[ERROR] Failed to upload {file.filename}: {upload_err}")
+
+    # Prepare tags for Shopify
+    tags = [
+        f"Set: {set_name}",
+        f"Rarity: {rarity.capitalize()}",
+        f"Number: {card_number}",
+        f"Condition: {condition}"
+    ]
+    
+    product_data = {
+        "title": name,
+        "description": description,
+        "price": price,
+        "vendor": "TCG Nakama",
+        "product_type": category,
+        "tags": tags,
+        "quantity": stock,
+        "images": all_images
+    }
+
+    try:
+        # 1. Create product in Shopify
+        new_product = await client.create_product(admin_token, product_data)
+        shopify_product_id = new_product["id"]
+
+        # 2. Save Buy Price (Cost) to local DB if provided
+        if buy_price is not None:
+            cost_db.set_cost(shopify_product_id, buy_price)
+            
+        return RedirectResponse(url="/admin?success=Card added successfully", status_code=303)
+    except Exception as e:
+        print(f"[ERROR] Failed to add card: {str(e).encode('ascii', 'backslashreplace').decode()}")
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": f"Failed to add card: {str(e)}"
+        })
 
 
 @router.get("/logout")

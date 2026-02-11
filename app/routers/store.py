@@ -11,15 +11,25 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/", response_class=HTMLResponse)
 async def read_root(
     request: Request,
+    page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     from app.dependencies import SHOPIFY_STORE_URL
     products = await client.get_products()
+    
+    # Pagination
+    PAGE_SIZE = 20
+    total_products = len(products)
+    total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
+    start = (page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    paginated_products = products[start:end]
+
     collections = await client.get_collections()
     
     # DEBUG: Check for duplicate variant IDs
     v_ids = [p.get('variant_id') for p in products]
-    print(f"DEBUG: read_root | Products Count: {len(products)} | Unique Variant IDs: {len(set(v_ids))}")
+    # Removed print statement that could cause Unicode issues
     if len(v_ids) != len(set(v_ids)):
         print(f"WARNING: DUPLICATE VARIANT IDS DETECTED: {v_ids}")
 
@@ -36,13 +46,16 @@ async def read_root(
 
     return templates.TemplateResponse("index.html", {
         "request": request, 
-        "products": products,
+        "products": paginated_products,
         "collections": collections,
         "shopify_url": SHOPIFY_STORE_URL,
         "cart_count": cart_count,
         "checkout_url": checkout_url,
         "svr_active_collection": None,
-        "svr_active_rarity": None
+        "svr_active_rarity": None,
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_products": total_products
     })
 
 @router.get("/search", response_class=HTMLResponse)
@@ -51,6 +64,7 @@ async def search_products(
     q: Optional[str] = None,
     collection: Optional[str] = None,
     rarity: Optional[str] = None,
+    page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     # Normalize for templates
@@ -70,13 +84,25 @@ async def search_products(
         products = await client.get_products(query=q)
 
     collections = await client.get_collections()
-    print(f"[DEBUG] Search | collection: {svr_active_collection}, rarity: {svr_active_rarity}")
+    
+    # Pagination
+    PAGE_SIZE = 20
+    total_products = len(products)
+    total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
+    start = (page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    paginated_products = products[start:end]
+
+    print(f"[DEBUG] Search | collection: {svr_active_collection}, rarity: {svr_active_rarity}, page: {page}")
     return templates.TemplateResponse("partials/product_grid.html", {
         "request": request, 
-        "products": products,
+        "products": paginated_products,
         "collections": collections,
         "svr_active_collection": svr_active_collection,
-        "svr_active_rarity": svr_active_rarity
+        "svr_active_rarity": svr_active_rarity,
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_products": total_products
     })
 
 @router.get("/filter", response_class=HTMLResponse)
@@ -87,6 +113,7 @@ async def filter_products(
     collection: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
+    page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     # Normalize for templates
@@ -108,13 +135,25 @@ async def filter_products(
         products = await client.get_products(query=q, rarity=rarity, min_price=min_price, max_price=max_price)
     
     collections = await client.get_collections()
-    print(f"[DEBUG] Filter | collection: {svr_active_collection}, rarity: {svr_active_rarity}")
+
+    # Pagination
+    PAGE_SIZE = 20
+    total_products = len(products)
+    total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
+    start = (page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    paginated_products = products[start:end]
+
+    print(f"[DEBUG] Filter | collection: {svr_active_collection}, rarity: {svr_active_rarity}, page: {page}")
     return templates.TemplateResponse("partials/product_grid.html", {
         "request": request, 
-        "products": products,
+        "products": paginated_products,
         "collections": collections,
         "svr_active_collection": svr_active_collection,
-        "svr_active_rarity": svr_active_rarity
+        "svr_active_rarity": svr_active_rarity,
+        "current_page": page,
+        "total_pages": total_pages,
+        "total_products": total_products
     })
 
 @router.get("/product/{product_id:path}", response_class=HTMLResponse)
@@ -185,6 +224,12 @@ async def add_to_cart(
     else:
         cart = await client.create_cart(variant_id, quantity)
     
+    if not cart:
+        return JSONResponse({
+            "status": "error",
+            "message": "Could not create or update cart"
+        }, status_code=500)
+
     response = JSONResponse({
         "status": "success",
         "total_quantity": cart.get("totalQuantity", 0),

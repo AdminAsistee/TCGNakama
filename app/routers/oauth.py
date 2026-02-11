@@ -78,7 +78,7 @@ async def callback(request: Request, code: str = None, state: str = None, shop: 
     # Exchange code for access token
     token_url = f"https://{shop_name}.myshopify.com/admin/oauth/access_token"
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             token_url,
             json={
@@ -103,8 +103,32 @@ async def callback(request: Request, code: str = None, state: str = None, shop: 
     # Save to environment for immediate use
     os.environ["SHOPIFY_ADMIN_TOKEN"] = access_token
     
+    # Persist to .env for server restarts
+    try:
+        from dotenv import set_key
+        set_key(".env", "SHOPIFY_ADMIN_TOKEN", access_token)
+    except Exception as e:
+        print(f"[ERROR] Failed to persist token to .env: {e}")
+    
     # Redirect back to admin dashboard with success message
-    return RedirectResponse(url="/admin?oauth=success")
+    response = RedirectResponse(url="/admin?oauth=success")
+    
+    # Automatically "log in" the admin by setting the session cookie
+    import hashlib
+    # Use the same secret as admin.py (or a default if not set)
+    # Note: In a real app, this should be shared via a config module
+    secret = os.getenv("SESSION_SECRET", "default_secret_change_me")
+    stored_email = os.getenv("ADMIN_EMAIL", "admin@asistee.com")
+    session_token = hashlib.sha256(f"{stored_email}{secret}".encode()).hexdigest()[:32]
+    
+    response.set_cookie(
+        key="admin_session",
+        value=session_token,
+        httponly=True,
+        max_age=3600 * 24 * 7 # 1 week
+    )
+    
+    return response
 
 
 @router.get("/status")
@@ -122,5 +146,22 @@ async def status():
 def get_admin_token() -> str | None:
     """
     Helper function to get the current admin access token.
+    Prioritizes SHOPIFY_ADMIN_TOKEN from environment if set correctly.
     """
-    return token_store.get("admin_access_token") or os.getenv("SHOPIFY_ADMIN_TOKEN")
+    env_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    stored_token = token_store.get("admin_access_token")
+    
+    if env_token and env_token.startswith("shpat_"):
+        print(f"[DEBUG] Using Admin Token from Environment (prefix: {env_token[:10]}...)")
+        return env_token
+    
+    if stored_token:
+        print(f"[DEBUG] Using Admin Token from token_store (prefix: {stored_token[:10]}...)")
+        return stored_token
+        
+    if env_token:
+        print(f"[DEBUG] Using Admin Token from Environment (prefix: {env_token[:10]}...)")
+        return env_token
+        
+    print("[DEBUG] No Admin Token found!")
+    return None

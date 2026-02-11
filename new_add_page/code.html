@@ -1,0 +1,219 @@
+<html class="dark" lang="en"><head><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">```html
+
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f425d1",
+                        "background-light": "#f8f5f8",
+                        "background-dark": "#120811",
+                        "surface-dark": "#22101f",
+                        "border-dark": "#3d1c37",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        .holo-glow {
+            box-shadow: 0 0 20px rgba(244, 37, 209, 0.4), 0 0 40px rgba(66, 220, 244, 0.2);
+            background: linear-gradient(135deg, #f425d1 0%, #a855f7 50%, #2dd4bf 100%);
+            background-size: 200% 200%;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 4px;
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3d1c37;
+            border-radius: 10px;
+        }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+
+
+<div class="relative flex min-h-screen w-full flex-col max-w-[480px] mx-auto bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden">
+<div class="sticky top-0 z-50 flex items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md p-4 justify-between border-b border-slate-200 dark:border-border-dark">
+<button class="flex items-center text-slate-500 dark:text-slate-400">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h2 class="text-lg font-bold leading-tight tracking-tight flex-1 text-center">Add New Card</h2>
+<div class="flex w-12 items-center justify-end">
+<p class="text-primary text-sm font-bold tracking-wide">Draft</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto pb-32 custom-scrollbar">
+<div class="p-4">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Card Assets</h3>
+<span class="text-[10px] text-primary font-bold uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded">Raw Hi-Res</span>
+</div>
+<div class="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
+<div class="flex-none w-32 snap-start flex flex-col gap-2">
+<div class="relative aspect-[3/4] rounded-xl border-2 border-dashed border-slate-300 dark:border-border-dark bg-slate-100 dark:bg-surface-dark flex flex-col items-center justify-center overflow-hidden transition-all hover:border-primary/50">
+<div class="absolute inset-0 bg-cover bg-center opacity-40 grayscale" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAlH-cqd1GUo1X0jc-qLlZMfpR3-SHcY9vlGsGPEM_EZhj5TUCQwB2OU7U63jT-FcxvC3RRd7ZTDMKBuxxoTEb8_z352-cUp4A1x06uFy_pISQ9H8dFiZ89Q882UJslOQtzux9ddSGzBPwC2cpRH0TOsYaRHRxbsgWteOAq8IPoY-Myc-rq6tfRwutkFSUH5JNIm3XR91xYiI7r9uHS56qly5Q5KVriMW7iG3Wp3nADyZ0Jwv79U52deNmW5SXMuiKhvXBZTN_bXmMC')"></div>
+<div class="z-10 flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined text-2xl">add_a_photo</span>
+</div>
+</div>
+<p class="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500">Front</p>
+</div>
+<div class="flex-none w-32 snap-start flex flex-col gap-2">
+<div class="relative aspect-[3/4] rounded-xl border-2 border-dashed border-slate-300 dark:border-border-dark bg-slate-100 dark:bg-surface-dark flex flex-col items-center justify-center overflow-hidden transition-all hover:border-primary/50">
+<div class="absolute inset-0 bg-cover bg-center opacity-40 grayscale" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBM60g9AO48dsGkAinM8oWu374DKNDHvxEzIH_9hYh0kWN8vaLQaRm2S1JbinxwxbqftlZdZVjzkscnaMI8j03oCVodfgMVWR-tL-qJGLSduoE1u_iHL7ipCppdHMlbN-PlOrnDsF0uDuTltZ9Xawts1rsatexOBom1Il0U5aqetHzL2KbBqQBY5F1lBulnnd-7TaFxKGSdxXK84T1fIILDzc7PolxMUvkpNvu60UsMU0AWT_7oc01qf52dBatoRizwYalwp8eU4Ck8')"></div>
+<div class="z-10 flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined text-2xl">add_a_photo</span>
+</div>
+</div>
+<p class="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500">Back</p>
+</div>
+<div class="flex-none w-32 snap-start flex flex-col gap-2">
+<div class="relative aspect-[3/4] rounded-xl border-2 border-dashed border-slate-300 dark:border-border-dark bg-slate-100 dark:bg-surface-dark flex flex-col items-center justify-center overflow-hidden transition-all hover:border-primary/50">
+<div class="z-10 flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined text-2xl">add_a_photo</span>
+</div>
+</div>
+<p class="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500/50">Detail 1</p>
+</div>
+<div class="flex-none w-16 snap-start flex items-center justify-center pr-2">
+<button class="size-12 rounded-full border border-slate-200 dark:border-border-dark flex items-center justify-center text-slate-400 bg-slate-50 dark:bg-surface-dark">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</div>
+</div>
+<div class="px-4 py-2 space-y-4">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Card Name</label>
+<input class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-xl p-4 text-base focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600" placeholder="e.g. Umbreon VMAX Alt Art" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Price (Yen)</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">¥</span>
+<input class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-xl p-4 pl-8 text-base focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="0" type="number"/>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Category</label>
+<select class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-xl p-4 text-base focus:ring-2 focus:ring-primary outline-none appearance-none transition-all">
+<option>Pokémon</option>
+<option>One Piece</option>
+<option>Magic: TG</option>
+<option>Yu-Gi-Oh!</option>
+</select>
+</div>
+</div>
+</div>
+<div class="px-4 py-4 space-y-4">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-primary text-sm">label</span>
+<h3 class="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Product Tags</h3>
+</div>
+<div class="grid grid-cols-1 gap-4 bg-slate-50 dark:bg-surface-dark/40 p-4 rounded-2xl border border-slate-100 dark:border-border-dark">
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Set / Expansion</label>
+<input class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="e.g. Evolving Skies" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Card Number</label>
+<input class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="215/203" type="text"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Rarity</label>
+<select class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none">
+<option>Secret Rare</option>
+<option>Ultra Rare</option>
+<option>Alt Art</option>
+<option>Common</option>
+</select>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Condition</label>
+<select class="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none appearance-none">
+<option>Booster Pack</option>
+<option>Slab</option>
+<option>Raw</option>
+<option>Toploader</option>
+</select>
+</div>
+</div>
+</div>
+<div class="px-4 py-2">
+<label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">Listing Description</label>
+<div class="border border-slate-200 dark:border-border-dark rounded-xl bg-white dark:bg-surface-dark overflow-hidden focus-within:ring-2 focus-within:ring-primary transition-all">
+<div class="flex items-center gap-4 px-4 py-2 border-b border-slate-100 dark:border-border-dark bg-slate-50 dark:bg-surface-dark/50">
+<span class="material-symbols-outlined text-sm cursor-pointer hover:text-primary">format_bold</span>
+<span class="material-symbols-outlined text-sm cursor-pointer hover:text-primary">format_italic</span>
+<span class="material-symbols-outlined text-sm cursor-pointer hover:text-primary">format_list_bulleted</span>
+<span class="material-symbols-outlined text-sm cursor-pointer hover:text-primary">link</span>
+</div>
+<textarea class="w-full p-4 min-h-[100px] bg-transparent border-none focus:ring-0 text-base" placeholder="Condition details, centering, notes..."></textarea>
+</div>
+</div>
+<div class="px-4 py-6 space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-sm font-bold uppercase tracking-wider">Stock Level</span>
+<span class="text-[10px] text-slate-500 uppercase">Available in Vault</span>
+</div>
+<div class="flex items-center gap-4 bg-slate-100 dark:bg-surface-dark rounded-full p-1 border border-slate-200 dark:border-border-dark">
+<button class="size-8 rounded-full bg-white dark:bg-border-dark flex items-center justify-center text-primary shadow-sm active:opacity-50">
+<span class="material-symbols-outlined text-xl">remove</span>
+</button>
+<span class="text-base font-bold w-4 text-center">1</span>
+<button class="size-8 rounded-full bg-white dark:bg-border-dark flex items-center justify-center text-primary shadow-sm active:opacity-50">
+<span class="material-symbols-outlined text-xl">add</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-dark/50 border border-slate-100 dark:border-border-dark">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-blue-500">sync</span>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-bold uppercase tracking-wider">Store Sync</span>
+<span class="text-[10px] uppercase tracking-tighter text-slate-400">Global Sync</span>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<div class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] p-6 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/95 dark:via-background-dark/95 to-transparent pt-10">
+<button class="holo-glow w-full py-4 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all duration-200 shadow-xl">
+<span class="material-symbols-outlined">auto_awesome</span>
+                Publish to Vault
+            </button>
+</div>
+</div>
+```</body></html>
