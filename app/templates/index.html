@@ -583,7 +583,8 @@
             <span class="material-symbols-outlined text-gray-500 text-xl">storefront</span>
             <span class="text-[9px] font-bold text-gray-500">Shop</span>
         </a>
-        <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1">
+        <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1"
+            onclick="event.preventDefault(); openCollectionSheet()">
             <span class="material-symbols-outlined text-gray-500 text-xl">grid_view</span>
             <span class="text-[9px] font-bold text-gray-500">Collection</span>
         </a>
@@ -597,6 +598,49 @@
         </button>
     </div>
 </nav>
+
+<!-- ═══════ MOBILE: Collection Bottom Sheet ═══════ -->
+<div id="collection-sheet-backdrop"
+    class="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] opacity-0 invisible transition-opacity duration-300"
+    onclick="closeCollectionSheet()"></div>
+<div id="collection-sheet"
+    class="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-surface rounded-t-2xl transform translate-y-full transition-transform duration-300 ease-out">
+    <div class="flex justify-center pt-3 pb-2" onclick="closeCollectionSheet()">
+        <div class="w-10 h-1 bg-white/20 rounded-full"></div>
+    </div>
+    <div class="flex items-center justify-between px-5 pb-3 border-b border-white/10">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Collections</h3>
+        <button type="button" onclick="closeCollectionSheet()"
+            class="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 active:bg-white/10">
+            <span class="material-symbols-outlined text-gray-400 text-lg">close</span>
+        </button>
+    </div>
+    <div class="px-5 py-4 space-y-1 safe-area-bottom">
+        <button type="button" onclick="pickCollection('pokemon')"
+            class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl active:bg-white/5 transition-all text-left">
+
+            <span class="text-sm font-bold text-white">Pokémon</span>
+        </button>
+        <button type="button" onclick="pickCollection('one-piece')"
+            class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl active:bg-white/5 transition-all text-left">
+
+            <span class="text-sm font-bold text-white">One Piece</span>
+        </button>
+        <div class="border-t border-white/5 my-2"></div>
+        <div class="flex items-center gap-3 px-4 py-3 opacity-40">
+
+            <span class="text-sm font-medium text-gray-400">Magic: The Gathering</span>
+            <span
+                class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase ml-auto">Soon</span>
+        </div>
+        <div class="flex items-center gap-3 px-4 py-3 opacity-40">
+
+            <span class="text-sm font-medium text-gray-400">Dragon Ball</span>
+            <span
+                class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase ml-auto">Soon</span>
+        </div>
+    </div>
+</div>
 
 <!-- Scripts -->
 <script>
@@ -1060,6 +1104,36 @@
                 clearBtn.classList.add('hidden');
             }
         }
+    }
+
+    // ───── Mobile Collection Sheet ─────
+    function openCollectionSheet() {
+        const backdrop = document.getElementById('collection-sheet-backdrop');
+        const sheet = document.getElementById('collection-sheet');
+        if (!backdrop || !sheet) return;
+        backdrop.classList.remove('opacity-0', 'invisible');
+        backdrop.classList.add('opacity-100');
+        sheet.classList.remove('translate-y-full');
+        sheet.classList.add('translate-y-0');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCollectionSheet() {
+        const backdrop = document.getElementById('collection-sheet-backdrop');
+        const sheet = document.getElementById('collection-sheet');
+        if (!backdrop || !sheet) return;
+        backdrop.classList.add('opacity-0', 'invisible');
+        backdrop.classList.remove('opacity-100');
+        sheet.classList.add('translate-y-full');
+        sheet.classList.remove('translate-y-0');
+        document.body.style.overflow = '';
+    }
+
+    function pickCollection(handle) {
+        closeCollectionSheet();
+        setTimeout(() => {
+            shopCollection(handle);
+        }, 300);
     }
 
     // ───── Hero Banner Carousel ─────
