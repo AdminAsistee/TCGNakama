@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
     <title>TCG Nakama Marketplace</title>
 
     <!-- HTMX -->
@@ -112,6 +112,11 @@
         }
         .mini-graph {
             filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.4));
+        }
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .safe-area-bottom {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
         }
     </style>
     <script>

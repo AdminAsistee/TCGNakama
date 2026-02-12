@@ -3,7 +3,7 @@
 {% block content %}
 <!-- ==================== HEADER / NAVBAR ==================== -->
 <header class="sticky top-0 z-50 bg-background-dark/90 backdrop-blur-md border-b border-white/5">
-    <div class="flex items-center p-4 px-6 justify-between max-w-7xl mx-auto">
+    <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto">
         <!-- Logo -->
         <div class="flex items-center gap-2">
             <img src="/static/logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
@@ -25,9 +25,9 @@
                 </button>
                 <div
                     class="absolute top-full left-0 mt-1 w-auto min-w-[200px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
-                    <a href="#"
+                    <a href="#all-cards-section" onclick="event.preventDefault(); shopCollection('pokemon')"
                         class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">Pokémon</a>
-                    <a href="#"
+                    <a href="#all-cards-section" onclick="event.preventDefault(); shopCollection('one-piece')"
                         class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">One
                         Piece</a>
                     <div class="border-t border-white/5"></div>
@@ -54,7 +54,7 @@
 
         <!-- Cart -->
         <button id="cart-btn"
-            class="relative w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+            class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
             hx-get="/cart/drawer" hx-target="#cart-drawer-container">
             <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
             <span id="cart-count"
@@ -64,10 +64,10 @@
     </div>
 
     <!-- Search Bar -->
-    <div class="px-6 pb-4 max-w-7xl mx-auto">
+    <div class="px-3 pb-3 md:px-6 md:pb-4 max-w-7xl mx-auto">
         <label class="flex flex-col w-full relative">
             <div
-                class="flex w-full items-stretch rounded-full h-11 bg-white/5 border border-white/10 focus-within:border-primary/50 transition-colors">
+                class="flex w-full items-stretch rounded-full h-10 md:h-11 bg-white/5 border border-white/10 focus-within:border-primary/50 transition-colors">
                 <div class="text-gray-400 flex items-center justify-center pl-4">
                     <span class="material-symbols-outlined text-lg">search</span>
                 </div>
@@ -114,10 +114,18 @@
                 <div class="relative h-full flex flex-col items-center justify-center text-center px-6">
                     <h2 class="text-xl md:text-2xl font-bold text-white mb-1">{{ banner.title }}</h2>
                     <p class="text-xs text-gray-300 mb-4">{{ banner.subtitle }}</p>
+                    {% if banner.cta_link.startswith('#collection:') %}
+                    <a href="#all-cards-section"
+                        onclick="event.preventDefault(); shopCollection('{{ banner.cta_link.replace('#collection:', '') }}')"
+                        class="px-6 py-2 bg-primary text-background-dark font-bold text-sm rounded-full hover:bg-primary-dark transition-colors shadow-lg gold-glow">
+                        {{ banner.cta_label }}
+                    </a>
+                    {% else %}
                     <a href="{{ banner.cta_link }}"
                         class="px-6 py-2 bg-primary text-background-dark font-bold text-sm rounded-full hover:bg-primary-dark transition-colors shadow-lg gold-glow">
                         {{ banner.cta_label }}
                     </a>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -244,7 +252,8 @@
 
     <!-- ==================== ALL PRODUCTS (VAULT GRAILS) ==================== -->
     <section id="all-cards-section" class="mt-10 scroll-mt-32">
-        <div class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-3 border-b border-white/5">
+        <div id="filter-sticky-bar"
+            class="sticky z-40 bg-background-dark/95 backdrop-blur-sm py-2 md:py-3 border-b border-white/5 mt-4 md:mt-8 mb-6 md:mb-10">
             <form id="filter-form" hx-get="/filter" hx-target="#product-grid" hx-indicator="#grid-loading"
                 hx-trigger="change" hx-include="#search-input">
                 <!-- Hidden Inputs for Additive Filtering -->
@@ -255,42 +264,218 @@
                     hx-include="[name='rarity'], [name='collection'], [name='condition'], [name='min_price'], [name='max_price']" />
                 <input type="hidden" name="max_price" id="price-slider" value="" />
 
-                <div class="flex items-center gap-2">
-                    <!-- Clear button — always visible, pinned left -->
-                    <button type="button" onclick="resetFilters()"
-                        class="shrink-0 text-[10px] font-bold text-gray-500 hover:text-primary uppercase tracking-wider transition-colors pl-1 pr-2">
-                        Clear
-                    </button>
+                <!-- ═══════ MOBILE: Compact Filter Bar ═══════ -->
+                <div class="md:hidden px-3 py-1">
+                    <div class="flex items-center justify-between">
+                        <button type="button" onclick="openFilterSheet()"
+                            class="flex items-center gap-2 h-10 px-4 rounded-full border border-white/10 bg-white/5 active:bg-white/10 transition-all">
+                            <span class="material-symbols-outlined text-gray-300 text-lg">tune</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-gray-300">Filter</span>
+                            <span id="mobile-filter-count"
+                                class="hidden text-[9px] font-black bg-primary text-background-dark w-5 h-5 rounded-full flex items-center justify-center">0</span>
+                        </button>
+                        <button type="button" onclick="resetFilters()"
+                            class="text-[11px] font-bold text-gray-500 hover:text-primary uppercase tracking-wider transition-colors px-3 h-10 hidden"
+                            id="mobile-clear-btn">
+                            Clear
+                        </button>
+                    </div>
+                </div>
 
-                    <div class="w-px h-5 bg-white/10 shrink-0"></div>
-
-                    <!-- Scrollable filter pills -->
-                    <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1">
-                        <!-- Price Filter Component -->
-                        {% include "partials/price_filter.html" %}
-
-                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
-
-                        <!-- Rarity Filters -->
-                        <div id="rarity-filters-container">
-                            {% include "partials/rarity_filters.html" %}
+                <!-- ═══════ DESKTOP: Inline Filter Bar (unchanged) ═══════ -->
+                <div class="hidden md:block px-4 py-3 bg-white/[0.02] rounded-xl border border-white/5">
+                    <div class="flex items-center justify-between gap-3">
+                        <!-- Price Filter -->
+                        <div class="flex items-center gap-3">
+                            {% include "partials/price_filter.html" %}
+                            <div class="w-px h-5 bg-white/10 shrink-0"></div>
                         </div>
 
-                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
+                        <!-- Filter Dropdowns -->
+                        <div class="flex items-center gap-1 flex-1">
+                            <!-- Rarity Dropdown -->
+                            <div class="relative filter-dropdown" data-filter-group="rarity">
+                                <button type="button" onclick="toggleFilterDropdown('rarity')"
+                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                    <span
+                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Rarity</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                        id="rarity-chevron">expand_more</span>
+                                    <span id="rarity-badge"
+                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                </button>
+                                <div id="rarity-dropdown-panel"
+                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                    {% set rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Ultra Rare'] %}
+                                    {% for r in rarities %}
+                                    <button type="button" data-rarity-btn="{{ r }}"
+                                        onclick="setActiveFilter('{{ r }}', this)"
+                                        class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                        {{ r }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
 
-                        <!-- Condition Filters -->
-                        <div id="condition-filters-container">
-                            {% include "partials/condition_filters.html" %}
+                            <!-- Condition Dropdown -->
+                            <div class="relative filter-dropdown" data-filter-group="condition">
+                                <button type="button" onclick="toggleFilterDropdown('condition')"
+                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                    <span
+                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Condition</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                        id="condition-chevron">expand_more</span>
+                                    <span id="condition-badge"
+                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                </button>
+                                <div id="condition-dropdown-panel"
+                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                    {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+                                    {% for c in conditions %}
+                                    <button type="button" data-condition-btn="{{ c }}"
+                                        onclick="setConditionFilter('{{ c }}', this)"
+                                        class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                        {{ c }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Collection Dropdown -->
+                            <div class="relative filter-dropdown" data-filter-group="collection">
+                                <button type="button" onclick="toggleFilterDropdown('collection')"
+                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                    <span
+                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Collection</span>
+                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                        id="collection-chevron">expand_more</span>
+                                    <span id="collection-badge"
+                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                </button>
+                                <div id="collection-dropdown-panel"
+                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                    {% for collection in collections %}
+                                    <button type="button" data-collection-btn="{{ collection.handle }}"
+                                        onclick="setActiveCollection('{{ collection.handle }}', this)"
+                                        class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                        {% if collection.image %}
+                                        <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
+                                        {% endif %}
+                                        {{ collection.title }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
-
-                        <!-- Collection Filters -->
-                        {% set oob = false %}
-                        {% include "partials/collection_filters.html" %}
+                        <!-- Clear button -->
+                        <div class="flex items-center gap-3">
+                            <div class="w-px h-5 bg-white/10 shrink-0"></div>
+                            <button type="button" onclick="resetFilters()"
+                                class="shrink-0 px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-primary hover:bg-white/5 uppercase tracking-wider transition-all rounded-lg border border-transparent hover:border-white/10">
+                                Clear
+                            </button>
+                        </div>
                     </div>
                 </div>
             </form>
+        </div>
+
+        <!-- ═══════ MOBILE: Filter Bottom Sheet ═══════ -->
+        <div id="filter-sheet-backdrop"
+            class="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] opacity-0 invisible transition-opacity duration-300"
+            onclick="closeFilterSheet()">
+        </div>
+        <div id="filter-sheet"
+            class="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-surface rounded-t-2xl transform translate-y-full transition-transform duration-300 ease-out"
+            style="max-height: 75vh;">
+            <!-- Drag Handle -->
+            <div class="flex justify-center pt-3 pb-2" onclick="closeFilterSheet()">
+                <div class="w-10 h-1 bg-white/20 rounded-full"></div>
+            </div>
+            <!-- Sheet Header -->
+            <div class="flex items-center justify-between px-5 pb-3 border-b border-white/10">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Filters</h3>
+                <button type="button" onclick="closeFilterSheet()"
+                    class="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 active:bg-white/10">
+                    <span class="material-symbols-outlined text-gray-400 text-lg">close</span>
+                </button>
+            </div>
+            <!-- Sheet Content (scrollable) -->
+            <div class="overflow-y-auto px-5 py-4 space-y-5" style="max-height: calc(75vh - 140px);">
+                <!-- Price Filter -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Price Range</h4>
+                    <div id="sheet-price-filter" class="px-1">
+                        <!-- Price slider will be synced via JS -->
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] text-gray-400">Price Under</span>
+                            <span id="sheet-price-display" class="text-[10px] font-black text-primary">¥30,000+</span>
+                        </div>
+                        <input type="range" id="sheet-price-slider" min="0" max="30000" value="30000" step="500"
+                            oninput="syncPriceFromSheet(this.value)"
+                            class="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary">
+                    </div>
+                </div>
+
+                <!-- Rarity -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Rarity</h4>
+                    <div class="flex flex-wrap gap-2">
+                        {% set rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Ultra Rare'] %}
+                        {% for r in rarities %}
+                        <button type="button" data-sheet-rarity="{{ r }}"
+                            onclick="setSheetFilter('rarity', '{{ r }}', this)"
+                            class="px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
+                            {{ r }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Condition -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Condition</h4>
+                    <div class="flex flex-wrap gap-2">
+                        {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+                        {% for c in conditions %}
+                        <button type="button" data-sheet-condition="{{ c }}"
+                            onclick="setSheetFilter('condition', '{{ c }}', this)"
+                            class="px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
+                            {{ c }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Collection -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Collection</h4>
+                    <div class="flex flex-wrap gap-2">
+                        {% for collection in collections %}
+                        <button type="button" data-sheet-collection="{{ collection.handle }}"
+                            onclick="setSheetFilter('collection', '{{ collection.handle }}', this)"
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
+                            {% if collection.image %}
+                            <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
+                            {% endif %}
+                            {{ collection.title }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <!-- Sheet Footer -->
+            <div class="px-5 py-4 border-t border-white/10 flex gap-3 safe-area-bottom">
+                <button type="button" onclick="resetFiltersFromSheet()"
+                    class="flex-1 h-12 rounded-xl border border-white/10 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:bg-white/5 transition-all">
+                    Clear All
+                </button>
+                <button type="button" onclick="applyFiltersFromSheet()"
+                    class="flex-1 h-12 rounded-xl bg-primary text-background-dark text-[11px] font-black uppercase tracking-wider active:bg-primary/80 transition-all">
+                    Show Results
+                </button>
+            </div>
         </div>
 
         <div class="py-6">
@@ -313,7 +498,7 @@
 
     <!-- ==================== FOOTER ==================== -->
     <footer class="mt-16 border-t border-white/5 pt-12 pb-32 md:pb-12">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <!-- About -->
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">About</h4>
@@ -323,12 +508,13 @@
             <!-- Support -->
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">Support</h4>
-                <ul class="space-y-2">
-                    <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Help Center</a>
-                    </li>
-                    <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Shipping</a></li>
-                    <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Returns</a></li>
-                </ul>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Help Center</a>
+                    <span class="text-gray-600 text-[10px]">·</span>
+                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Shipping</a>
+                    <span class="text-gray-600 text-[10px]">·</span>
+                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Returns</a>
+                </div>
             </div>
             <!-- Social -->
             <div>
@@ -361,7 +547,7 @@
         </div>
         <!-- Copyright + Merchant Login -->
         <div class="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-2">
-            <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2024 TCG Nakama</p>
+            <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2026 TCG Nakama</p>
             <a href="/admin/login"
                 class="text-[10px] text-gray-600 hover:text-primary font-bold uppercase tracking-[0.3em] transition-colors">
                 🔐 Merchant Login</a>
@@ -381,8 +567,9 @@
 </a>
 
 <!-- ==================== MOBILE BOTTOM NAV ==================== -->
-<nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-lg border-t border-white/10">
-    <div class="flex items-center justify-around py-2">
+<nav
+    class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-lg border-t border-white/10 safe-area-bottom">
+    <div class="flex items-center justify-around pt-2 pb-1">
         <a href="/" class="flex flex-col items-center gap-0.5 px-3 py-1">
             <span class="material-symbols-outlined text-primary text-xl">home</span>
             <span class="text-[9px] font-bold text-primary">Home</span>
@@ -418,16 +605,79 @@
         if (display) display.textContent = `¥${parseInt(val).toLocaleString()}`;
     }
 
+    // ───── Dynamic Sticky Offset ─────
+    function updateFilterStickyOffset() {
+        const header = document.querySelector('header');
+        const filterBar = document.getElementById('filter-sticky-bar');
+        if (header && filterBar) {
+            filterBar.style.top = header.offsetHeight + 'px';
+        }
+    }
+    updateFilterStickyOffset();
+    window.addEventListener('resize', updateFilterStickyOffset);
+
+    // ───── Filter Dropdown Toggle ─────
+    function toggleFilterDropdown(group) {
+        const panel = document.getElementById(`${group}-dropdown-panel`);
+        const chevron = document.getElementById(`${group}-chevron`);
+        if (!panel) return;
+
+        const isOpen = panel.classList.contains('opacity-100');
+
+        // Close all dropdowns first
+        document.querySelectorAll('.filter-dropdown [id$="-dropdown-panel"]').forEach(p => {
+            p.classList.remove('opacity-100', 'visible');
+            p.classList.add('opacity-0', 'invisible');
+        });
+        document.querySelectorAll('.filter-dropdown [id$="-chevron"]').forEach(c => {
+            c.classList.remove('rotate-180');
+        });
+
+        // Toggle current dropdown
+        if (!isOpen) {
+            panel.classList.remove('opacity-0', 'invisible');
+            panel.classList.add('opacity-100', 'visible');
+            if (chevron) chevron.classList.add('rotate-180');
+        }
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.filter-dropdown')) {
+            document.querySelectorAll('.filter-dropdown [id$="-dropdown-panel"]').forEach(p => {
+                p.classList.remove('opacity-100', 'visible');
+                p.classList.add('opacity-0', 'invisible');
+            });
+            document.querySelectorAll('.filter-dropdown [id$="-chevron"]').forEach(c => {
+                c.classList.remove('rotate-180');
+            });
+        }
+    });
+
+    function updateFilterBadge(group, value) {
+        const badge = document.getElementById(`${group}-badge`);
+        if (!badge) return;
+
+        if (value) {
+            badge.textContent = value;
+            badge.classList.remove('hidden');
+        } else {
+            badge.textContent = '';
+            badge.classList.add('hidden');
+        }
+    }
+
     function setActiveFilter(rarity, el) {
         const input = document.getElementById('rarity-input');
         const current = input.value;
-        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
-        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
 
         if (current === rarity) {
             input.value = '';
             el.classList.remove(...activeClasses);
             el.classList.add(...inactiveClasses);
+            updateFilterBadge('rarity', '');
         } else {
             document.querySelectorAll('[data-rarity-btn]').forEach(b => {
                 b.classList.remove(...activeClasses);
@@ -436,6 +686,7 @@
             input.value = rarity;
             el.classList.add(...activeClasses);
             el.classList.remove(...inactiveClasses);
+            updateFilterBadge('rarity', rarity);
         }
 
         if (typeof htmx !== 'undefined') {
@@ -447,13 +698,14 @@
     function setActiveCollection(handle, el) {
         const input = document.getElementById('collection-input');
         const current = input.value;
-        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
-        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
 
         if (current === handle) {
             input.value = '';
             el.classList.remove(...activeClasses);
             el.classList.add(...inactiveClasses);
+            updateFilterBadge('collection', '');
         } else {
             document.querySelectorAll('[data-collection-btn]').forEach(b => {
                 b.classList.remove(...activeClasses);
@@ -462,6 +714,9 @@
             input.value = handle;
             el.classList.add(...activeClasses);
             el.classList.remove(...inactiveClasses);
+            // Get collection title for badge
+            const collectionTitle = el.textContent.trim();
+            updateFilterBadge('collection', collectionTitle);
         }
 
         if (typeof htmx !== 'undefined') {
@@ -470,11 +725,34 @@
         input.dispatchEvent(new Event('change'));
     }
 
-    function clearFilterVisuals() {
-        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]'];
-        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10'];
+    function shopCollection(handle) {
+        // Find the matching collection filter button and click it
+        const btn = document.querySelector(`[data-collection-btn="${handle}"]`);
+        if (btn) {
+            setActiveCollection(handle, btn);
+        } else {
+            // Fallback: set the input directly if filter button hasn't loaded yet
+            const input = document.getElementById('collection-input');
+            if (input) {
+                input.value = handle;
+                if (typeof htmx !== 'undefined') {
+                    htmx.trigger(input, 'change');
+                }
+                input.dispatchEvent(new Event('change'));
+            }
+        }
+        // Smooth scroll to All Cards section
+        const section = document.getElementById('all-cards-section');
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
 
-        document.querySelectorAll('[data-rarity-btn], [data-collection-btn]').forEach(b => {
+    function clearFilterVisuals() {
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
+
+        document.querySelectorAll('[data-rarity-btn], [data-collection-btn], [data-condition-btn]').forEach(b => {
             b.classList.remove(...activeClasses);
             b.classList.add(...inactiveClasses);
         });
@@ -485,17 +763,36 @@
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
         if (conditionInput) conditionInput.value = '';
+
+        // Clear badges
+        updateFilterBadge('rarity', '');
+        updateFilterBadge('condition', '');
+        updateFilterBadge('collection', '');
     }
 
     function setConditionFilter(condition, element) {
         const conditionInput = document.getElementById('condition-input');
         if (!conditionInput) return;
 
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
+
         // Toggle: if clicking the same condition, clear it
         if (conditionInput.value === condition) {
             conditionInput.value = '';
+            element.classList.remove(...activeClasses);
+            element.classList.add(...inactiveClasses);
+            updateFilterBadge('condition', '');
         } else {
+            // Clear other condition buttons
+            document.querySelectorAll('[data-condition-btn]').forEach(b => {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            });
             conditionInput.value = condition;
+            element.classList.add(...activeClasses);
+            element.classList.remove(...inactiveClasses);
+            updateFilterBadge('condition', condition);
         }
 
         // Trigger HTMX update
@@ -527,12 +824,240 @@
 
         clearFilterVisuals();
 
+        // Clear all badges
+        updateFilterBadge('rarity', '');
+        updateFilterBadge('condition', '');
+        updateFilterBadge('collection', '');
+
+        // Sync mobile sheet visuals
+        syncSheetVisuals();
+        updateMobileFilterCount();
+
         // Trigger update
         if (rarityInput) {
             if (typeof htmx !== 'undefined') {
                 htmx.trigger(rarityInput, 'change');
             } else {
                 rarityInput.dispatchEvent(new Event('change'));
+            }
+        }
+    }
+
+    // ───── Mobile Filter Bottom Sheet ─────
+    function openFilterSheet() {
+        const backdrop = document.getElementById('filter-sheet-backdrop');
+        const sheet = document.getElementById('filter-sheet');
+        if (!backdrop || !sheet) return;
+
+        // Sync sheet state with current hidden inputs
+        syncSheetVisuals();
+
+        backdrop.classList.remove('opacity-0', 'invisible');
+        backdrop.classList.add('opacity-100');
+        sheet.classList.remove('translate-y-full');
+        sheet.classList.add('translate-y-0');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeFilterSheet() {
+        const backdrop = document.getElementById('filter-sheet-backdrop');
+        const sheet = document.getElementById('filter-sheet');
+        if (!backdrop || !sheet) return;
+
+        backdrop.classList.add('opacity-0', 'invisible');
+        backdrop.classList.remove('opacity-100');
+        sheet.classList.add('translate-y-full');
+        sheet.classList.remove('translate-y-0');
+        document.body.style.overflow = '';
+    }
+
+    function setSheetFilter(group, value, el) {
+        const input = document.getElementById(`${group}-input`);
+        if (!input) return;
+
+        const activeClasses = ['bg-primary', 'border-primary', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'text-gray-300'];
+        const btnAttr = `data-sheet-${group}`;
+
+        if (input.value === value) {
+            // Deselect
+            input.value = '';
+            el.classList.remove(...activeClasses);
+            el.classList.add(...inactiveClasses);
+        } else {
+            // Deselect all in this group first
+            document.querySelectorAll(`[${btnAttr}]`).forEach(b => {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            });
+            // Select this one
+            input.value = value;
+            el.classList.add(...activeClasses);
+            el.classList.remove(...inactiveClasses);
+        }
+
+        // Also sync desktop dropdown visuals
+        syncDesktopFilterVisual(group, input.value);
+        updateMobileFilterCount();
+    }
+
+    function syncDesktopFilterVisual(group, value) {
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
+
+        document.querySelectorAll(`[data-${group}-btn]`).forEach(b => {
+            const btnVal = b.getAttribute(`data-${group}-btn`);
+            if (btnVal === value) {
+                b.classList.add(...activeClasses);
+                b.classList.remove(...inactiveClasses);
+            } else {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            }
+        });
+
+        updateFilterBadge(group, value);
+    }
+
+    function syncPriceFromSheet(val) {
+        const priceSlider = document.getElementById('price-slider');
+        const mainSlider = document.getElementById('main-price-slider');
+        const sheetDisplay = document.getElementById('sheet-price-display');
+        const mainDisplay = document.getElementById('price-display');
+
+        if (priceSlider) priceSlider.value = val;
+        if (mainSlider) mainSlider.value = val;
+
+        const displayText = parseInt(val) >= 30000 ? '¥30,000+' : `¥${parseInt(val).toLocaleString()}`;
+        if (sheetDisplay) sheetDisplay.textContent = displayText;
+        if (mainDisplay) mainDisplay.textContent = displayText;
+
+        updateMobileFilterCount();
+    }
+
+    function syncSheetVisuals() {
+        const activeClasses = ['bg-primary', 'border-primary', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'text-gray-300'];
+
+        // Sync rarity
+        const rarityVal = document.getElementById('rarity-input')?.value || '';
+        document.querySelectorAll('[data-sheet-rarity]').forEach(b => {
+            if (b.getAttribute('data-sheet-rarity') === rarityVal && rarityVal) {
+                b.classList.add(...activeClasses);
+                b.classList.remove(...inactiveClasses);
+            } else {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            }
+        });
+
+        // Sync condition
+        const conditionVal = document.getElementById('condition-input')?.value || '';
+        document.querySelectorAll('[data-sheet-condition]').forEach(b => {
+            if (b.getAttribute('data-sheet-condition') === conditionVal && conditionVal) {
+                b.classList.add(...activeClasses);
+                b.classList.remove(...inactiveClasses);
+            } else {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            }
+        });
+
+        // Sync collection
+        const collectionVal = document.getElementById('collection-input')?.value || '';
+        document.querySelectorAll('[data-sheet-collection]').forEach(b => {
+            if (b.getAttribute('data-sheet-collection') === collectionVal && collectionVal) {
+                b.classList.add(...activeClasses);
+                b.classList.remove(...inactiveClasses);
+            } else {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            }
+        });
+
+        // Sync price slider
+        const priceVal = document.getElementById('price-slider')?.value || '30000';
+        const sheetSlider = document.getElementById('sheet-price-slider');
+        const sheetDisplay = document.getElementById('sheet-price-display');
+        if (sheetSlider) sheetSlider.value = priceVal || 30000;
+        if (sheetDisplay) {
+            const v = parseInt(priceVal || 30000);
+            sheetDisplay.textContent = v >= 30000 ? '¥30,000+' : `¥${v.toLocaleString()}`;
+        }
+    }
+
+    function resetFiltersFromSheet() {
+        // Clear all hidden inputs
+        const rarityInput = document.getElementById('rarity-input');
+        const collectionInput = document.getElementById('collection-input');
+        const conditionInput = document.getElementById('condition-input');
+        const priceSlider = document.getElementById('price-slider');
+
+        if (rarityInput) rarityInput.value = '';
+        if (collectionInput) collectionInput.value = '';
+        if (conditionInput) conditionInput.value = '';
+        if (priceSlider) priceSlider.value = '';
+
+        // Reset main price slider
+        const mainSlider = document.getElementById('main-price-slider');
+        if (mainSlider) mainSlider.value = 30000;
+        const mainDisplay = document.getElementById('price-display');
+        if (mainDisplay) mainDisplay.textContent = '¥30,000+';
+
+        // Clear desktop visuals
+        clearFilterVisuals();
+        updateFilterBadge('rarity', '');
+        updateFilterBadge('condition', '');
+        updateFilterBadge('collection', '');
+
+        // Sync and update sheet visuals
+        syncSheetVisuals();
+        updateMobileFilterCount();
+    }
+
+    function applyFiltersFromSheet() {
+        // Trigger HTMX update using hidden inputs
+        const rarityInput = document.getElementById('rarity-input');
+        if (rarityInput && typeof htmx !== 'undefined') {
+            htmx.trigger(rarityInput, 'change');
+        }
+
+        closeFilterSheet();
+
+        // Scroll to product grid
+        const section = document.getElementById('all-cards-section');
+        if (section) {
+            setTimeout(() => {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 350);
+        }
+    }
+
+    function updateMobileFilterCount() {
+        const count = [
+            document.getElementById('rarity-input')?.value,
+            document.getElementById('condition-input')?.value,
+            document.getElementById('collection-input')?.value,
+            (document.getElementById('price-slider')?.value && parseInt(document.getElementById('price-slider')?.value) < 30000) ? 'price' : ''
+        ].filter(Boolean).length;
+
+        const badge = document.getElementById('mobile-filter-count');
+        const clearBtn = document.getElementById('mobile-clear-btn');
+
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        if (clearBtn) {
+            if (count > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
             }
         }
     }
