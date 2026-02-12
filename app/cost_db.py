@@ -47,6 +47,15 @@ class SearchLog(Base):
     results_count = Column(Integer, default=0)
     searched_at = Column(DateTime, default=datetime.utcnow)
 
+class ValueSnapshot(Base):
+    """Weekly inventory value snapshots for tracking changes over time."""
+    __tablename__ = "value_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    week_label = Column(String, unique=True, nullable=False)  # e.g. "2026-W07"
+    total_value = Column(Float, nullable=False)
+    product_count = Column(Integer, default=0)
+    recorded_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 def init_db():
     """Initialize the database and create tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
@@ -127,5 +136,47 @@ def get_trending_searches(days: int = 30, limit: int = 10) -> list:
         
         return [{"query": row[0], "count": row[1]} for row in results]
 
+
+def save_value_snapshot(total_value: float, product_count: int = 0) -> bool:
+    """Save or update this week's inventory value snapshot."""
+    week_label = datetime.utcnow().strftime("%G-W%V")  # ISO year-week, e.g. "2026-W07"
+    
+    with SessionLocal() as session:
+        snapshot = session.query(ValueSnapshot).filter(ValueSnapshot.week_label == week_label).first()
+        if snapshot:
+            snapshot.total_value = total_value
+            snapshot.product_count = product_count
+            snapshot.recorded_at = datetime.utcnow()
+        else:
+            snapshot = ValueSnapshot(
+                week_label=week_label,
+                total_value=total_value,
+                product_count=product_count
+            )
+            session.add(snapshot)
+        session.commit()
+    return True
+
+
+def get_value_history(limit: int = 12) -> list:
+    """Get the last N weekly value snapshots, oldest first."""
+    with SessionLocal() as session:
+        snapshots = session.query(ValueSnapshot)\
+            .order_by(ValueSnapshot.week_label.desc())\
+            .limit(limit)\
+            .all()
+        
+        # Reverse so oldest is first (for chart display)
+        snapshots.reverse()
+        
+        return [{
+            "week": s.week_label,
+            "value": s.total_value,
+            "count": s.product_count,
+            "date": s.recorded_at.strftime("%b %d") if s.recorded_at else ""
+        } for s in snapshots]
+
+
 # Initialize DB on module load
 init_db()
+

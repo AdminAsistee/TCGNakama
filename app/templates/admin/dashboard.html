@@ -15,6 +15,7 @@
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
         rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -164,7 +165,7 @@
                             disabled.</p>
                     </div>
                 </div>
-                <a href="/oauth/authorize"
+                <a href="/admin/connect-shopify"
                     class="w-full md:w-auto px-6 py-2.5 bg-danger-red text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-lg hover:bg-danger-red/80 transition-all text-center">
                     Reconnect Shopify
                 </a>
@@ -237,7 +238,7 @@
                 </div>
             </div>
 
-            <!-- Active Leaderboard (Whale Watch) -->
+            <!-- Active Leaderboard (Top 10 - Horizontal Scroll) -->
             <div class="glass-panel rounded-xl p-0 overflow-hidden border-t border-t-white/10">
                 <div
                     class="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center backdrop-blur-md sticky top-0 z-10">
@@ -246,38 +247,130 @@
                         Active Leaderboard
                         <span class="px-1 py-0.5 rounded bg-white/10 text-[8px] text-white/60 font-bold">SOON</span>
                     </h3>
-                    <div class="flex gap-2">
-                        <span class="text-[9px] text-white/40 uppercase">Top 10 Active</span>
-                    </div>
+                    <span class="text-[9px] text-white/40 uppercase">Top 10 Active</span>
                 </div>
-                <div class="max-h-[340px] overflow-y-auto scrollbar-hide opacity-60">
+                <div class="flex gap-3 overflow-x-auto scrollbar-hide p-4 opacity-60">
+                    <!-- Rank 1 - Gold -->
                     <div
-                        class="p-3 border-b border-white/5 bg-gradient-to-r from-neon-purple/10 via-neon-purple/5 to-transparent relative group whale-glow transition-all duration-300">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center gap-3">
-                                <div class="relative">
-                                    <span class="text-2xl drop-shadow-md">🇯🇵</span>
-                                    <div class="absolute -bottom-1 -right-1 bg-background-dark rounded-full p-0.5">
-                                        <span
-                                            class="material-symbols-outlined text-neon-gold text-[10px]">workspace_premium</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="text-xs font-bold text-white flex items-center gap-1 iridescent-text">
-                                        Mock User VIP
-                                    </div>
-                                    <div class="flex items-center gap-2 mt-0.5">
-                                        <span class="text-[9px] text-white/50 font-mono">LTV:</span>
-                                        <span class="text-[9px] text-neon-purple font-mono font-bold">¥4,250,000</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">Cart Value</div>
-                                <div
-                                    class="text-sm font-mono text-white font-bold drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
-                                    ¥{{ cart_value_vip|default('1,245,000') }}</div>
-                            </div>
+                        class="flex-shrink-0 w-[130px] bg-gradient-to-b from-neon-gold/15 to-transparent border border-neon-gold/30 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-neon-gold/20 border border-neon-gold/50 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-neon-gold">1</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2">
+                            <span class="text-2xl">🇯🇵</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-neon-gold truncate">Whale_JP</div>
+                            <div class="text-[8px] text-white/40 font-mono mt-0.5">LTV ¥4.2M</div>
+                        </div>
+                    </div>
+                    <!-- Rank 2 - Silver -->
+                    <div
+                        class="flex-shrink-0 w-[130px] bg-gradient-to-b from-white/8 to-transparent border border-white/20 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/10 border border-white/30 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/70">2</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2">
+                            <span class="text-2xl">🇺🇸</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/70 truncate">CardKing_US</div>
+                            <div class="text-[8px] text-white/40 font-mono mt-0.5">LTV ¥3.1M</div>
+                        </div>
+                    </div>
+                    <!-- Rank 3 - Bronze -->
+                    <div
+                        class="flex-shrink-0 w-[130px] bg-gradient-to-b from-orange-500/10 to-transparent border border-orange-500/25 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-orange-500/15 border border-orange-500/40 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-orange-400">3</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2">
+                            <span class="text-2xl">🇬🇧</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-orange-300/80 truncate">TCG_Master</div>
+                            <div class="text-[8px] text-white/40 font-mono mt-0.5">LTV ¥2.8M</div>
+                        </div>
+                    </div>
+                    <!-- Rank 4-10 -->
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">4</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇩🇪</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">Berlin_TCG</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥2.1M</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">5</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇫🇷</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">Paris_Cltcr</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥1.9M</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">6</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇦🇺</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">Melb_Vault</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥1.5M</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">7</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇰🇷</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">Seoul_Cards</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥1.2M</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">8</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇧🇷</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">SP_Collector</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥980K</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">9</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇨🇦</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">TO_Trader</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥750K</div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-[130px] bg-white/[0.02] border border-white/10 rounded-xl p-3 relative">
+                        <div
+                            class="absolute top-2 left-2 w-5 h-5 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+                            <span class="text-[9px] font-black text-white/40">10</span>
+                        </div>
+                        <div class="text-center mt-5 mb-2"><span class="text-2xl">🇸🇬</span></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-bold text-white/50 truncate">SG_Nakama</div>
+                            <div class="text-[8px] text-white/30 font-mono mt-0.5">LTV ¥620K</div>
                         </div>
                     </div>
                 </div>
@@ -298,10 +391,10 @@
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3 auto-rows-min">
-                <!-- Daily Gross -->
+                <!-- Total Inventory Value + Chart -->
                 <div
                     class="col-span-2 obsidian-hub-card rounded-xl p-4 shadow-teal-glow border-l-2 border-l-teal-accent group relative">
-                    <div class="flex justify-between items-start mb-2 relative z-10">
+                    <div class="flex justify-between items-start mb-1 relative z-10">
                         <div>
                             <h3 class="text-[10px] text-teal-accent uppercase tracking-widest font-bold mb-1">Total
                                 Inventory Value</h3>
@@ -309,12 +402,28 @@
                                 id="total-value-display">
                                 ¥{{ total_value|default('4,200,500') }}
                             </div>
-                            <div id="value-change-indicator"
-                                class="text-[10px] font-mono mt-1 opacity-0 transition-opacity">
-                                <!-- Populated by JavaScript -->
+                            {% if value_history and value_history|length > 1 %}
+                            {% set last_val = value_history[-1].value %}
+                            {% set prev_val = value_history[-2].value %}
+                            {% if prev_val > 0 %}
+                            {% set change_pct = ((last_val - prev_val) / prev_val * 100)|round(1) %}
+                            <div class="text-[10px] font-mono mt-1 flex items-center gap-1">
+                                {% if change_pct > 0 %}
+                                <span class="text-neon-green">↑ +{{ change_pct }}%</span>
+                                {% elif change_pct < 0 %} <span class="text-danger-red">↓ {{ change_pct }}%</span>
+                                    {% else %}
+                                    <span class="text-white/40">→ 0%</span>
+                                    {% endif %}
+                                    <span class="text-white/30">vs last week</span>
                             </div>
+                            {% endif %}
+                            {% endif %}
                         </div>
                         <span class="material-symbols-outlined text-teal-accent/50">show_chart</span>
+                    </div>
+                    <!-- Weekly Value Chart -->
+                    <div class="mt-3 relative z-10" style="height: 160px;">
+                        <canvas id="valueChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -331,7 +440,7 @@
                     Synced
                 </div>
                 {% else %}
-                <a href="/oauth/authorize"
+                <a href="/admin/connect-shopify"
                     class="flex items-center gap-1 text-neon-gold text-[9px] uppercase tracking-wider font-bold border border-neon-gold/30 px-2 py-0.5 rounded-full hover:bg-neon-gold/10 transition-colors animate-pulse"
                     title="Connect to Shopify Admin API to enable order tracking">
                     <span class="material-symbols-outlined text-[10px]">cloud_off</span>
@@ -722,47 +831,99 @@
             }
         }
 
-        // Track inventory value changes
+        // Weekly Value Chart
         (function () {
-            const currentValueText = '{{ total_value }}';
-            const currentValue = parseInt(currentValueText.replace(/,/g, ''));
+            const ctx = document.getElementById('valueChart');
+            if (!ctx) return;
 
-            if (!isNaN(currentValue)) {
-                const lastValue = localStorage.getItem('lastInventoryValue');
-                const lastDate = localStorage.getItem('lastInventoryDate');
-                const today = new Date().toDateString();
+            const historyData = {{ value_history | tojson
+        }};
 
-                const indicator = document.getElementById('value-change-indicator');
+        if (historyData.length === 0) {
+            // No data yet - show placeholder
+            ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-white/20 text-xs font-mono">Chart data will appear after weekly snapshots are recorded</div>';
+            return;
+        }
 
-                if (lastValue && lastDate !== today) {
-                    const prev = parseInt(lastValue);
-                    const change = currentValue - prev;
-                    const percentChange = ((change / prev) * 100).toFixed(1);
+        const labels = historyData.map(d => d.week.replace(/^\d{4}-/, ''));
+        const values = historyData.map(d => d.value);
 
-                    let arrow = '';
-                    let color = '';
-
-                    if (change > 0) {
-                        arrow = '↑';
-                        color = 'text-green-400';
-                    } else if (change < 0) {
-                        arrow = '↓';
-                        color = 'text-red-400';
-                    } else {
-                        arrow = '→';
-                        color = 'text-white/40';
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Inventory Value (¥)',
+                    data: values,
+                    borderColor: '#00f2ea',
+                    borderWidth: 2,
+                    backgroundColor: (context) => {
+                        const chart = context.chart;
+                        const { ctx: c, chartArea } = chart;
+                        if (!chartArea) return 'rgba(0,242,234,0.1)';
+                        const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                        gradient.addColorStop(0, 'rgba(0, 242, 234, 0.25)');
+                        gradient.addColorStop(1, 'rgba(0, 242, 234, 0.02)');
+                        return gradient;
+                    },
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00f2ea',
+                    pointBorderColor: '#000',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#fff',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.9)',
+                        titleColor: '#00f2ea',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(0,242,234,0.3)',
+                        borderWidth: 1,
+                        padding: 10,
+                        displayColors: false,
+                        callbacks: {
+                            label: function (context) {
+                                return '¥' + context.parsed.y.toLocaleString();
+                            }
+                        }
                     }
-
-                    indicator.innerHTML = `<span class="${color}">${arrow} ${percentChange}% vs Last Snapshot</span>`;
-                    indicator.classList.remove('opacity-0');
-                    indicator.classList.add('opacity-100');
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.03)' },
+                        ticks: {
+                            color: 'rgba(255,255,255,0.3)',
+                            font: { size: 9, family: 'monospace' }
+                        },
+                        border: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.03)' },
+                        ticks: {
+                            color: 'rgba(255,255,255,0.3)',
+                            font: { size: 9, family: 'monospace' },
+                            callback: function (value) {
+                                return '¥' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        },
+                        border: { color: 'rgba(255,255,255,0.05)' }
+                    }
                 }
-
-                // Update snapshot
-                localStorage.setItem('lastInventoryValue', currentValue);
-                localStorage.setItem('lastInventoryDate', today);
             }
-        })();
+        });
+        }) ();
 
         // Refresh Shopify Sync
         async function refreshShopifySync() {

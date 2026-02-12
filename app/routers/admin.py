@@ -195,16 +195,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         # Create session token
         session_token = hashlib.sha256(f"{email}{SESSION_SECRET}".encode()).hexdigest()[:32]
         
-        # Check if we have a valid Shopify token
-        admin_token = get_admin_token()
-        
-        # Determine redirect target
-        target_url = "/admin"
-        if not admin_token or not admin_token.startswith("shpat_"):
-            print("[DEBUG] No valid Admin Token found after login, redirecting to OAuth")
-            target_url = "/oauth/authorize"
-        
-        response = RedirectResponse(url=target_url, status_code=303)
+        response = RedirectResponse(url="/admin", status_code=303)
         response.set_cookie(
             key="admin_session",
             value=session_token,
@@ -219,6 +210,67 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
             "error": "Invalid email or password"
         })
 
+
+@router.get("/connect-shopify", response_class=HTMLResponse)
+async def connect_shopify_page(request: Request, admin: str = Depends(get_admin_session)):
+    """Show the Shopify token connection page."""
+    return templates.TemplateResponse("admin/connect_shopify.html", {
+        "request": request,
+        "error": None,
+        "success": None
+    })
+
+
+@router.post("/connect-shopify")
+async def connect_shopify(request: Request, admin: str = Depends(get_admin_session), admin_token: str = Form(...)):
+    """Save the Shopify Admin API token."""
+    admin_token = admin_token.strip()
+    
+    if not admin_token.startswith("shpat_"):
+        return templates.TemplateResponse("admin/connect_shopify.html", {
+            "request": request,
+            "error": "Invalid token. It should start with 'shpat_'",
+            "success": None
+        })
+    
+    # Validate the token by making a test API call
+    shop_url = os.getenv("SHOPIFY_STORE_URL", "").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{shop_url}/admin/api/2024-01/shop.json",
+                headers={"X-Shopify-Access-Token": admin_token}
+            )
+            if response.status_code != 200:
+                return templates.TemplateResponse("admin/connect_shopify.html", {
+                    "request": request,
+                    "error": f"Token validation failed (HTTP {response.status_code}). Please check your token.",
+                    "success": None
+                })
+    except Exception as e:
+        return templates.TemplateResponse("admin/connect_shopify.html", {
+            "request": request,
+            "error": f"Could not connect to Shopify: {str(e)}",
+            "success": None
+        })
+    
+    # Token is valid — save it
+    os.environ["SHOPIFY_ADMIN_TOKEN"] = admin_token
+    
+    # Also update the oauth token store
+    from app.routers.oauth import token_store
+    token_store["admin_access_token"] = admin_token
+    
+    # Persist to .env
+    try:
+        from dotenv import set_key
+        set_key(".env", "SHOPIFY_ADMIN_TOKEN", admin_token)
+    except Exception as e:
+        print(f"[ERROR] Failed to persist token to .env: {e}")
+    
+    print(f"[SUCCESS] Shopify Admin Token connected (prefix: {admin_token[:15]}...)")
+    
+    return RedirectResponse(url="/admin?connected=true", status_code=303)
 
 
 
@@ -274,6 +326,10 @@ async def admin_dashboard(
     vip_products = [p for p in products if p['price'] > vip_threshold]
     cart_value_vip = sum(p['price'] for p in vip_products)
 
+    # Save weekly value snapshot and get history
+    cost_db.save_value_snapshot(total_value, product_count=len(products))
+    value_history = cost_db.get_value_history(limit=12)
+
     # Format currency for display
     def format_yen(val):
         return f"{int(val):,}"
@@ -299,6 +355,7 @@ async def admin_dashboard(
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "total_value": format_yen(total_value),
+        "total_value_raw": total_value,
         "live_count": live_count,
         "cart_value_vip": format_yen(cart_value_vip),
         "products": paginated_products,
@@ -307,7 +364,8 @@ async def admin_dashboard(
         "oauth_connected": oauth_connected,
         "current_page": page,
         "total_pages": total_pages,
-        "total_products": total_products
+        "total_products": total_products,
+        "value_history": value_history
     })
 
 

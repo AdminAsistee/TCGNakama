@@ -13,10 +13,43 @@
         <!-- Desktop Nav -->
         <nav class="hidden md:flex items-center gap-6">
             <a href="/" class="text-sm font-semibold text-primary border-b-2 border-primary pb-1">Home</a>
-            <a href="/" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Shop</a>
-            <a href="#" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Sell</a>
-            <a href="#" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">My Collection</a>
-            <a href="#" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Community</a>
+            <a href="#all-cards-section"
+                class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Shop</a>
+
+            <!-- My Collection dropdown -->
+            <div class="relative group">
+                <button
+                    class="text-sm font-medium text-gray-400 hover:text-white transition-colors flex items-center gap-1 pb-1">
+                    Collection
+                    <span class="material-symbols-outlined text-xs">expand_more</span>
+                </button>
+                <div
+                    class="absolute top-full left-0 mt-1 w-auto min-w-[200px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
+                    <a href="#"
+                        class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">Pokémon</a>
+                    <a href="#"
+                        class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">One
+                        Piece</a>
+                    <div class="border-t border-white/5"></div>
+                    <div class="flex items-center gap-2 px-4 py-3 opacity-40 cursor-default whitespace-nowrap">
+                        <span class="text-sm text-gray-400 font-medium">Magic: The Gathering</span>
+                        <span
+                            class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase">Soon</span>
+                    </div>
+                    <div class="flex items-center gap-2 px-4 py-3 opacity-40 cursor-default whitespace-nowrap">
+                        <span class="text-sm text-gray-400 font-medium">Dragon Ball</span>
+                        <span
+                            class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase">Soon</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Community (coming soon) -->
+            <span class="text-sm font-medium text-gray-600 cursor-default flex items-center gap-1.5">
+                Community
+                <span
+                    class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>
+            </span>
         </nav>
 
         <!-- Cart -->
@@ -52,15 +85,7 @@
             </div>
         </label>
 
-        <!-- Refresh Button -->
-        <button hx-post="/refresh" hx-target="#product-grid" hx-indicator="#refresh-loading"
-            class="mt-3 flex items-center justify-center gap-2 w-full bg-neon-green/10 hover:bg-neon-green/20 text-neon-green border border-neon-green/30 px-4 py-2.5 rounded-full text-xs uppercase tracking-wider font-semibold transition-colors">
-            <span class="material-symbols-outlined text-sm">sync</span>
-            <span>Sync Latest Cards</span>
-            <div id="refresh-loading" class="htmx-indicator">
-                <span class="material-symbols-outlined text-sm animate-spin">sync</span>
-            </div>
-        </button>
+
     </div>
 </header>
 
@@ -131,7 +156,7 @@
             </span>
         </div>
 
-        <div class="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
             {% for product in fresh_pulls %}
             <div
                 class="flex flex-col bg-surface rounded-xl border border-vault-border overflow-hidden hover:border-primary/30 transition-all group">
@@ -173,7 +198,7 @@
             📈 What's Hot <span class="text-sm font-normal text-gray-400">(Investor Focus)</span>
         </h3>
 
-        <div class="grid grid-cols-3 md:grid-cols-3 gap-3 md:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {% for product in hot_picks %}
             <div
                 class="flex flex-col bg-surface rounded-xl border border-vault-border overflow-hidden hover:border-primary/30 transition-all">
@@ -183,7 +208,7 @@
                 <div class="p-3 flex flex-col gap-2">
                     <div class="flex gap-2 items-start">
                         <!-- Card Image -->
-                        <div class="w-20 md:w-24 aspect-[3/4] rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
+                        <div class="w-16 sm:w-20 md:w-24 aspect-[3/4] rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
                             hx-get="/product/{{ product.id }}" hx-target="#modal-container" hx-swap="innerHTML">
                             <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=200"
                                 alt="{{ product.title }}" class="w-full h-full object-cover" loading="lazy">
@@ -218,13 +243,10 @@
     </section>
 
     <!-- ==================== ALL PRODUCTS (VAULT GRAILS) ==================== -->
-    <section class="mt-10">
-        <!-- Filter Stickies -->
-        <div
-            class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-4 border-b border-white/5 overflow-hidden">
+    <section id="all-cards-section" class="mt-10 scroll-mt-32">
+        <div class="sticky top-[116px] z-40 bg-background-dark/95 backdrop-blur-sm py-3 border-b border-white/5">
             <form id="filter-form" hx-get="/filter" hx-target="#product-grid" hx-indicator="#grid-loading"
-                hx-trigger="change" hx-include="#search-input"
-                class="flex gap-3 overflow-x-auto hide-scrollbar items-center">
+                hx-trigger="change" hx-include="#search-input">
                 <!-- Hidden Inputs for Additive Filtering -->
                 <input type="hidden" name="rarity" id="rarity-input" value="" />
                 <input type="hidden" name="collection" id="collection-input" value="" />
@@ -233,36 +255,42 @@
                     hx-include="[name='rarity'], [name='collection'], [name='condition'], [name='min_price'], [name='max_price']" />
                 <input type="hidden" name="max_price" id="price-slider" value="" />
 
-                <!-- Price Filter Component -->
-                {% include "partials/price_filter.html" %}
+                <div class="flex items-center gap-2">
+                    <!-- Clear button — always visible, pinned left -->
+                    <button type="button" onclick="resetFilters()"
+                        class="shrink-0 text-[10px] font-bold text-gray-500 hover:text-primary uppercase tracking-wider transition-colors pl-1 pr-2">
+                        Clear
+                    </button>
 
-                <div class="w-px h-8 bg-white/10 shrink-0 mx-2"></div>
+                    <div class="w-px h-5 bg-white/10 shrink-0"></div>
 
-                <!-- Rarity Filters -->
-                <div id="rarity-filters-container">
-                    {% include "partials/rarity_filters.html" %}
-                </div>
+                    <!-- Scrollable filter pills -->
+                    <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1">
+                        <!-- Price Filter Component -->
+                        {% include "partials/price_filter.html" %}
 
-                <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
+                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
 
-                <!-- Condition Filters -->
-                <div id="condition-filters-container">
-                    {% include "partials/condition_filters.html" %}
-                </div>
+                        <!-- Rarity Filters -->
+                        <div id="rarity-filters-container">
+                            {% include "partials/rarity_filters.html" %}
+                        </div>
 
-                <div class="w-px h-8 bg-white/10 self-center mx-2"></div>
+                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
 
-                <!-- Reset Button -->
-                <div class="flex flex-col items-center gap-1 cursor-pointer hover:opacity-75 transition-opacity"
-                    onclick="resetFilters()">
-                    <span class="material-symbols-outlined text-gray-400 text-sm">restart_alt</span>
-                    <p class="text-gray-300 text-[10px] font-bold uppercase whitespace-nowrap">Reset</p>
+                        <!-- Condition Filters -->
+                        <div id="condition-filters-container">
+                            {% include "partials/condition_filters.html" %}
+                        </div>
+
+                        <div class="w-px h-5 bg-white/10 shrink-0"></div>
+
+                        <!-- Collection Filters -->
+                        {% set oob = false %}
+                        {% include "partials/collection_filters.html" %}
+                    </div>
                 </div>
             </form>
-
-            <!-- Collection Filters -->
-            {% set oob = false %}
-            {% include "partials/collection_filters.html" %}
         </div>
 
         <div class="py-6">
@@ -364,9 +392,9 @@
             <span class="material-symbols-outlined text-gray-500 text-xl">search</span>
             <span class="text-[9px] font-bold text-gray-500">Search</span>
         </a>
-        <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1">
-            <span class="material-symbols-outlined text-gray-500 text-xl">add_circle</span>
-            <span class="text-[9px] font-bold text-gray-500">Sell</span>
+        <a href="#all-cards-section" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">storefront</span>
+            <span class="text-[9px] font-bold text-gray-500">Shop</span>
         </a>
         <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1">
             <span class="material-symbols-outlined text-gray-500 text-xl">grid_view</span>
