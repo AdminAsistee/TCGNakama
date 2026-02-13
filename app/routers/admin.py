@@ -440,18 +440,16 @@ async def appraise_market_value(
         card_number = ''
         
         # Extract from tags using prefix format (same as edit card function)
+        # Make case-insensitive to handle both "Set:" and "set:"
         for tag in tags:
-            if tag.startswith("Set:"):
-                set_name = tag.replace("Set:", "").strip()
-            elif tag.startswith("Number:"):
-                card_number = tag.replace("Number:", "").strip()
+            tag_lower = tag.lower()
+            if tag_lower.startswith("set:"):
+                set_name = tag[4:].strip()  # Skip "Set:" or "set:"
+            elif tag_lower.startswith("number:"):
+                card_number = tag[7:].strip()  # Skip "Number:" or "number:"
                 # Add # prefix if not present
                 if card_number and not card_number.startswith('#'):
                     card_number = f'#{card_number}'
-        
-        # If set_name is too short or looks like a variant code, ignore it
-        if set_name and len(set_name) <= 3:
-            set_name = ''
         
         print(f"[APPRAISE] Extracted from tags - Set: '{set_name}', Card Number: '{card_number}'")
         
