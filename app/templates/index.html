@@ -25,22 +25,12 @@
                 </button>
                 <div
                     class="absolute top-full left-0 mt-1 w-auto min-w-[200px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
-                    <a href="#all-cards-section" onclick="event.preventDefault(); shopCollection('pokemon')"
-                        class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">Pokémon</a>
-                    <a href="#all-cards-section" onclick="event.preventDefault(); shopCollection('one-piece')"
-                        class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">One
-                        Piece</a>
-                    <div class="border-t border-white/5"></div>
-                    <div class="flex items-center gap-2 px-4 py-3 opacity-40 cursor-default whitespace-nowrap">
-                        <span class="text-sm text-gray-400 font-medium">Magic: The Gathering</span>
-                        <span
-                            class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase">Soon</span>
-                    </div>
-                    <div class="flex items-center gap-2 px-4 py-3 opacity-40 cursor-default whitespace-nowrap">
-                        <span class="text-sm text-gray-400 font-medium">Dragon Ball</span>
-                        <span
-                            class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase">Soon</span>
-                    </div>
+                    {% for collection in collections %}
+                    <a href="#all-cards-section"
+                        onclick="event.preventDefault(); shopCollection('{{ collection.handle }}')"
+                        class="block px-4 py-3 text-sm text-white font-medium hover:bg-white/5 transition-colors whitespace-nowrap">{{
+                        collection.title }}</a>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -283,98 +273,111 @@
                 </div>
 
                 <!-- ═══════ DESKTOP: Inline Filter Bar (unchanged) ═══════ -->
-                <div class="hidden md:block px-4 py-3 bg-white/[0.02] rounded-xl border border-white/5">
-                    <div class="flex items-center justify-between gap-3">
-                        <!-- Price Filter -->
-                        <div class="flex items-center gap-3">
-                            {% include "partials/price_filter.html" %}
-                            <div class="w-px h-5 bg-white/10 shrink-0"></div>
-                        </div>
+                <div class="hidden md:flex items-center gap-3">
+                    <!-- Resync Button (outside the filter box) -->
+                    <button type="button" onclick="resyncShopifyProducts()" id="resync-btn"
+                        class="flex items-center gap-2 h-9 px-4 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all group">
+                        <span class="material-symbols-outlined text-primary text-sm" id="resync-icon">sync</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-primary">Resync</span>
+                    </button>
 
-                        <!-- Filter Dropdowns -->
-                        <div class="flex items-center gap-1 flex-1">
-                            <!-- Rarity Dropdown -->
-                            <div class="relative filter-dropdown" data-filter-group="rarity">
-                                <button type="button" onclick="toggleFilterDropdown('rarity')"
-                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
-                                    <span
-                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Rarity</span>
-                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
-                                        id="rarity-chevron">expand_more</span>
-                                    <span id="rarity-badge"
-                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
-                                </button>
-                                <div id="rarity-dropdown-panel"
-                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
-                                    {% set rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Ultra Rare'] %}
-                                    {% for r in rarities %}
-                                    <button type="button" data-rarity-btn="{{ r }}"
-                                        onclick="setActiveFilter('{{ r }}', this)"
-                                        class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
-                                        {{ r }}
+                    <!-- Filter Box -->
+                    <div class="flex-1 px-4 py-3 bg-white/[0.02] rounded-xl border border-white/5">
+                        <div class="flex items-center justify-between gap-3">
+                            <!-- Price Filter -->
+                            <div class="flex items-center gap-3">
+                                {% include "partials/price_filter.html" %}
+                                <div class="w-px h-5 bg-white/10 shrink-0"></div>
+                            </div>
+
+                            <!-- Filter Dropdowns -->
+                            <div class="flex items-center gap-1 flex-1">
+                                <!-- Rarity Dropdown -->
+                                <div class="relative filter-dropdown" data-filter-group="rarity">
+                                    <button type="button" onclick="toggleFilterDropdown('rarity')"
+                                        class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                        <span
+                                            class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Rarity</span>
+                                        <span
+                                            class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                            id="rarity-chevron">expand_more</span>
+                                        <span id="rarity-badge"
+                                            class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
                                     </button>
-                                    {% endfor %}
+                                    <div id="rarity-dropdown-panel"
+                                        class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                        {% set rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Ultra Rare'] %}
+                                        {% for r in rarities %}
+                                        <button type="button" data-rarity-btn="{{ r }}"
+                                            onclick="setActiveFilter('{{ r }}', this)"
+                                            class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                            {{ r }}
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <!-- Condition Dropdown -->
+                                <div class="relative filter-dropdown" data-filter-group="condition">
+                                    <button type="button" onclick="toggleFilterDropdown('condition')"
+                                        class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                        <span
+                                            class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Condition</span>
+                                        <span
+                                            class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                            id="condition-chevron">expand_more</span>
+                                        <span id="condition-badge"
+                                            class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                    </button>
+                                    <div id="condition-dropdown-panel"
+                                        class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                        {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+                                        {% for c in conditions %}
+                                        <button type="button" data-condition-btn="{{ c }}"
+                                            onclick="setConditionFilter('{{ c }}', this)"
+                                            class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                            {{ c }}
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <!-- Collection Dropdown -->
+                                <div class="relative filter-dropdown" data-filter-group="collection">
+                                    <button type="button" onclick="toggleFilterDropdown('collection')"
+                                        class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                        <span
+                                            class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Collection</span>
+                                        <span
+                                            class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                            id="collection-chevron">expand_more</span>
+                                        <span id="collection-badge"
+                                            class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                    </button>
+                                    <div id="collection-dropdown-panel"
+                                        class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                        {% for collection in collections %}
+                                        <button type="button" data-collection-btn="{{ collection.handle }}"
+                                            onclick="setActiveCollection('{{ collection.handle }}', this)"
+                                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                            {% if collection.image %}
+                                            <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
+                                            {% endif %}
+                                            {{ collection.title }}
+                                        </button>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Condition Dropdown -->
-                            <div class="relative filter-dropdown" data-filter-group="condition">
-                                <button type="button" onclick="toggleFilterDropdown('condition')"
-                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
-                                    <span
-                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Condition</span>
-                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
-                                        id="condition-chevron">expand_more</span>
-                                    <span id="condition-badge"
-                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                            <!-- Clear button -->
+                            <div class="flex items-center gap-3">
+                                <div class="w-px h-5 bg-white/10 shrink-0"></div>
+                                <button type="button" onclick="resetFilters()"
+                                    class="shrink-0 px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-primary hover:bg-white/5 uppercase tracking-wider transition-all rounded-lg border border-transparent hover:border-white/10">
+                                    Clear
                                 </button>
-                                <div id="condition-dropdown-panel"
-                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
-                                    {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-                                    {% for c in conditions %}
-                                    <button type="button" data-condition-btn="{{ c }}"
-                                        onclick="setConditionFilter('{{ c }}', this)"
-                                        class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
-                                        {{ c }}
-                                    </button>
-                                    {% endfor %}
-                                </div>
                             </div>
-
-                            <!-- Collection Dropdown -->
-                            <div class="relative filter-dropdown" data-filter-group="collection">
-                                <button type="button" onclick="toggleFilterDropdown('collection')"
-                                    class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
-                                    <span
-                                        class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Collection</span>
-                                    <span class="material-symbols-outlined text-gray-400 text-sm transition-transform"
-                                        id="collection-chevron">expand_more</span>
-                                    <span id="collection-badge"
-                                        class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
-                                </button>
-                                <div id="collection-dropdown-panel"
-                                    class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
-                                    {% for collection in collections %}
-                                    <button type="button" data-collection-btn="{{ collection.handle }}"
-                                        onclick="setActiveCollection('{{ collection.handle }}', this)"
-                                        class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
-                                        {% if collection.image %}
-                                        <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
-                                        {% endif %}
-                                        {{ collection.title }}
-                                    </button>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Clear button -->
-                        <div class="flex items-center gap-3">
-                            <div class="w-px h-5 bg-white/10 shrink-0"></div>
-                            <button type="button" onclick="resetFilters()"
-                                class="shrink-0 px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-primary hover:bg-white/5 uppercase tracking-wider transition-all rounded-lg border border-transparent hover:border-white/10">
-                                Clear
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -616,29 +619,15 @@
         </button>
     </div>
     <div class="px-5 py-4 space-y-1 safe-area-bottom">
-        <button type="button" onclick="pickCollection('pokemon')"
+        {% for collection in collections %}
+        <button type="button" onclick="pickCollection('{{ collection.handle }}')"
             class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl active:bg-white/5 transition-all text-left">
-
-            <span class="text-sm font-bold text-white">Pokémon</span>
+            {% if collection.image %}
+            <img src="{{ collection.image }}" class="w-6 h-6 rounded-full" alt="">
+            {% endif %}
+            <span class="text-sm font-bold text-white">{{ collection.title }}</span>
         </button>
-        <button type="button" onclick="pickCollection('one-piece')"
-            class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl active:bg-white/5 transition-all text-left">
-
-            <span class="text-sm font-bold text-white">One Piece</span>
-        </button>
-        <div class="border-t border-white/5 my-2"></div>
-        <div class="flex items-center gap-3 px-4 py-3 opacity-40">
-
-            <span class="text-sm font-medium text-gray-400">Magic: The Gathering</span>
-            <span
-                class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase ml-auto">Soon</span>
-        </div>
-        <div class="flex items-center gap-3 px-4 py-3 opacity-40">
-
-            <span class="text-sm font-medium text-gray-400">Dragon Ball</span>
-            <span
-                class="text-[8px] font-bold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full uppercase ml-auto">Soon</span>
-        </div>
+        {% endfor %}
     </div>
 </div>
 
@@ -647,6 +636,38 @@
     function updatePriceDisplay(val) {
         const display = document.getElementById('price-display');
         if (display) display.textContent = `¥${parseInt(val).toLocaleString()}`;
+    }
+
+    // ───── Resync Shopify Products ─────
+    function resyncShopifyProducts() {
+        const btn = document.getElementById('resync-btn');
+        const icon = document.getElementById('resync-icon');
+
+        // Disable button and show loading state
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        icon.classList.add('animate-spin');
+
+        // Trigger HTMX refresh
+        if (typeof htmx !== 'undefined') {
+            htmx.ajax('POST', '/refresh', {
+                target: '#product-grid',
+                swap: 'outerHTML'
+            }).then(() => {
+                // Re-enable button after sync
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    icon.classList.remove('animate-spin');
+                }, 1000);
+            }).catch(() => {
+                // Re-enable button on error
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                icon.classList.remove('animate-spin');
+                alert('Failed to sync products. Please try again.');
+            });
+        }
     }
 
     // ───── Dynamic Sticky Offset ─────
