@@ -729,8 +729,39 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 safe_print(f"[PRICECHARTING_API] No valid prices found")
                 return None
             
-            # Select the cheapest price (more conservative pricing)
-            cheapest = min(valid_prices, key=lambda x: x['price'])
+            # Filter by card number first (if card number provided)
+            filtered_prices = valid_prices
+            if card_number:
+                import re
+                
+                # Extract just the numbers from the search card number
+                # e.g., "#001/024" -> ["001", "024"], "18-051" -> ["18", "051"]
+                search_numbers = re.findall(r'\d+', card_number)
+                
+                if search_numbers:
+                    safe_print(f"[PRICECHARTING_API] Looking for card numbers: {search_numbers}")
+                    
+                    # Try to find products that contain these numbers
+                    number_matches = []
+                    for item in valid_prices:
+                        # Extract numbers from product name
+                        product_numbers = re.findall(r'\d+', item['name'])
+                        
+                        # Check if the main card number (first number) matches
+                        if product_numbers and search_numbers:
+                            # Match if the first number matches (main card number)
+                            if product_numbers[0] == search_numbers[0] or product_numbers[0] == search_numbers[0].lstrip('0'):
+                                number_matches.append(item)
+                                safe_print(f"[PRICECHARTING_API]   ✓ Matched: '{item['name']}' (number: {product_numbers[0]})")
+                    
+                    if number_matches:
+                        safe_print(f"[PRICECHARTING_API] Filtered to {len(number_matches)} products matching card number")
+                        filtered_prices = number_matches
+                    else:
+                        safe_print(f"[PRICECHARTING_API] No card number matches, using all {len(valid_prices)} results")
+            
+            # Select the cheapest price from filtered results
+            cheapest = min(filtered_prices, key=lambda x: x['price'])
             safe_print(f"[PRICECHARTING_API] Selected cheapest: '{cheapest['name']}' = ${cheapest['price']} ({cheapest['type']})")
             return cheapest['price']
     
