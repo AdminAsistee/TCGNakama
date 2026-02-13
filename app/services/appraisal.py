@@ -373,6 +373,7 @@ async def get_market_value_jpy(
         market_jpy = market_usd * exchange_rate # Initialize with fallback
         
         try:
+            safe_print(f"[APPRAISE] Converting ${market_usd} USD to JPY...")
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(
                     f"https://api.frankfurter.app/latest",
@@ -385,9 +386,11 @@ async def get_market_value_jpy(
                 
                 if response.status_code == 200:
                     data = response.json()
+                    safe_print(f"[APPRAISE] Frankfurter API response: {data}")
                     market_jpy = data['rates']['JPY']
                     exchange_rate = market_jpy / market_usd
                     rate_date = data.get('date', 'today')
+                    safe_print(f"[APPRAISE] Converted: ${market_usd} USD -> ¥{market_jpy} JPY (rate: {exchange_rate})")
                 else:
                     # Use fallback rate if API returns non-200 status
                     safe_print(f"[APPRAISE] Currency API returned status {response.status_code}, using fallback rate: {exchange_rate}")
