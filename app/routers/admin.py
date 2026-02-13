@@ -460,19 +460,33 @@ async def appraise_market_value(
         has_japanese = bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', card_name))
         
         # Extract clean English card name from title
-        # Title format: "ピカチュウ (Pikachu) - Pikachu sA #001/024"
-        # We want: "Pikachu sA"
+        # Title format: "ピカチュウ (Pikachu) - s10a #014/071"
+        # We want: "Pikachu" (the set and card number will be added separately)
         search_name = card_name
         
-        # Remove Japanese characters and parentheses
-        search_name = re.sub(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\(\)]', '', search_name)
+        # For Japanese cards, extract the English name from parentheses
+        if has_japanese:
+            # Look for English name in parentheses: "Japanese (English) - ..."
+            match = re.search(r'\(([^)]+)\)', search_name)
+            if match:
+                # Use the English name from parentheses
+                search_name = match.group(1).strip()
+            else:
+                # No parentheses, just remove Japanese characters
+                search_name = re.sub(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', '', search_name)
+                # Remove card number and dashes
+                search_name = re.sub(r'#?\d+/\d+', '', search_name)
+                search_name = re.sub(r'\s*-\s*', ' ', search_name).strip()
+        else:
+            # For non-Japanese cards, remove parentheses and their content
+            search_name = re.sub(r'\([^)]*\)', '', search_name)
+            # Remove card number
+            search_name = re.sub(r'#?\d+/\d+', '', search_name)
+            # Remove dashes
+            search_name = re.sub(r'\s*-\s*', ' ', search_name).strip()
         
-        # Remove card number pattern (#001/024 or similar)
-        search_name = re.sub(r'#?\d+/\d+', '', search_name)
-        
-        # Remove extra dashes and whitespace
-        search_name = re.sub(r'\s*-\s*', ' ', search_name).strip()
-        search_name = ' '.join(search_name.split())  # Normalize whitespace
+        # Normalize whitespace
+        search_name = ' '.join(search_name.split())
         
         print(f"[APPRAISE] Clean search name: '{search_name}'")
         safe_print(f"[APPRAISE] Card: {card_name}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Japanese: {has_japanese}")
