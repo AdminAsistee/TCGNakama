@@ -114,8 +114,38 @@
             </div>
         </div>
 
+        <!-- Duplicate Card Detection Modal -->
+        <div id="duplicate-modal"
+            class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+            <div class="glass-panel rounded-2xl p-8 border border-white/10 flex flex-col gap-6 max-w-md mx-4">
+                <div class="flex items-start gap-4">
+                    <span class="material-symbols-outlined text-4xl text-yellow-400">warning</span>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-white mb-2">Duplicate Card Detected</h3>
+                        <p class="text-sm text-white/60 mb-4">A card with the same name and rarity already exists:</p>
+                        <p id="duplicate-card-name"
+                            class="text-sm text-white font-medium bg-white/5 p-3 rounded-lg border border-white/10"></p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-3">
+                    <button type="button" onclick="editExistingCard()"
+                        class="w-full py-3 rounded-xl bg-gradient-to-r from-neon-purple to-primary text-white font-bold text-sm transition-all hover:shadow-lg hover:shadow-primary/50">
+                        Edit Existing Card
+                    </button>
+                    <button type="button" onclick="closeDuplicateModal()"
+                        class="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-sm transition-all hover:bg-white/10">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="window.location.href='/admin'"
+                        class="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 font-bold text-sm transition-all hover:bg-white/10 hover:text-white">
+                        Exit Form
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <form action="{% if edit_mode %}/admin/update-card{% else %}/admin/add-card{% endif %}" method="POST"
-            enctype="multipart/form-data" class="flex flex-col gap-8" onsubmit="return showLoading()">
+            enctype="multipart/form-data" class="flex flex-col gap-8" onsubmit="return checkDuplicateAndSubmit(event)">
             {% if edit_mode %}
             <input type="hidden" name="product_id" value="{{ product.id }}">
             <input type="hidden" name="variant_id" value="{{ product.variant_id }}">
@@ -179,8 +209,62 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Appraise Card Button -->
+                    {% if not edit_mode %}
+                    <div class="flex flex-col gap-3">
+                        <button type="button" id="appraise-btn" onclick="enableImageSelection()" disabled
+                            class="w-full py-4 rounded-xl bg-gradient-to-r from-neon-purple to-primary text-white font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/50">
+                            <span class="material-symbols-outlined">auto_fix_high</span>
+                            <span>Appraise Card with AI</span>
+                        </button>
+                        <p class="text-xs text-white/40 text-center">Click to select which card image to analyze</p>
+                    </div>
+                    {% endif %}
                 </div>
             </section>
+
+            <!-- Toast Notification -->
+            <div id="toast" class="fixed top-20 right-4 z-50 hidden">
+                <div
+                    class="glass-panel rounded-xl p-4 border border-white/10 flex items-start gap-3 max-w-sm shadow-2xl">
+                    <span id="toast-icon" class="material-symbols-outlined text-2xl"></span>
+                    <div class="flex-1">
+                        <h4 id="toast-title" class="font-bold text-sm mb-1"></h4>
+                        <p id="toast-message" class="text-xs text-white/70"></p>
+                    </div>
+                    <button onclick="hideToast()" class="text-white/40 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Duplicate Card Modal -->
+            <div id="duplicate-modal"
+                class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm">
+                <div class="glass-panel rounded-2xl p-8 border border-white/10 max-w-md w-full mx-4 shadow-2xl">
+                    <div class="flex items-start gap-4 mb-6">
+                        <span class="material-symbols-outlined text-4xl text-yellow-400">warning</span>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold mb-2">Duplicate Card Detected</h3>
+                            <p class="text-sm text-white/70">
+                                A card with this name already exists:
+                            </p>
+                            <p class="text-base font-bold text-primary mt-2" id="duplicate-card-name"></p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="editExistingCard()"
+                            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-neon-purple to-primary text-white font-bold text-sm hover:shadow-lg hover:shadow-primary/50 transition-all">
+                            Edit Existing Card
+                        </button>
+                        <button onclick="closeDuplicateModal()"
+                            class="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold text-sm hover:bg-white/20 transition-all">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Metadata Section -->
             <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -484,6 +568,144 @@
             }
         }
 
+        // Duplicate detection variables
+        let duplicateProductId = null;
+        let bypassDuplicateCheck = false;
+
+        // Check for duplicate card before submission
+        async function checkDuplicateAndSubmit(event) {
+            console.log('[DUPLICATE CHECK] Form submission triggered');
+
+            // Prevent default form submission
+            event.preventDefault();
+
+            // Check if we're in edit mode
+            const editMode = document.querySelector('input[name="product_id"]') !== null;
+            console.log('[DUPLICATE CHECK] Edit mode:', editMode, 'Bypass:', bypassDuplicateCheck);
+
+            // Get card name early to check if it changed
+            const cardNameInput = document.querySelector('input[name="name"]');
+            const currentCardName = cardNameInput ? cardNameInput.value.trim() : '';
+
+            // In edit mode, check if the card name has changed
+            let nameChanged = false;
+            if (editMode) {
+                // Get the original card name from the product data
+                const originalName = "{{ product.title if edit_mode else '' }}";
+                nameChanged = currentCardName !== originalName;
+                console.log('[DUPLICATE CHECK] Original name:', originalName);
+                console.log('[DUPLICATE CHECK] Current name:', currentCardName);
+                console.log('[DUPLICATE CHECK] Name changed:', nameChanged);
+            }
+
+            // If we're in edit mode and name hasn't changed, OR bypassing duplicate check, proceed with validation
+            if ((editMode && !nameChanged) || bypassDuplicateCheck) {
+                console.log('[DUPLICATE CHECK] Bypassing duplicate check, running validation');
+                // Run validation
+                if (showLoading()) {
+                    console.log('[DUPLICATE CHECK] Validation passed, submitting form');
+                    // Remove the onsubmit handler to prevent infinite loop
+                    event.target.onsubmit = null;
+                    // Validation passed, submit the form
+                    event.target.submit();
+                } else {
+                    console.log('[DUPLICATE CHECK] Validation failed');
+                }
+                return false;
+            }
+
+            // Get card name and rarity (already got cardNameInput above)
+            // const cardNameInput = document.querySelector('input[name="name"]'); // Removed duplicate declaration
+
+            console.log('[DUPLICATE CHECK] Card name input:', cardNameInput);
+
+            if (!cardNameInput) {
+                console.error('[DUPLICATE CHECK] Could not find card name input');
+                // Proceed with normal validation if input not found
+                if (showLoading()) {
+                    event.target.onsubmit = null;
+                    event.target.submit();
+                }
+                return false;
+            }
+
+            const cardName = cardNameInput.value.trim();
+
+            console.log('[DUPLICATE CHECK] Card name:', cardName);
+
+            if (!cardName) {
+                console.log('[DUPLICATE CHECK] No card name, proceeding with normal validation');
+                // If no card name, proceed with normal validation
+                if (showLoading()) {
+                    event.target.onsubmit = null;
+                    event.target.submit();
+                }
+                return false;
+            }
+
+            try {
+                console.log('[DUPLICATE CHECK] Calling duplicate check endpoint');
+
+                // Build the API URL - include current product ID if in edit mode
+                let apiUrl = `/admin/check-duplicate-card?card_name=${encodeURIComponent(cardName)}`;
+                if (editMode) {
+                    const currentProductId = document.querySelector('input[name="product_id"]').value;
+                    apiUrl += `&current_product_id=${encodeURIComponent(currentProductId)}`;
+                    console.log('[DUPLICATE CHECK] Edit mode - excluding current product:', currentProductId);
+                }
+
+                // Call duplicate check endpoint
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                console.log('[DUPLICATE CHECK] Response:', data);
+
+                if (data.exists) {
+                    console.log('[DUPLICATE CHECK] Duplicate found, showing modal');
+                    // Show duplicate modal
+                    duplicateProductId = data.product_id;
+                    document.getElementById('duplicate-card-name').textContent = data.product_title;
+                    document.getElementById('duplicate-modal').classList.remove('hidden');
+                    document.getElementById('duplicate-modal').classList.add('flex');
+                    return false;
+                } else {
+                    console.log('[DUPLICATE CHECK] No duplicate, proceeding with submission');
+                    // No duplicate, proceed with validation and submission
+                    bypassDuplicateCheck = true;
+                    if (showLoading()) {
+                        console.log('[DUPLICATE CHECK] Submitting form');
+                        event.target.onsubmit = null;
+                        event.target.submit();
+                    }
+                }
+            } catch (error) {
+                console.error('[DUPLICATE CHECK] Error:', error);
+                // On error, proceed with normal validation and submission
+                bypassDuplicateCheck = true;
+                if (showLoading()) {
+                    event.target.onsubmit = null;
+                    event.target.submit();
+                }
+            }
+
+            return false;
+        }
+
+        // Close duplicate modal
+        function closeDuplicateModal() {
+            document.getElementById('duplicate-modal').classList.add('hidden');
+            document.getElementById('duplicate-modal').classList.remove('flex');
+            duplicateProductId = null;
+        }
+
+        // Redirect to edit existing card
+        function editExistingCard() {
+            if (duplicateProductId) {
+                // URL-encode to preserve special characters like :// in Shopify GIDs
+                window.location.href = `/admin/edit-card?product_id=${encodeURIComponent(duplicateProductId)}`;
+            }
+        }
+
         function showLoading() {
             // Validate at least one collection is selected
             const checkboxes = document.querySelectorAll('.collection-checkbox');
@@ -494,16 +716,21 @@
                 return false;
             }
 
-            // Validate at least one image is provided
-            const fileInput = document.getElementById('file-input');
-            const urlInputs = document.getElementsByName('image_urls');
-            const hasFiles = fileInput.files && fileInput.files.length > 0;
-            const hasUrls = Array.from(urlInputs).some(input => input.value.trim() !== '');
+            // Check if we're in edit mode
+            const editMode = document.querySelector('input[name="product_id"]') !== null;
 
-            if (!hasFiles && !hasUrls) {
-                document.getElementById('image-error').classList.remove('hidden');
-                document.getElementById('collection-error').classList.add('hidden');
-                return false;
+            // Validate at least one image is provided (ONLY in add mode, not edit mode)
+            if (!editMode) {
+                const fileInput = document.getElementById('file-input');
+                const urlInputs = document.getElementsByName('image_urls');
+                const hasFiles = fileInput.files && fileInput.files.length > 0;
+                const hasUrls = Array.from(urlInputs).some(input => input.value.trim() !== '');
+
+                if (!hasFiles && !hasUrls) {
+                    document.getElementById('image-error').classList.remove('hidden');
+                    document.getElementById('collection-error').classList.add('hidden');
+                    return false;
+                }
             }
 
             document.getElementById('image-error').classList.add('hidden');
@@ -513,6 +740,269 @@
             document.getElementById('loading-overlay').classList.add('flex');
             return true;
         }
+
+        // Toast notification functions
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const titleEl = document.getElementById('toast-title');
+            const messageEl = document.getElementById('toast-message');
+
+            // Set content
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            // Set icon and color based on type
+            if (type === 'success') {
+                icon.textContent = 'check_circle';
+                icon.className = 'material-symbols-outlined text-2xl text-neon-green';
+            } else if (type === 'error') {
+                icon.textContent = 'error';
+                icon.className = 'material-symbols-outlined text-2xl text-danger-red';
+            } else if (type === 'loading') {
+                icon.textContent = 'progress_activity';
+                icon.className = 'material-symbols-outlined text-2xl text-primary animate-spin';
+            }
+
+            // Show toast
+            toast.classList.remove('hidden');
+
+            // Auto-hide after 5 seconds (unless loading)
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    hideToast();
+                }, 5000);
+            }
+        }
+
+        function hideToast() {
+            document.getElementById('toast').classList.add('hidden');
+        }
+
+        // Image selection mode for appraisal
+        let selectionMode = false;
+        let imageMetadata = []; // Store metadata about each image (file or URL)
+
+        function enableImageSelection() {
+            selectionMode = true;
+            const previews = document.getElementById('image-previews');
+            const images = previews.querySelectorAll('div');
+
+            if (images.length === 0) {
+                showToast('No Images', 'Please upload at least one image first', 'error');
+                return;
+            }
+
+            // Add selection borders to all images
+            images.forEach((imgDiv, index) => {
+                imgDiv.classList.add('ring-4', 'ring-primary', 'ring-opacity-50', 'cursor-pointer');
+                imgDiv.onclick = () => selectImageForAppraisal(index);
+            });
+
+            // Update button text
+            document.getElementById('appraise-btn').innerHTML = `
+                <span class="material-symbols-outlined">touch_app</span>
+                <span>Click on an image to appraise</span>
+            `;
+
+            showToast('Select Image', 'Click on the card image you want to analyze', 'loading');
+        }
+
+        async function selectImageForAppraisal(index) {
+            if (!selectionMode) return;
+
+            // Disable selection mode
+            selectionMode = false;
+            const previews = document.getElementById('image-previews');
+            const images = previews.querySelectorAll('div');
+
+            // Remove selection borders from all images
+            images.forEach((imgDiv, i) => {
+                imgDiv.classList.remove('ring-4', 'ring-primary', 'ring-opacity-50', 'cursor-pointer');
+                imgDiv.onclick = null;
+
+                // Highlight the selected image
+                if (i === index) {
+                    imgDiv.classList.add('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                    // Add checkmark overlay
+                    const checkmark = document.createElement('div');
+                    checkmark.className = 'absolute top-2 right-2 bg-neon-green text-black rounded-full p-1';
+                    checkmark.innerHTML = '<span class="material-symbols-outlined text-sm">check</span>';
+                    imgDiv.appendChild(checkmark);
+                }
+            });
+
+            // Reset button
+            document.getElementById('appraise-btn').innerHTML = `
+                <span class="material-symbols-outlined">auto_fix_high</span>
+                <span>Appraise Card with AI</span>
+            `;
+
+            // Show loading toast
+            hideToast();
+            showToast('Analyzing Card', 'Gemini AI is analyzing your card...', 'loading');
+
+            // Get image data
+            const fileInput = document.getElementById('file-input');
+            const urlInputs = document.getElementsByName('image_urls');
+            const validUrls = Array.from(urlInputs).filter(input => input.value.trim() !== '').map(input => input.value.trim());
+
+            let formData = new FormData();
+
+            // Determine if this is a file or URL
+            const totalFiles = fileInput.files ? fileInput.files.length : 0;
+
+            if (index < totalFiles) {
+                // This is a file upload
+                formData.append('image_file', fileInput.files[index]);
+            } else {
+                // This is a URL
+                const urlIndex = index - totalFiles;
+                if (urlIndex < validUrls.length) {
+                    formData.append('image_url', validUrls[urlIndex]);
+                }
+            }
+
+            try {
+                const response = await fetch('/admin/appraise-card-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    const data = result.data;
+
+                    // Auto-populate form fields
+                    if (data.card_name) {
+                        document.querySelector('input[name="name"]').value = data.card_name;
+                    }
+                    if (data.set_name) {
+                        document.querySelector('input[name="set_name"]').value = data.set_name;
+                    }
+                    if (data.card_number) {
+                        document.querySelector('input[name="card_number"]').value = data.card_number;
+                    }
+                    if (data.rarity) {
+                        const raritySelect = document.querySelector('select[name="rarity"]');
+                        // Try to find matching option
+                        const options = Array.from(raritySelect.options);
+                        const matchingOption = options.find(opt => opt.value.toLowerCase() === data.rarity.toLowerCase());
+                        if (matchingOption) {
+                            raritySelect.value = matchingOption.value;
+                        }
+                    }
+                    if (data.manufacturer) {
+                        document.querySelector('input[name="vendor"]').value = data.manufacturer;
+                    }
+
+                    // Build description with scanned information in bulleted form
+                    let description = '**Card Detailed Information:**\n\n';
+                    if (data.card_name_japanese) {
+                        description += `• **Japanese Name:** ${data.card_name_japanese}\n`;
+                    }
+                    if (data.card_name_english) {
+                        description += `• **English Name:** ${data.card_name_english}\n`;
+                    }
+                    if (data.set_name) {
+                        description += `• **Set:** ${data.set_name}\n`;
+                    }
+                    if (data.card_number) {
+                        description += `• **Card Number:** ${data.card_number}\n`;
+                    }
+                    if (data.rarity) {
+                        description += `• **Rarity:** ${data.rarity}\n`;
+                    }
+                    if (data.year) {
+                        description += `• **Year:** ${data.year}\n`;
+                    }
+                    if (data.manufacturer) {
+                        description += `• **Manufacturer:** ${data.manufacturer}\n`;
+                    }
+
+                    // Set description
+                    const descriptionField = document.querySelector('textarea[name="description"]');
+                    if (descriptionField) {
+                        descriptionField.value = description;
+                    }
+
+                    // Remove selection highlight
+                    const previews = document.getElementById('image-previews');
+                    const images = previews.querySelectorAll('div');
+                    images.forEach(imgDiv => {
+                        imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                        // Remove checkmark if exists
+                        const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
+                        if (checkmark) checkmark.remove();
+                    });
+
+                    hideToast();
+                    showToast(
+                        'Appraisal Complete!',
+                        `Identified: ${data.card_name_english || data.card_name_japanese || 'Unknown'} - ${data.rarity || 'Unknown rarity'}. Fetching market value...`,
+                        'loading'
+                    );
+
+                    // Fetch market value using the same appraisal system as admin dashboard
+                    console.log('[APPRAISE] About to call fetchMarketValue with data:', data);
+                    fetchMarketValue(data);
+                } else {
+                    // Remove selection highlight on error too
+                    const previews = document.getElementById('image-previews');
+                    const images = previews.querySelectorAll('div');
+                    images.forEach(imgDiv => {
+                        imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                        const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
+                        if (checkmark) checkmark.remove();
+                    });
+
+                    hideToast();
+                    showToast('Appraisal Failed', result.error || 'Could not analyze the card', 'error');
+                }
+            } catch (error) {
+                // Remove selection highlight on error
+                const previews = document.getElementById('image-previews');
+                const images = previews.querySelectorAll('div');
+                images.forEach(imgDiv => {
+                    imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                    const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
+                    if (checkmark) checkmark.remove();
+                });
+
+                hideToast();
+                showToast('Error', 'Failed to connect to appraisal service', 'error');
+                console.error('Appraisal error:', error);
+            }
+        }
+
+        // Update appraise button state when images change
+        function updateAppraiseButton() {
+            const fileInput = document.getElementById('file-input');
+            const urlInputs = document.getElementsByName('image_urls');
+            const hasFiles = fileInput.files && fileInput.files.length > 0;
+            const hasUrls = Array.from(urlInputs).some(input => input.value.trim() !== '');
+
+            const appraiseBtn = document.getElementById('appraise-btn');
+            if (hasFiles || hasUrls) {
+                appraiseBtn.disabled = false;
+            } else {
+                appraiseBtn.disabled = true;
+            }
+        }
+
+        // Override existing functions to also update appraise button
+        const originalHandleFileSelect = handleFileSelect;
+        handleFileSelect = function (input) {
+            originalHandleFileSelect(input);
+            updateAppraiseButton();
+        };
+
+        const originalUpdatePreviews = updatePreviews;
+        updatePreviews = function () {
+            originalUpdatePreviews();
+            updateAppraiseButton();
+        };
 
         // Initialize previews and additional URL fields on page load for edit mode
         document.addEventListener('DOMContentLoaded', function () {
@@ -545,6 +1035,65 @@
         updatePreviews();
         {% endif %}
         });
+
+        // Fetch market value using the same appraisal system as admin dashboard
+        async function fetchMarketValue(cardData) {
+            console.log('[FETCH_MARKET_VALUE] Function called with:', cardData);
+            try {
+                // Build query parameters for the appraisal API
+                const params = new URLSearchParams();
+
+                // Use English name for market lookup (more common in pricing databases)
+                const cardName = cardData.card_name_english || cardData.card_name_japanese || '';
+                params.append('card_name', cardName);
+                params.append('set_name', cardData.set_name || '');
+                params.append('card_number', cardData.card_number || '');
+                params.append('rarity', cardData.rarity || '');
+
+                // Call the market value estimation endpoint (create a temporary product-like structure)
+                const apiUrl = `/admin/estimate-market-value?${params.toString()}`;
+                console.log('[FETCH_MARKET_VALUE] Calling API:', apiUrl);
+                const response = await fetch(apiUrl);
+                console.log('[FETCH_MARKET_VALUE] Response:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch market value');
+                }
+
+                const result = await response.json();
+                console.log('[FETCH_MARKET_VALUE] Result:', result);
+
+                if (result.market_value_jpy) {
+                    // Set the price field with the market value in JPY
+                    const priceField = document.querySelector('input[name="price"]');
+                    if (priceField) {
+                        priceField.value = Math.round(result.market_value_jpy);
+                    }
+
+                    hideToast();
+                    showToast(
+                        'Price Set!',
+                        `Market value: ¥${Math.round(result.market_value_jpy).toLocaleString()} (${result.market_value_usd ? '$' + result.market_value_usd.toFixed(2) : 'N/A'})`,
+                        'success'
+                    );
+                } else {
+                    hideToast();
+                    showToast(
+                        'Appraisal Complete!',
+                        'Card identified, but market value not available. Please set price manually.',
+                        'success'
+                    );
+                }
+            } catch (error) {
+                console.error('Market value fetch error:', error);
+                hideToast();
+                showToast(
+                    'Appraisal Complete!',
+                    'Card identified, but market value unavailable. Please set price manually.',
+                    'success'
+                );
+            }
+        }
     </script>
 
 </html>

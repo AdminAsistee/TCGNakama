@@ -393,6 +393,10 @@
                         class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-green/20 text-neon-green border-neon-green/40 hover:bg-neon-green/30">
                         <span class="material-symbols-outlined text-[10px] align-middle">attach_money</span> Value
                     </button>
+                    <button onclick="toggleColumn('market')" id="toggle-market"
+                        class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-blue/20 text-neon-blue border-neon-blue/40 hover:bg-neon-blue/30">
+                        <span class="material-symbols-outlined text-[10px] align-middle">currency_exchange</span> Market
+                    </button>
                     <button onclick="toggleColumn('cost')" id="toggle-cost"
                         class="text-[9px] uppercase tracking-wider px-2 py-1 rounded border transition-colors bg-neon-gold/20 text-neon-gold border-neon-gold/40 hover:bg-neon-gold/30">
                         <span class="material-symbols-outlined text-[10px] align-middle">payments</span> Cost
@@ -421,6 +425,7 @@
                             <th class="p-3 font-medium" data-col="stock">Stock</th>
                             <th class="p-3 font-medium" data-col="age">Age</th>
                             <th class="p-3 font-medium text-right" data-col="value">Value (¥)</th>
+                            <th class="p-3 font-medium text-right" data-col="market">Market (¥)</th>
                             <th class="p-3 font-medium text-right" data-col="cost">Buy Price</th>
                             <th class="p-3 font-medium text-right" data-col="sell">Sell Price</th>
                             <th class="p-3 font-medium text-right" data-col="gl">G/L (%)</th>
@@ -467,6 +472,17 @@
                             </td>
                             <td class="p-3 text-right font-bold text-white" data-col="value">¥{{ product.price|int }}
                             </td>
+                            <td class="p-3 text-right" data-col="market">
+                                <div class="flex items-center justify-end gap-2">
+                                    <button onclick="appraiseMarket('{{ product.id }}')"
+                                        class="text-[9px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-2 py-1 rounded hover:bg-neon-blue/10 transition-colors whitespace-nowrap"
+                                        id="appraise-btn-{{ product.id }}">
+                                        💰 Appraise
+                                    </button>
+                                    <div id="market-result-{{ product.id }}" class="text-sm font-mono min-w-[80px]">
+                                    </div>
+                                </div>
+                            </td>
                             <td class="p-3 text-right" data-col="cost">
                                 <div class="flex items-center justify-end gap-1">
                                     <span class="text-white/40 font-bold text-sm">¥</span>
@@ -501,7 +517,7 @@
                             </td>
                             <td class="p-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="/admin/edit-card/{{ product.id }}"
+                                    <a href="/admin/edit-card?product_id={{ product.id|urlencode }}"
                                         class="text-[10px] uppercase tracking-wider text-neon-gold border border-neon-gold/20 px-2 py-1 rounded hover:bg-neon-gold/10 transition-colors">
                                         Edit
                                     </a>
@@ -721,6 +737,79 @@
                 console.error('Failed to save grade:', error);
             }
         }
+
+        // Appraise market value with currency conversion
+        async function appraiseMarket(productId) {
+            const btn = document.getElementById(`appraise-btn-${productId}`);
+            const resultDiv = document.getElementById(`market-result-${productId}`);
+
+            // Extract numeric ID from Shopify GID format (gid://shopify/Product/123456)
+            let numericId = productId;
+            if (productId.includes('gid://shopify/Product/')) {
+                numericId = productId.split('/').pop();
+            }
+
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            resultDiv.innerHTML = '<span class="text-white/40 text-xs">Fetching...</span>';
+
+            try {
+                // Create abort controller with 120 second timeout (detail page scraping + Gemini takes extra time)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+                // Add force_refresh=true to bypass cache
+                const response = await fetch(`/admin/appraise-market/${numericId}?force_refresh=true`, {
+                    method: 'POST',
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                const data = await response.json();
+
+                if (data.error) {
+                    resultDiv.innerHTML = `<span class="text-red-400 text-xs">${data.error}</span>`;
+                } else {
+                    const marketJpy = data.market_jpy;
+                    const diff = data.price_diff_pct;
+
+                    // Color code based on difference
+                    let color = 'text-white/60';
+                    let indicator = '';
+                    if (diff < -15) {
+                        color = 'text-red-400';  // Underpriced
+                        indicator = '🔴';
+                    } else if (diff > 15) {
+                        color = 'text-green-400';  // Overpriced
+                        indicator = '🟢';
+                    } else {
+                        color = 'text-yellow-400';  // Fair price
+                        indicator = '🟡';
+                    }
+
+                    resultDiv.innerHTML = `
+                        <div class="flex flex-col items-end gap-0.5">
+                            <div class="text-sm font-bold ${color}">¥${marketJpy.toLocaleString()}</div>
+                            <div class="text-[9px] ${color}">${indicator} ${diff > 0 ? '+' : ''}${diff}%</div>
+                        </div>
+                    `;
+
+                    // Update button
+                    btn.textContent = '🔄 Refresh';
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    resultDiv.innerHTML = '<span class="text-red-400 text-xs">Timeout - Try again</span>';
+                } else {
+                    resultDiv.innerHTML = '<span class="text-red-400 text-xs">Failed</span>';
+                }
+                console.error('Appraisal error:', error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
 
         // Track inventory value changes
         (function () {

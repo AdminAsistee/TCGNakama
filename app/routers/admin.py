@@ -7,6 +7,8 @@ from app.routers.oauth import get_admin_token
 from app import cost_db
 from app.database import get_db
 from app.models import Banner
+from app.services import appraisal
+from app.services.appraisal import safe_print
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from pydantic import BaseModel
@@ -18,6 +20,7 @@ import os
 from pathlib import Path
 from PIL import Image
 import hashlib
+from urllib.parse import quote, unquote
 
 
 # Session secret for signing cookies
@@ -112,6 +115,13 @@ def analyze_basket_combinations(orders: list) -> list:
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# Add custom filter for URL-encoding Shopify GIDs (which contain slashes)
+def urlencode_gid(value):
+    """URL-encode a Shopify GID, encoding slashes and colons."""
+    return quote(str(value), safe='')
+
+templates.env.filters['urlencode_gid'] = urlencode_gid
 
 
 def verify_session(request: Request) -> str:
@@ -331,6 +341,154 @@ async def save_grade(data: GradeUpdate, admin: str = Depends(get_admin_session))
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+@router.post("/appraise-market/{product_id}")
+async def appraise_market_value(
+    product_id: str,
+    force_refresh: bool = False,  # Query parameter to bypass cache
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Get market appraisal with JPY conversion for a specific product."""
+    try:
+        safe_print(f"[APPRAISE] Starting appraisal for product_id: {product_id} (force_refresh={force_refresh})")
+        
+        # Reconstruct full Shopify GID if only numeric ID provided
+        if not product_id.startswith("gid://shopify/Product/"):
+            product_id = f"gid://shopify/Product/{product_id}"
+            safe_print(f"[APPRAISE] Reconstructed GID: {product_id}")
+        
+        # Fetch product from Shopify
+        product = await client.get_product(product_id)
+        
+        if not product:
+            safe_print(f"[APPRAISE] Product not found: {product_id}")
+            return JSONResponse({'error': 'Product not found'}, status_code=404)
+        
+        # Extract card data
+        card_name = product.get('title', 'Unknown')
+        rarity = product.get('rarity', 'Common')
+        
+        # Extract set and card number from tags (using Shopify prefix format)
+        tags = product.get('tags', [])
+        # Handle both list and string formats
+        if isinstance(tags, str):
+            tags = [tag.strip() for tag in tags.split(',')]
+        elif isinstance(tags, list):
+            tags = [str(tag).strip() for tag in tags]
+        else:
+            tags = []
+        
+        set_name = 'Unknown'
+        card_number = ''
+        
+        # Extract from tags using prefix format (same as edit card function)
+        for tag in tags:
+            if tag.startswith("Set:"):
+                set_name = tag.replace("Set:", "").strip()
+            elif tag.startswith("Number:"):
+                card_number = tag.replace("Number:", "").strip()
+                # Add # prefix if not present
+                if card_number and not card_number.startswith('#'):
+                    card_number = f'#{card_number}'
+        
+        # If set_name is too short or looks like a variant code, ignore it
+        if set_name and len(set_name) <= 3:
+            set_name = ''
+        
+        print(f"[APPRAISE] Extracted from tags - Set: '{set_name}', Card Number: '{card_number}'")
+        
+        # Detect if Japanese card (has Japanese characters)
+        import re
+        has_japanese = bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', card_name))
+        
+        # Extract clean English card name from title
+        # Title format: "ピカチュウ (Pikachu) - Pikachu sA #001/024"
+        # We want: "Pikachu sA"
+        search_name = card_name
+        
+        # Remove Japanese characters and parentheses
+        search_name = re.sub(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\(\)]', '', search_name)
+        
+        # Remove card number pattern (#001/024 or similar)
+        search_name = re.sub(r'#?\d+/\d+', '', search_name)
+        
+        # Remove extra dashes and whitespace
+        search_name = re.sub(r'\s*-\s*', ' ', search_name).strip()
+        search_name = ' '.join(search_name.split())  # Normalize whitespace
+        
+        print(f"[APPRAISE] Clean search name: '{search_name}'")
+        safe_print(f"[APPRAISE] Card: {card_name}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Japanese: {has_japanese}")
+        
+        # Detect variants from title
+        variants = []
+        title_upper = card_name.upper()
+        if '1ST EDITION' in title_upper or 'FIRST EDITION' in title_upper:
+            variants.append('1st Edition')
+        if 'HOLO' in title_upper or 'HOLOGRAPHIC' in title_upper:
+            variants.append('Holographic')
+        if 'REVERSE' in title_upper:
+            variants.append('Reverse Holo')
+        if has_japanese:
+            variants.append('Japanese')
+        
+        # Get market value in JPY
+        safe_print(f"[APPRAISE] Calling appraisal service...")
+        market_data = await appraisal.get_market_value_jpy(
+            card_name=search_name,  # Use cleaned search name
+            rarity=rarity,
+            set_name=set_name,
+            card_number=card_number,
+            variants=variants if variants else None,
+            force_refresh=force_refresh  # Pass through force_refresh parameter
+        )
+        
+        safe_print(f"[APPRAISE] Market data: {market_data}")
+        
+        if 'error' in market_data:
+            safe_print(f"[APPRAISE] Error in market data: {market_data['error']}")
+            return JSONResponse(market_data, status_code=500)
+        
+        # Get actual price and compare
+        actual_price = float(product.get('price', 0))
+        market_jpy = market_data['market_jpy']
+        
+        comparison = await appraisal.compare_price_to_market(actual_price, market_jpy)
+        
+        # Combine results
+        result = {
+            **market_data,
+            'actual_price': int(actual_price),
+            'price_diff_pct': comparison['difference_pct'],
+            'status': comparison['status'],
+            'recommendation': comparison['recommendation']
+        }
+        
+        safe_print(f"[APPRAISE] Success! Result: {result}")
+        return JSONResponse(
+            result,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    
+    except Exception as e:
+        # Safely handle exception with potential Unicode characters
+        try:
+            error_msg = f"[APPRAISE] Exception: {type(e).__name__}: {str(e)}"
+            safe_print(error_msg)
+        except:
+            # If even safe_print fails, use basic ASCII
+            print(f"[APPRAISE] Exception occurred (Unicode error in message)")
+        
+        # Return error without Unicode characters
+        error_str = str(e).encode('ascii', 'replace').decode('ascii')
+        return JSONResponse({'error': f'Appraisal failed: {error_str}'}, status_code=500)
+
+
+
+
 @router.get("/analytics", response_class=HTMLResponse)
 async def admin_analytics(request: Request, admin: str = Depends(get_admin_session), client: ShopifyClient = Depends(get_shopify_client)):
     products = await client.get_products()
@@ -427,6 +585,257 @@ async def force_sync(request: Request, admin: str = Depends(get_admin_session), 
     return RedirectResponse(url="/admin", status_code=303)
 
 
+@router.get("/estimate-market-value")
+async def estimate_market_value(
+    card_name: str,
+    set_name: str = "",
+    card_number: str = "",
+    rarity: str = "",
+    admin: str = Depends(get_admin_session)
+):
+    """
+    Estimate market value for a card based on its details.
+    Used by the add card form after AI image appraisal.
+    
+    Note: card_name should be the clean English name (e.g., "Monkey D. Luffy")
+    already extracted by the AI, not the full formatted title.
+    """
+    try:
+        from app.services.appraisal import get_market_value_jpy
+        
+        safe_print(f"[ESTIMATE] ===== Market Value Estimation Request =====")
+        safe_print(f"[ESTIMATE] card_name: '{card_name}'")
+        safe_print(f"[ESTIMATE] set_name: '{set_name}'")
+        safe_print(f"[ESTIMATE] card_number: '{card_number}'")
+        safe_print(f"[ESTIMATE] rarity: '{rarity}'")
+        safe_print(f"[ESTIMATE] ==========================================")
+        
+        # Call the market value estimation service
+        # card_name is already clean English name from AI extraction
+        market_data = await get_market_value_jpy(
+            card_name=card_name,
+            rarity=rarity,
+            set_name=set_name,
+            card_number=card_number,
+            variants=None,  # No variant detection from image appraisal
+            force_refresh=True  # Always get fresh data for new cards
+        )
+        
+        safe_print(f"[ESTIMATE] Market data: {market_data}")
+        
+        return JSONResponse({
+            'success': True,
+            'market_value_jpy': market_data.get('market_jpy'),  # Fixed: was market_value_jpy
+            'market_value_usd': market_data.get('market_usd'),  # Fixed: was market_value_usd
+            'source': market_data.get('source', 'estimated'),
+            'debug': {
+                'search_params': {
+                    'card_name': card_name,
+                    'set_name': set_name,
+                    'card_number': card_number,
+                    'rarity': rarity
+                },
+                'raw_response': market_data
+            }
+        })
+        
+    except Exception as e:
+        safe_print(f"[ESTIMATE] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({
+            'success': False,
+            'error': str(e)
+        }, status_code=500)
+
+
+@router.get("/check-duplicate-card")
+async def check_duplicate_card(
+    card_name: str,
+    current_product_id: Optional[str] = None,  # ID of product being edited (to exclude from check)
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """
+    Check if a card with the same name already exists in Shopify.
+    Returns duplicate status and product info if found.
+    Matches both card name and card number (e.g., "027/071") if present.
+    
+    Args:
+        card_name: The card name to check
+        current_product_id: Optional product ID being edited (will be excluded from duplicate check)
+    """
+    try:
+        import re
+        
+        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}'")
+        if current_product_id:
+            safe_print(f"[DUPLICATE_CHECK] Excluding current product: {current_product_id}")
+        
+        # STEP 1: Extract card number FIRST from the original input
+        # Extract card number pattern - supports multiple formats:
+        # - Pokemon with hash: #027/071
+        # - One Piece: #OP09-051, #ST01-001
+        # - Pokemon without hash: 027/071
+        # - Simple numbered: #123
+        # Order matters: longer/more specific patterns first!
+        card_number_pattern = re.search(r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#\d{1,4})', card_name)
+        card_number = card_number_pattern.group(0) if card_number_pattern else None
+        
+        # STEP 2: Extract the clean card name (remove everything except the character/card name)
+        # Start fresh from original input
+        clean_card_name = card_name
+        
+        # Remove the card number if found
+        if card_number:
+            clean_card_name = clean_card_name.replace(card_number, '')
+        
+        # Remove parentheses/brackets content (like language translations)
+        clean_card_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_card_name)
+        
+        # Remove set names (everything after dash)
+        clean_card_name = re.sub(r'\s*[-–—]\s*.*$', '', clean_card_name)
+        
+        # Clean up extra whitespace
+        clean_card_name = clean_card_name.strip()
+        
+        safe_print(f"[DUPLICATE_CHECK] Extracted - Name: '{clean_card_name}', Number: '{card_number}'")
+        
+        # Search strategy: Use card number if available (more specific), otherwise use card name
+        # This is much faster than fetching all products
+        if card_number:
+            search_query = card_number
+            safe_print(f"[DUPLICATE_CHECK] Searching by card number: '{search_query}'")
+        else:
+            search_query = clean_card_name
+            safe_print(f"[DUPLICATE_CHECK] Searching by card name: '{search_query}'")
+        
+        products = await client.get_products(query=search_query)
+        
+        safe_print(f"[DUPLICATE_CHECK] Found {len(products)} products matching '{search_query}'")
+        
+        # Define Unicode normalization function (handles accented characters)
+        import unicodedata
+        def normalize_text(text):
+            # NFD = decompose accented chars, then filter out combining marks
+            nfd = unicodedata.normalize('NFD', text)
+            return ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
+        
+        # Check for match by card name and card number
+        matches_found = 0
+        for product in products:
+            product_id = str(product.get('id', ''))
+            product_title = product.get('title', '')
+            product_title_lower = product_title.lower()
+            
+            # Skip if this is the current product being edited
+            if current_product_id and product_id == current_product_id:
+                safe_print(f"[DUPLICATE_CHECK] Skipping current product: {product_title}")
+                continue
+            
+            # Check if card name is in the product title (accent-insensitive)
+            normalized_clean_name = normalize_text(clean_card_name.lower())
+            normalized_product_title = normalize_text(product_title_lower)
+            name_matches = normalized_clean_name in normalized_product_title
+            
+            # Check if card number is in the product title (if we have a card number)
+            number_matches = True  # Default to true if no card number
+            if card_number:
+                number_matches = card_number in product_title
+            
+            # Log each product check for debugging
+            if name_matches or number_matches:
+                safe_print(f"[DUPLICATE_CHECK] Checking: {product_title}")
+                safe_print(f"[DUPLICATE_CHECK]   Clean name: '{clean_card_name}' -> normalized: '{normalized_clean_name}'")
+                safe_print(f"[DUPLICATE_CHECK]   Card number: '{card_number}'")
+                safe_print(f"[DUPLICATE_CHECK]   Name match: {name_matches}, Number match: {number_matches}")
+            
+            # Both must match
+            if name_matches and number_matches:
+                matches_found += 1
+                safe_print(f"[DUPLICATE_CHECK] ✓✓✓ DUPLICATE FOUND #{matches_found}: {product_title} (ID: {product.get('id')})")
+                return JSONResponse({
+                    'exists': True,
+                    'product_id': str(product.get('id')),
+                    'product_title': product_title
+                })
+        
+        safe_print(f"[DUPLICATE_CHECK] No duplicate found after checking {len(products)} products")
+        return JSONResponse({
+            'exists': False,
+            'product_id': None,
+            'product_title': None
+        })
+    except Exception as e:
+        safe_print(f"[DUPLICATE_CHECK] Error: {e}")
+        return JSONResponse({
+            'exists': False,
+            'product_id': None,
+            'product_title': None,
+            'error': str(e)
+        })
+
+
+
+@router.post("/appraise-card-image")
+async def appraise_card_image(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    image_file: Optional[UploadFile] = File(None),
+    image_url: Optional[str] = Form(None)
+):
+    """
+    Appraise a card from an uploaded image or URL using Gemini AI vision.
+    Returns extracted card details for form auto-population.
+    """
+    try:
+        safe_print("[APPRAISE_IMAGE] Received appraisal request")
+        
+        # Validate that we have either a file or URL
+        if not image_file and not image_url:
+            return JSONResponse(
+                {'error': 'Please provide either an image file or image URL'},
+                status_code=400
+            )
+        
+        # Prepare image data
+        image_data = None
+        url_to_use = None
+        
+        if image_file and image_file.filename:
+            # Read uploaded file
+            safe_print(f"[APPRAISE_IMAGE] Processing uploaded file: {image_file.filename}")
+            image_data = await image_file.read()
+        elif image_url:
+            # Use URL directly
+            safe_print(f"[APPRAISE_IMAGE] Processing image URL: {image_url}")
+            url_to_use = image_url
+        
+        # Call appraisal service
+        result = await appraisal.appraise_card_from_image(
+            image_data=image_data,
+            image_url=url_to_use
+        )
+        
+        if 'error' in result:
+            safe_print(f"[APPRAISE_IMAGE] Error: {result['error']}")
+            return JSONResponse(result, status_code=500)
+        
+        safe_print(f"[APPRAISE_IMAGE] Success: {result}")
+        return JSONResponse({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        safe_print(f"[APPRAISE_IMAGE] Exception: {e}")
+        return JSONResponse(
+            {'error': f'Appraisal failed: {str(e)}'},
+            status_code=500
+        )
+
+
+
 @router.get("/add-card", response_class=HTMLResponse)
 async def add_card_page(
     request: Request, 
@@ -463,7 +872,7 @@ async def add_card_success(
     })
 
 
-@router.get("/edit-card/{product_id:path}", response_class=HTMLResponse)
+@router.get("/edit-card", response_class=HTMLResponse)
 async def edit_card_page(
     request: Request,
     product_id: str,
@@ -471,88 +880,94 @@ async def edit_card_page(
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     """Show the add card form pre-populated with existing product data for editing."""
-    # Fetch product data
-    product = await client.get_product(product_id)
-    
-    if not product:
+    try:
+        print(f"[EDIT_CARD] Attempting to fetch product: {product_id}")
+        
+        # Fetch product data
+        product = await client.get_product(product_id)
+        
+        if not product:
+            # Product not found - this could mean:
+            # 1. Product doesn't exist in Shopify
+            # 2. API permissions issue
+            # 3. Product was deleted
+            error_msg = f"Unable to load product for editing. Product ID: {product_id}. The product may have been deleted or there may be an API issue. Check server logs for details."
+            print(f"[EDIT_CARD] ERROR: Product not found for ID: {product_id}")
+            return templates.TemplateResponse("admin/add_card.html", {
+                "request": request,
+                "error": error_msg,
+                "categories": []
+            })
+        
+        # Fetch collections for dropdowns
+        admin_token = get_admin_token()
+        categories = []
+        if admin_token:
+            try:
+                categories = await client.get_collections(admin_token)
+            except Exception as e:
+                print(f"Error fetching categories: {e}")
+        
+        if not categories:
+            categories = ["Pokémon", "One Piece", "Magic: TG", "Yu-Gi-Oh!"]
+        
+        # Get vendor from product data
+        vendor = product.get("vendor", "TCG Nakama")
+        
+        # Extract metadata from tags
+        condition = "Booster Pack"  # default
+        rarity = product.get("rarity", "Common")  # default from _map_product
+        set_name = product.get("set", "")  # default from _map_product
+        card_number = product.get("card_number", "")  # default from _map_product
+        
+        # Get collections - already extracted by _map_product
+        product_collections = product.get("collections", [])
+        
+        # Extract values from tags (these override the defaults from _map_product)
+        for tag in product.get("tags", []):
+            if tag.startswith("Condition:"):
+                condition = tag.replace("Condition:", "").strip()
+            elif tag.startswith("Rarity:"):
+                rarity = tag.replace("Rarity:", "").strip()
+            elif tag.startswith("Set:"):
+                set_name = tag.replace("Set:", "").strip()
+            elif tag.startswith("Number:"):
+                card_number = tag.replace("Number:", "").strip()
+        
+        # Extract image URLs - images are already in the correct format from _map_product
+        image_urls = product.get("images", [])
+        
+        # Store extracted values in product dict for template access
+        product["vendor"] = vendor
+        product["condition"] = condition
+        product["rarity"] = rarity
+        product["set"] = set_name
+        product["card_number"] = card_number
+        product["image_urls"] = image_urls
+        
+        # Fetch buy_price from local database
+        from app import cost_db
+        buy_price = cost_db.get_cost(product_id)
+        product["buy_price"] = buy_price
+        
         return templates.TemplateResponse("admin/add_card.html", {
             "request": request,
-            "error": f"Product not found: {product_id}",
+            "edit_mode": True,
+            "product": product,
+            "categories": categories,
+            "vendor": vendor,
+            "product_collections": product_collections
+        })
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[EDIT_CARD] EXCEPTION: {e}")
+        print(f"[EDIT_CARD] TRACEBACK:\n{error_trace}")
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": f"Error loading product for editing: {str(e)}. Check server logs for full traceback.",
             "categories": []
         })
-    
-    # Fetch collections for dropdowns
-    admin_token = get_admin_token()
-    categories = []
-    if admin_token:
-        try:
-            categories = await client.get_collections(admin_token)
-        except Exception as e:
-            print(f"Error fetching categories: {e}")
-    
-    if not categories:
-        categories = ["Pokémon", "One Piece", "Magic: TG", "Yu-Gi-Oh!"]
-    
-    # Get vendor from product data
-    vendor = product.get("vendor", "TCG Nakama")
-    
-    # Extract metadata from tags
-    condition = "Booster Pack"  # default
-    rarity = product.get("rarity", "Common")  # default from _map_product
-    set_name = product.get("set", "")  # default from _map_product
-    card_number = product.get("card_number", "")  # default from _map_product
-    
-    # Get collections - already extracted by _map_product
-    product_collections = product.get("collections", [])
-    
-    print(f"[DEBUG] Product tags: {product.get('tags', [])}")
-    try:
-        print(f"[DEBUG] Product vendor: {vendor}".encode('ascii', 'backslashreplace').decode())
-    except:
-        print("[DEBUG] Product vendor: <contains special characters>")
-    print(f"[DEBUG] Product collections from Shopify: {product_collections}")
-    print(f"[DEBUG] Product images raw: {product.get('images', [])}")
-    
-    # Extract values from tags (these override the defaults from _map_product)
-    for tag in product.get("tags", []):
-        if tag.startswith("Condition:"):
-            condition = tag.replace("Condition:", "").strip()
-        elif tag.startswith("Rarity:"):
-            rarity = tag.replace("Rarity:", "").strip()
-        elif tag.startswith("Set:"):
-            set_name = tag.replace("Set:", "").strip()
-        elif tag.startswith("Number:"):
-            card_number = tag.replace("Number:", "").strip()
-    
-    # Extract image URLs - images are already in the correct format from _map_product
-    image_urls = product.get("images", [])
-    
-    # Store extracted values in product dict for template access
-    product["vendor"] = vendor
-    product["condition"] = condition
-    product["rarity"] = rarity
-    product["set"] = set_name
-    product["card_number"] = card_number
-    product["image_urls"] = image_urls
-    
-    # Fetch buy_price from local database
-    from app import cost_db
-    buy_price = cost_db.get_cost(product_id)
-    product["buy_price"] = buy_price
-    
-    try:
-        print(f"[DEBUG] Extracted - Vendor: {vendor}, Condition: {condition}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Collections: {product_collections}, Images: {len(image_urls)}, Buy Price: {buy_price}".encode('ascii', 'backslashreplace').decode())
-    except:
-        print(f"[DEBUG] Extracted - Condition: {condition}, Rarity: {rarity}, Set: {set_name}, Number: {card_number}, Collections: {product_collections}, Images: {len(image_urls)}, Buy Price: {buy_price}")
-    
-    return templates.TemplateResponse("admin/add_card.html", {
-        "request": request,
-        "edit_mode": True,
-        "product": product,
-        "categories": categories,
-        "vendor": vendor,
-        "product_collections": product_collections
-    })
 
 
 @router.post("/add-card")
@@ -740,22 +1155,30 @@ async def update_card(
     description_html = description.replace('\n', '<br>')
     
     # Update product with separate lists for existing vs new images
-    success = await client.update_product(
-        product_id=product_id,
-        title=name,
-        description=description_html,
-        price=price,
-        tags=tags,
-        vendor=vendor,
-        images_to_keep=existing_images_to_keep,
-        images_to_add=new_images_to_add,
-        collections=collections if collections else None
-    )
-    
-    if not success:
+    try:
+        success = await client.update_product(
+            product_id=product_id,
+            title=name,
+            description=description_html,
+            price=price,
+            tags=tags,
+            vendor=vendor,
+            images_to_keep=existing_images_to_keep,
+            images_to_add=new_images_to_add,
+            collections=collections if collections else None
+        )
+    except Exception as e:
+        safe_print(f"[ERROR] Exception during update_product: {e}")
         return templates.TemplateResponse("admin/add_card.html", {
             "request": request,
-            "error": "Failed to update product"
+            "error": f"Failed to update product: {str(e)}"
+        })
+    
+    if not success:
+        safe_print(f"[ERROR] update_product returned False for product_id: {product_id}")
+        return templates.TemplateResponse("admin/add_card.html", {
+            "request": request,
+            "error": "Failed to update product - check server logs for details"
         })
     
     # Update inventory
