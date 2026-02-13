@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Connect Shopify - TCG Nakama</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "neon-blue": "#00f0ff",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-background-dark font-display text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-lg">
+        <!-- Back to Dashboard -->
+        <a href="/admin"
+            class="inline-flex items-center gap-1 text-white/40 hover:text-white text-sm mb-6 transition-colors">
+            <span class="material-symbols-outlined text-sm">arrow_back</span>
+            Back to Dashboard
+        </a>
+
+        <div class="bg-surface-dark border border-white/10 rounded-2xl p-8 shadow-2xl">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div
+                    class="w-16 h-16 rounded-full bg-neon-green/10 border border-neon-green/30 flex items-center justify-center mx-auto mb-4">
+                    <span class="material-symbols-outlined text-neon-green text-3xl">link</span>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">Connect Shopify Admin API</h1>
+                <p class="text-white/40 text-sm mt-2">Enter your Shopify Admin API access token to enable inventory
+                    sync, card creation, and order tracking.</p>
+            </div>
+
+            {% if error %}
+            <div class="bg-danger-red/10 border border-danger-red/30 rounded-lg p-3 mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined text-danger-red text-sm">error</span>
+                <span class="text-danger-red text-sm">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% if success %}
+            <div class="bg-neon-green/10 border border-neon-green/30 rounded-lg p-3 mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined text-neon-green text-sm">check_circle</span>
+                <span class="text-neon-green text-sm">{{ success }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Token Form -->
+            <form method="POST" action="/admin/connect-shopify" class="space-y-6">
+                <div>
+                    <label class="block text-xs text-white/60 uppercase tracking-wider font-bold mb-2">
+                        Admin API Access Token
+                    </label>
+                    <input type="password" name="admin_token" required placeholder="shpat_xxxxxxxxxxxxxxx"
+                        class="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-sm font-mono text-white placeholder-white/20 focus:ring-2 focus:ring-neon-green focus:border-neon-green/50 outline-none transition-all" />
+                    <p class="text-[11px] text-white/30 mt-2">Token should start with <code
+                            class="text-neon-gold/60 bg-white/5 px-1 py-0.5 rounded">shpat_</code></p>
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-neon-green/20 hover:bg-neon-green/30 text-neon-green border border-neon-green/40 py-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-sm">bolt</span>
+                    Connect Shopify
+                </button>
+            </form>
+
+            <!-- Instructions -->
+            <div class="mt-8 pt-6 border-t border-white/10">
+                <h3 class="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">How to get your token</h3>
+                <ol class="space-y-2 text-xs text-white/40">
+                    <li class="flex gap-2">
+                        <span class="text-neon-blue font-bold">1.</span>
+                        Go to your Shopify Admin → <strong class="text-white/60">Settings</strong> → <strong
+                            class="text-white/60">Apps and sales channels</strong>
+                    </li>
+                    <li class="flex gap-2">
+                        <span class="text-neon-blue font-bold">2.</span>
+                        Click <strong class="text-white/60">Develop apps</strong> → Select your custom app
+                    </li>
+                    <li class="flex gap-2">
+                        <span class="text-neon-blue font-bold">3.</span>
+                        Go to <strong class="text-white/60">API credentials</strong> tab
+                    </li>
+                    <li class="flex gap-2">
+                        <span class="text-neon-blue font-bold">4.</span>
+                        Copy the <strong class="text-white/60">Admin API access token</strong> (starts with
+                        <code class="text-neon-gold/60">shpat_</code>)
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

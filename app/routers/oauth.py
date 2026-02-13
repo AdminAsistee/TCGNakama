@@ -111,7 +111,7 @@ async def callback(request: Request, code: str = None, state: str = None, shop: 
         print(f"[ERROR] Failed to persist token to .env: {e}")
     
     # Redirect back to admin dashboard with success message
-    response = RedirectResponse(url="/admin?oauth=success")
+    response = RedirectResponse(url="/admin")
     
     # Automatically "log in" the admin by setting the session cookie
     import hashlib
@@ -125,7 +125,8 @@ async def callback(request: Request, code: str = None, state: str = None, shop: 
         key="admin_session",
         value=session_token,
         httponly=True,
-        max_age=3600 * 24 * 7 # 1 week
+        max_age=3600 * 24 * 7, # 1 week
+        samesite="lax" # Added samesite for security
     )
     
     return response

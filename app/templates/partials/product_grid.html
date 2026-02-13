@@ -27,11 +27,12 @@
     </div>
 
     <!-- Info & Action Area -->
-    <div class="mt-3 px-2 pb-3 space-y-2">
-        <div hx-get="/product/{{ product.id }}" hx-target="#modal-container" hx-swap="innerHTML" class="cursor-pointer">
-            <div class="flex items-center justify-between">
-                <h4 class="text-xs font-bold truncate pr-2 text-white/90">{{ product.title }}</h4>
-                <div class="flex items-center gap-1">
+    <div class="mt-3 px-3 pb-4 space-y-2 flex flex-col flex-1">
+        <div hx-get="/product/{{ product.id }}" hx-target="#modal-container" hx-swap="innerHTML"
+            class="cursor-pointer flex-1">
+            <div class="flex items-start justify-between gap-1">
+                <h4 class="text-xs font-bold text-white/90 line-clamp-2 leading-snug">{{ product.title }}</h4>
+                <div class="flex items-center gap-1 shrink-0 mt-0.5">
                     <span
                         class="w-1 h-1 rounded-full {{ 'bg-neon-green' if product.status == 'Sync' else 'bg-primary' }}"></span>
                     <span
@@ -42,14 +43,11 @@
             <p class="text-[10px] text-gray-400 mt-1">{{ product.set }}</p>
         </div>
 
-        <div class="flex items-center justify-between pt-2">
-            <div>
-                <p class="text-xs font-black text-white">¥{{ "{:,}".format(product.price|int) }}</p>
-            </div>
-            <button hx-post="/cart/add?variant_id={{ product.variant_id }}&quantity=1" hx-target="#cart-drawer"
-                hx-swap="innerHTML" hx-on:click="openCartDrawer()"
-                class="px-3 py-1.5 bg-primary hover:bg-primary/80 text-white text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 shadow-sm">
-                <span class="material-symbols-outlined text-sm">add_shopping_cart</span>
+        <div class="flex items-center justify-between pt-2 border-t border-white/5">
+            <p class="text-sm font-black text-primary">¥{{ "{:,}".format(product.price|int) }}</p>
+            <button onclick="handleCartAction('{{ product.variant_id }}', 'add', event)"
+                class="h-9 px-4 bg-primary hover:bg-primary/80 text-background-dark text-[10px] font-black rounded-lg transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wider">
+                <span class="material-symbols-outlined text-base">add_shopping_cart</span>
                 <span>Add</span>
             </button>
         </div>
