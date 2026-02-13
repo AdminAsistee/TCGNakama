@@ -668,7 +668,11 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
         with httpx.Client(timeout=10.0, follow_redirects=True) as client:
             response = client.get(url, headers=headers)
             
+            safe_print(f"[PRICECHARTING] Response status: {response.status_code}")
+            safe_print(f"[PRICECHARTING] Response length: {len(response.text)} bytes")
+            
             if response.status_code != 200:
+                safe_print(f"[PRICECHARTING] Non-200 status, aborting")
                 return None
             
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -678,6 +682,8 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
             
             # Find all table rows in search results
             rows = soup.find_all('tr')
+            safe_print(f"[PRICECHARTING] Found {len(rows)} table rows")
+            
             for row in rows:
                 # Find card name in <td class='title'>
                 name_elem = row.find('td', class_='title')
@@ -696,6 +702,7 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                 if match:
                     price = float(match.group(1).replace(',', ''))
                     if price > 0:
+                        safe_print(f"[PRICECHARTING] Found result: '{card_title}' = ${price}")
                         results.append({"name": card_title, "price": price})
             
             
