@@ -10,6 +10,10 @@ from typing import Dict, Optional
 from datetime import datetime, timedelta
 import asyncio
 from dotenv import load_dotenv
+import os
+import re
+import json  # Import at module level to avoid scope issues in exception handlers
+
 
 # Load environment variables
 load_dotenv(override=True)
@@ -45,8 +49,6 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
     """
     try:
         import google.generativeai as genai
-        import os
-        import json
         import base64
         from PIL import Image
         import io
