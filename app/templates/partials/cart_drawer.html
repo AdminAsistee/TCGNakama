@@ -39,11 +39,12 @@
                         <p class="text-[10px] text-gray-500 uppercase font-black uppercase tracking-wider">{{
                             item.rarity }} • {{ item.set }}</p>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-2">
                         <span class="text-primary font-black">¥{{ "{:,.0f}".format(item.price) }}</span>
 
                         <!-- Quantity Control -->
-                        <div class="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5">
+                        <div
+                            class="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 flex-shrink-0">
                             <button hx-post="/cart/update?line_id={{ item.line_id }}&quantity={{ item.quantity - 1 }}"
                                 hx-target="#cart-drawer-container"
                                 class="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors {{ 'opacity-30 pointer-events-none' if item.quantity <= 0 }}">
