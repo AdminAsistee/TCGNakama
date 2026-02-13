@@ -445,12 +445,18 @@ async def estimate_market_value_usd(
     # Check if Japanese card
     is_japanese = variants and 'Japanese' in variants
     
-    # Use ONLY PriceCharting (fastest and most reliable)
+    # Try PriceCharting API first (official, no blocking)
+    price = await _try_pricecharting_api(card_name, set_name, card_number, is_japanese)
+    if price:
+        return price
+    
+    # Fallback to scraping if API not available or failed
+    safe_print(f"[APPRAISE] API unavailable, trying web scraping...")
     price = await _try_pricecharting_scrape(card_name, set_name, card_number, is_japanese)
     if price:
         return price
     
-    # Fallback to mock data if PriceCharting fails
+    # Fallback to mock data if both API and scraping fail
     safe_print(f"[APPRAISE] PriceCharting failed for '{card_name}', using mock data")
     return _mock_estimate(card_name, rarity, set_name, variants)
 
@@ -624,7 +630,83 @@ If no cards match, return an empty array: []
         
     except Exception as e:
         safe_print(f"[APPRAISE] Gemini filtering error: {e}, using all results")
-        return results  # Fallback to all results on error
+        return results  # Fallback to all results
+    return None
+
+
+async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
+    """Try to get price from PriceCharting API (official, no scraping)."""
+    try:
+        import httpx
+        import os
+        from urllib.parse import quote_plus
+        
+        # Check if API key is configured
+        api_key = os.getenv("PRICECHARTING_API_KEY")
+        if not api_key:
+            safe_print("[PRICECHARTING_API] No API key configured, skipping API")
+            return None
+        
+        # Build search query
+        search_name = card_name.split('(')[0].strip()
+        query_parts = [search_name]
+        
+        if set_name and set_name != "Unknown":
+            query_parts.append(set_name)
+        
+        if card_number:
+            clean_card_number = card_number.replace('#', '')
+            query_parts.append(clean_card_number)
+        
+        search_query = " ".join(query_parts)
+        
+        # API endpoint
+        url = f"https://www.pricecharting.com/api/products?t={api_key}&q={quote_plus(search_query)}"
+        
+        safe_print(f"[PRICECHARTING_API] Search query: '{search_query}'")
+        safe_print(f"[PRICECHARTING_API] Calling API...")
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            
+            safe_print(f"[PRICECHARTING_API] Response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                safe_print(f"[PRICECHARTING_API] Non-200 status, falling back to scraping")
+                return None
+            
+            data = response.json()
+            
+            if not data.get('products') or len(data['products']) == 0:
+                safe_print(f"[PRICECHARTING_API] No products found")
+                return None
+            
+            # Get the first product (best match)
+            product = data['products'][0]
+            product_name = product.get('product-name', 'Unknown')
+            
+            # Try to get price (prefer loose-price for single cards)
+            price = None
+            if 'loose-price' in product and product['loose-price']:
+                price = float(product['loose-price'])
+                price_type = "loose"
+            elif 'cib-price' in product and product['cib-price']:
+                price = float(product['cib-price'])
+                price_type = "complete"
+            elif 'new-price' in product and product['new-price']:
+                price = float(product['new-price'])
+                price_type = "new"
+            
+            if price and price > 0:
+                safe_print(f"[PRICECHARTING_API] Found: '{product_name}' = ${price} ({price_type})")
+                return price
+            else:
+                safe_print(f"[PRICECHARTING_API] Product found but no valid price")
+                return None
+    
+    except Exception as e:
+        safe_print(f"[PRICECHARTING_API] Error: {e}")
+        return None
 
 
 async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
