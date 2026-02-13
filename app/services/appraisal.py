@@ -681,28 +681,58 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 safe_print(f"[PRICECHARTING_API] No products found")
                 return None
             
-            # Get the first product (best match)
-            product = data['products'][0]
-            product_name = product.get('product-name', 'Unknown')
+            products = data['products']
+            safe_print(f"[PRICECHARTING_API] Found {len(products)} products")
             
-            # Try to get price (prefer loose-price for single cards)
-            price = None
-            if 'loose-price' in product and product['loose-price']:
-                price = float(product['loose-price'])
-                price_type = "loose"
-            elif 'cib-price' in product and product['cib-price']:
-                price = float(product['cib-price'])
-                price_type = "complete"
-            elif 'new-price' in product and product['new-price']:
-                price = float(product['new-price'])
-                price_type = "new"
+            # Collect all valid prices from all products
+            valid_prices = []
+            for product in products:
+                product_name = product.get('product-name', 'Unknown')
+                
+                # Try to get price (prefer loose-price for single cards)
+                price = None
+                price_type = None
+                
+                if 'loose-price' in product and product['loose-price']:
+                    try:
+                        # API returns prices in cents, convert to dollars
+                        price = float(product['loose-price']) / 100
+                        price_type = "loose"
+                    except (ValueError, TypeError):
+                        pass
+                
+                if not price and 'cib-price' in product and product['cib-price']:
+                    try:
+                        # API returns prices in cents, convert to dollars
+                        price = float(product['cib-price']) / 100
+                        price_type = "complete"
+                    except (ValueError, TypeError):
+                        pass
+                
+                if not price and 'new-price' in product and product['new-price']:
+                    try:
+                        # API returns prices in cents, convert to dollars
+                        price = float(product['new-price']) / 100
+                        price_type = "new"
+                    except (ValueError, TypeError):
+                        pass
+                
+                if price and price > 0:
+                    valid_prices.append({
+                        'name': product_name,
+                        'price': price,
+                        'type': price_type
+                    })
+                    safe_print(f"[PRICECHARTING_API]   - '{product_name}' = ${price} ({price_type})")
             
-            if price and price > 0:
-                safe_print(f"[PRICECHARTING_API] Found: '{product_name}' = ${price} ({price_type})")
-                return price
-            else:
-                safe_print(f"[PRICECHARTING_API] Product found but no valid price")
+            if not valid_prices:
+                safe_print(f"[PRICECHARTING_API] No valid prices found")
                 return None
+            
+            # Select the cheapest price (more conservative pricing)
+            cheapest = min(valid_prices, key=lambda x: x['price'])
+            safe_print(f"[PRICECHARTING_API] Selected cheapest: '{cheapest['name']}' = ${cheapest['price']} ({cheapest['type']})")
+            return cheapest['price']
     
     except Exception as e:
         safe_print(f"[PRICECHARTING_API] Error: {e}")
