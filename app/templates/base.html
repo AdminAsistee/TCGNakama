@@ -138,12 +138,16 @@
             const originalContent = btn.innerHTML;
 
             const cartCount = document.getElementById('cart-count');
+            const cartCountMobile = document.getElementById('cart-count-mobile');
             let originalCount = 0;
             if (cartCount) {
                 originalCount = parseInt(cartCount.innerText) || 0;
                 cartCount.innerText = originalCount + qty;
                 cartCount.classList.add('scale-125');
                 setTimeout(() => cartCount.classList.remove('scale-125'), 500);
+            }
+            if (cartCountMobile) {
+                cartCountMobile.innerText = originalCount + qty;
             }
 
             if (action === 'buy') {
@@ -159,6 +163,7 @@
                 const data = await response.json();
 
                 if (cartCount) cartCount.innerText = data.total_quantity;
+                if (cartCountMobile) cartCountMobile.innerText = data.total_quantity;
 
                 if (action === 'buy' && data.checkout_url) {
                     window.location.href = data.checkout_url;
@@ -172,6 +177,7 @@
             } catch (err) {
                 console.error("Cart error:", err);
                 if (cartCount) cartCount.innerText = originalCount;
+                if (cartCountMobile) cartCountMobile.innerText = originalCount;
                 btn.innerHTML = '<span class="material-symbols-outlined text-neon-red">error</span>';
                 setTimeout(() => {
                     btn.innerHTML = originalContent;
