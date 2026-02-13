@@ -734,31 +734,28 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             if card_number:
                 import re
                 
-                # Extract just the numbers from the search card number
-                # e.g., "#001/024" -> ["001", "024"], "18-051" -> ["18", "051"]
-                search_numbers = re.findall(r'\d+', card_number)
+                # Normalize the search card number: remove common separators and symbols
+                # e.g., "#OP09-051" -> "OP09051", "001/024" -> "001024"
+                search_normalized = re.sub(r'[#\-/\s]', '', card_number).upper()
                 
-                if search_numbers:
-                    safe_print(f"[PRICECHARTING_API] Looking for card numbers: {search_numbers}")
+                safe_print(f"[PRICECHARTING_API] Looking for card number: '{card_number}' (normalized: '{search_normalized}')")
+                
+                # Try to find products that contain this card number
+                number_matches = []
+                for item in valid_prices:
+                    # Normalize product name the same way
+                    product_normalized = re.sub(r'[#\-/\s]', '', item['name']).upper()
                     
-                    # Try to find products that contain these numbers
-                    number_matches = []
-                    for item in valid_prices:
-                        # Extract numbers from product name
-                        product_numbers = re.findall(r'\d+', item['name'])
-                        
-                        # Check if the main card number (first number) matches
-                        if product_numbers and search_numbers:
-                            # Match if the first number matches (main card number)
-                            if product_numbers[0] == search_numbers[0] or product_numbers[0] == search_numbers[0].lstrip('0'):
-                                number_matches.append(item)
-                                safe_print(f"[PRICECHARTING_API]   ✓ Matched: '{item['name']}' (number: {product_numbers[0]})")
-                    
-                    if number_matches:
-                        safe_print(f"[PRICECHARTING_API] Filtered to {len(number_matches)} products matching card number")
-                        filtered_prices = number_matches
-                    else:
-                        safe_print(f"[PRICECHARTING_API] No card number matches, using all {len(valid_prices)} results")
+                    # Check if the normalized search number appears in the product name
+                    if search_normalized in product_normalized:
+                        number_matches.append(item)
+                        safe_print(f"[PRICECHARTING_API]   ✓ Matched: '{item['name']}'")
+                
+                if number_matches:
+                    safe_print(f"[PRICECHARTING_API] Filtered to {len(number_matches)} products matching card number")
+                    filtered_prices = number_matches
+                else:
+                    safe_print(f"[PRICECHARTING_API] No card number matches, using all {len(valid_prices)} results")
             
             # Select the cheapest price from filtered results
             cheapest = min(filtered_prices, key=lambda x: x['price'])
