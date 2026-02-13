@@ -9,14 +9,9 @@ import httpx
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 import asyncio
-from dotenv import load_dotenv
 import os
 import re
 import json  # Import at module level to avoid scope issues in exception handlers
-
-
-# Load environment variables
-load_dotenv(override=True)
 
 
 # Simple in-memory cache for appraisal results (5 minute TTL)
