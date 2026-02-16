@@ -78,19 +78,17 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
 
 1. **Card Name (Japanese)**: The Japanese name if visible on the card
 2. **Card Name (English)**: The English translation or romanized name
-3. **Set Name**: The BOOSTER SET/EXPANSION name IN ENGLISH
+3. **Set Code**: The EXACT set code/identifier as printed on the card
    
-   CRITICAL RULES FOR SET NAME:
-   - First, identify the card number from the image (e.g., "OP09-051", "OP04-024", "ST01-001")
-   - Use your knowledge of trading card sets to determine the official English set name based on the card number prefix
-   - For One Piece cards:
-     * OP## prefixes indicate booster packs (e.g., OP01, OP02, OP09)
-     * ST## prefixes indicate starter decks
-     * Use your knowledge to map the prefix to the correct English set name
-   - IGNORE text in brackets like [Memorial Collection], [Promo], [Alt Art], [Special], etc. - these are VARIANTS, not set names
-   - IGNORE character affiliation text like "Straw Hat Crew", "Donquixote Pirates", "四皇/クロスギルド" - these are CHARACTER INFO, not set names
-   - Return the official English booster pack/expansion name (e.g., "Four Emperors", "Kingdoms of Intrigue", "Paramount War")
-   - If you're unsure of the exact English name, use your best knowledge based on the card number prefix
+   CRITICAL RULES FOR SET CODE:
+   - Extract the set code EXACTLY as it appears on the card
+   - For One Piece cards: Use the prefix from the card number (e.g., "OP12", "OP09", "ST01")
+   - For Pokémon cards: Use the set code as printed (e.g., "sA", "SV1", "XY")
+   - DO NOT expand or translate set codes (keep "OP12" as "OP12", NOT "One Piece Romance Dawn")
+   - DO NOT use full set names (use "sA" NOT "Shiny Treasure ex")
+   - IGNORE text in brackets like [Memorial Collection], [Promo], [Alt Art] - these are VARIANTS
+   - IGNORE character affiliation text - these are CHARACTER INFO, not set codes
+   - Return the short set code/identifier exactly as scanned from the card
    
 4. **Card Number**: The collector number (e.g., "001/024", "OP13-001", "OP09-051")
 5. **Rarity**: The rarity of the card (look for rarity symbols or text)
@@ -137,96 +135,6 @@ Do not include any markdown formatting or code blocks, just the raw JSON."""
             
             card_data = json.loads(response_text)
             
-            # Use AI to determine correct set name based on card number
-            # This ensures correct set name even if AI extracts variant text from the image
-            card_number = card_data.get('card_number', '')
-            if card_number:
-                try:
-                    # Detect if this is a One Piece card (OP##, ST##) or other card game
-                    is_one_piece = card_number.upper().startswith(('OP', 'ST')) and len(card_number) >= 4
-                    
-                    if is_one_piece:
-                        # For One Piece cards, use card number to determine set
-                        set_name_prompt = f"""You are a One Piece Trading Card Game expert. Based on the card number "{card_number}", determine the official English booster set name.
-
-CRITICAL INSTRUCTIONS:
-1. The card number prefix (OP01, OP02, etc.) uniquely identifies the set
-2. Return ONLY the official English set name - no explanations, no prefixes, no extra text
-3. Do NOT make up set names - use only official Bandai One Piece TCG set names
-4. Double-check your answer is the correct English name for this specific prefix
-
-Card number: {card_number}
-
-Think step by step:
-1. What is the prefix? (e.g., OP09)
-2. What is the official English name for this set?
-3. Verify this is correct
-
-Answer (official English set name only):"""
-                        
-                        set_response = model.generate_content(set_name_prompt)
-                    else:
-                        # For Pokémon and other cards, analyze the card image to determine set
-                        # Card numbers alone aren't unique across sets
-                        set_name_prompt = """Look at this trading card image carefully. What is the official English set name?
-
-CRITICAL: Return ONLY the set name, nothing else. No explanations, no card number, no extra text.
-
-Look for:
-- Set logos or symbols on the card
-- Copyright text at the bottom
-- Set codes or identifiers
-- Unique design elements that identify the set
-
-Examples of correct responses:
-- "Obsidian Flames"
-- "Paldean Fates"
-- "Base Set"
-
-Answer (set name only):"""
-                        
-                        set_response = model.generate_content([set_name_prompt, img])
-                    
-                    ai_set_name = set_response.text.strip()
-                    
-                    # Debug: Log the raw AI response
-                    safe_print(f"[APPRAISE_IMAGE] AI raw response for set name: '{ai_set_name}'")
-                    
-                    # Clean up the response
-                    # Remove common prefixes/patterns
-                    ai_set_name = ai_set_name.replace('"', '').replace("'", '').strip()
-                    
-                    # Remove markdown formatting (bold, italic, etc.)
-                    ai_set_name = ai_set_name.replace('**', '').replace('*', '').replace('__', '').replace('_', '').strip()
-                    
-                    # Remove "Set name:" prefix if present
-                    if "Set name:" in ai_set_name:
-                        ai_set_name = ai_set_name.split("Set name:")[-1].strip()
-                    
-                    # Remove "Card number:" and everything before it
-                    if "Card number:" in ai_set_name:
-                        ai_set_name = ai_set_name.split("Card number:")[0].strip()
-                    
-                    # Take only the first line if multi-line
-                    ai_set_name = ai_set_name.split('\n')[0].strip()
-                    
-                    # Remove any remaining prefixes like "SVN" or set codes
-                    # Keep only the actual set name (e.g., "Obsidian Flames" not "SVN Obsidian Flames")
-                    words = ai_set_name.split()
-                    if len(words) > 1 and len(words[0]) <= 4 and words[0].isupper():
-                        # First word is likely a set code (e.g., "SVN"), remove it
-                        ai_set_name = ' '.join(words[1:])
-                    
-                    safe_print(f"[APPRAISE_IMAGE] AI cleaned set name: '{ai_set_name}'")
-                    
-                    # Override the set name if AI provided a valid response
-                    if ai_set_name and len(ai_set_name) > 0:
-                        safe_print(f"[APPRAISE_IMAGE] Overriding set name from '{card_data.get('set_name')}' to '{ai_set_name}'")
-                        card_data['set_name'] = ai_set_name
-                        safe_print(f"[APPRAISE_IMAGE] AI determined set name: '{ai_set_name}' for card number '{card_number}'")
-                except Exception as e:
-                    safe_print(f"[APPRAISE_IMAGE] Error determining set name from card number: {e}")
-                    # Keep the original set name from image extraction
             
             # Map rarity to internal system
             rarity_mapping = {
@@ -647,11 +555,13 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             safe_print("[PRICECHARTING_API] No API key configured, skipping API")
             return None
         
-        # Build search query - only use card name and card number
+        # Build search query
         search_name = card_name.split('(')[0].strip()
         query_parts = [search_name]
         
-        # Only add card number, skip set name for simpler queries
+        if set_name and set_name != "Unknown":
+            query_parts.append(set_name)
+        
         if card_number:
             clean_card_number = card_number.replace('#', '')
             query_parts.append(clean_card_number)
