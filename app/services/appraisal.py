@@ -82,9 +82,12 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
    
    CRITICAL RULES FOR SET CODE:
    - Extract the set code EXACTLY as it appears on the card
+   - For Pokémon cards: Look at the BOTTOM LEFT of the card, near the card number
+     * The set code is usually 2-4 characters (e.g., "SV5M", "SV1", "XY", "sA")
+     * It appears just before or after the card number (e.g., "SV5M 023/071")
+     * DO NOT use full set names like "Shiny Treasure ex" - use ONLY the code like "SV5M" or "sA"
    - For One Piece cards: Use the prefix from the card number (e.g., "OP12", "OP09", "ST01")
-   - For Pokémon cards: Use the set code as printed (e.g., "sA", "SV1", "XY")
-   - DO NOT expand or translate set codes (keep "OP12" as "OP12", NOT "One Piece Romance Dawn")
+   - DO NOT expand or translate set codes (keep "SV5M" as "SV5M", NOT "Cyber Judge")
    - DO NOT use full set names (use "sA" NOT "Shiny Treasure ex")
    - IGNORE text in brackets like [Memorial Collection], [Promo], [Alt Art] - these are VARIANTS
    - IGNORE character affiliation text - these are CHARACTER INFO, not set codes
