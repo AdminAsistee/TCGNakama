@@ -1623,28 +1623,96 @@ import io
 # BULK UPLOAD - Complete Implementation
 # ============================================================================
 
+@router.get("/debug/check-temp-dir")
+async def check_temp_dir(admin: str = Depends(get_admin_session)):
+    """Debug endpoint to check temp directory status"""
+    import os
+    import stat
+    
+    temp_dir = Path("app/static/uploads/temp")
+    
+    result = {
+        "exists": temp_dir.exists(),
+        "is_directory": temp_dir.is_dir() if temp_dir.exists() else False,
+        "absolute_path": str(temp_dir.absolute()),
+        "writable": False,
+        "files_count": 0,
+        "files": [],
+        "permissions": None,
+        "error": None
+    }
+    
+    try:
+        if temp_dir.exists():
+            # Check if writable
+            test_file = temp_dir / "test_write.txt"
+            try:
+                test_file.write_text("test")
+                test_file.unlink()
+                result["writable"] = True
+            except Exception as e:
+                result["writable"] = False
+                result["error"] = str(e)
+            
+            # List files
+            files = list(temp_dir.glob("*"))
+            result["files_count"] = len(files)
+            result["files"] = [f.name for f in files[:10]]  # First 10 files
+            
+            # Get permissions
+            st = temp_dir.stat()
+            result["permissions"] = oct(st.st_mode)[-3:]
+    except Exception as e:
+        result["error"] = str(e)
+    
+    return result
+
+
 @router.get("/bulk-upload", response_class=HTMLResponse)
 async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_session)):
     """Show bulk card upload page."""
     return templates.TemplateResponse("admin/bulk_upload.html", {"request": request})
 
 
+
+def cleanup_old_temp_files(temp_dir: Path, days: int = 7):
+    """Delete temp files older than specified days"""
+    try:
+        import time
+        current_time = time.time()
+        cutoff_time = current_time - (days * 24 * 60 * 60)
+        
+        deleted_count = 0
+        for file_path in temp_dir.glob("bulk_*"):
+            if file_path.is_file():
+                file_age = file_path.stat().st_mtime
+                if file_age < cutoff_time:
+                    file_path.unlink()
+                    deleted_count += 1
+        
+        if deleted_count > 0:
+            safe_print(f"[CLEANUP] Deleted {deleted_count} old temp files")
+    except Exception as e:
+        safe_print(f"[CLEANUP] Error during cleanup: {e}")
+
+
 @router.post("/bulk-upload/appraise")
 async def bulk_upload_appraise(
     images: List[UploadFile] = File(...),
     admin: str = Depends(get_admin_session),
-    client: ShopifyClient = Depends(get_shopify_client)
 ):
     """
     Phase 1: Appraise multiple card images.
     Returns appraisal data for each card with 'exists' flag.
     """
     results = []
-    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
     
     # Create temp directory for uploads
     temp_dir = Path("app/static/uploads/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Clean up old temp files (older than 7 days)
+    cleanup_old_temp_files(temp_dir, days=7)
     
     for idx, image_file in enumerate(images):
         try:
@@ -1883,30 +1951,47 @@ async def bulk_confirm(
                     
                     # Handle image upload using staged uploads (same as add_card)
                     all_images = []
-                    if temp_path and Path(temp_path).exists():
-                        try:
-                            with open(temp_path, "rb") as img_file:
-                                img_content = img_file.read()
+                    
+                    if temp_path:
+                        # Convert string path to Path object
+                        temp_file_path = Path(temp_path)
+                        safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
+                        safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
+                        safe_print(f"[BULK_UPLOAD] Path is absolute: {temp_file_path.is_absolute()}")
+                        
+                        if temp_file_path.exists():
+                            try:
+                                with open(temp_file_path, "rb") as img_file:
+                                    img_content = img_file.read()
+                                    
+                                # Get the original filename and mime type
+                                original_filename = card.get("filename", "card.jpg")
+                                mime_type = "image/jpeg" if original_filename.lower().endswith(('.jpg', '.jpeg')) else "image/png"
                                 
-                            # Create staged upload
-                            filename = Path(temp_path).name
-                            target = await client.staged_uploads_create(
-                                admin_token=admin_token,
-                                filename=filename,
-                                mime_type="image/png",
-                                file_size=str(len(img_content))
-                            )
-                            
-                            # Upload file to staged target
-                            resource_url = await client.upload_file_to_staged_target(
-                                target=target,
-                                file_content=img_content,
-                                mime_type="image/png"
-                            )
-                            all_images.append(resource_url)
-                            safe_print(f"[BULK_UPLOAD] Uploaded image: {resource_url}")
-                        except Exception as img_error:
-                            safe_print(f"[BULK_UPLOAD] Error uploading image: {img_error}")
+                                # Create staged upload
+                                target = await client.staged_uploads_create(
+                                    admin_token=admin_token,
+                                    filename=original_filename,
+                                    mime_type=mime_type,
+                                    file_size=str(len(img_content))
+                                )
+                                
+                                # Upload file to staged target
+                                resource_url = await client.upload_file_to_staged_target(
+                                    target=target,
+                                    file_content=img_content,
+                                    mime_type=mime_type
+                                )
+                                all_images.append(resource_url)
+                                safe_print(f"[BULK_UPLOAD] Uploaded image: {resource_url}")
+                            except Exception as img_error:
+                                safe_print(f"[BULK_UPLOAD] Error uploading image: {img_error}")
+                                import traceback
+                                safe_print(traceback.format_exc())
+                        else:
+                            safe_print(f"[BULK_UPLOAD] WARNING: Temp file not found at {temp_file_path}")
+                    else:
+                        safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
                     
                     product_data = {
                         "title": card_name.strip(),
