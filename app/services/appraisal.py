@@ -687,13 +687,14 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 # Try to find products that contain any of these variations
                 number_matches = []
                 for item in filtered_prices:  # Search in filtered_prices, not valid_prices
-                    # Normalize product name the same way
-                    product_normalized = re.sub(r'[#\-/\s]', '', item['name']).upper()
+                    product_name_upper = item['name'].upper()
                     
-                    # Check if the normalized search number appears in the product name
-                    if search_normalized in product_normalized:
-                        number_matches.append(item)
-                        safe_print(f"[PRICECHARTING_API]   ✓ Matched: '{item['name']}'")
+                    # Check if any variation appears in the product name
+                    for variation in variations:
+                        if variation in product_name_upper:
+                            number_matches.append(item)
+                            safe_print(f"[PRICECHARTING_API]   ✓ Number match ('{variation}'): '{item['name']}'")
+                            break  # Don't check other variations for this item
                 
                 if number_matches:
                     safe_print(f"[PRICECHARTING_API] Filtered to {len(number_matches)} products matching card number")
