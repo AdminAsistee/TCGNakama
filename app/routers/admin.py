@@ -1727,8 +1727,15 @@ async def bulk_upload_appraise(
             
             # Read and save file
             content = await image_file.read()
-            with open(temp_path, "wb") as f:
-                f.write(content)
+            safe_print(f"[BULK_UPLOAD] Saving {image_file.filename} as {temp_filename}, size: {len(content)} bytes")
+            
+            try:
+                with open(temp_path, "wb") as f:
+                    f.write(content)
+                safe_print(f"[BULK_UPLOAD] Successfully saved to {temp_path}")
+            except Exception as save_error:
+                safe_print(f"[BULK_UPLOAD] ERROR saving file: {save_error}")
+                raise
             
             # Appraise the card using image bytes
             appraisal_result = await appraisal.appraise_card_from_image(image_data=content)
@@ -1797,7 +1804,7 @@ async def bulk_upload_appraise(
                 "shopify_inventory_item_id": shopify_inventory_item_id,
                 "current_quantity": current_quantity,
                 "image_url": f"/static/uploads/temp/{temp_filename}",
-                "temp_path": str(temp_path),
+                "temp_path": str(temp_path.absolute()),  # Use absolute path
                 "filename": image_file.filename,
                 # Additional AI-extracted details for description
                 "year": appraisal_result.get("year"),
