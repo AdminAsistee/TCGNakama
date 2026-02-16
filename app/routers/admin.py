@@ -1707,6 +1707,10 @@ async def bulk_upload_appraise(
     """
     results = []
     
+    # Get admin token and Shopify client
+    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    client = ShopifyClient()
+    
     # Create temp directory for uploads
     temp_dir = Path("app/static/uploads/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
