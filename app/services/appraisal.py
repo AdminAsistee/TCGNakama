@@ -627,8 +627,29 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 safe_print(f"[PRICECHARTING_API] No valid prices found")
                 return None
             
-            # Filter by card number first (if card number provided)
+            
+            # Step 1: Filter by card name first
             filtered_prices = valid_prices
+            card_name_english = card_name.split('(')[0].strip()  # Extract English name before parentheses
+            if card_name_english:
+                import re
+                
+                safe_print(f"[PRICECHARTING_API] Filtering by card name: '{card_name_english}'")
+                
+                name_matches = []
+                for item in valid_prices:
+                    # Check if card name appears in product name (case-insensitive)
+                    if card_name_english.upper() in item['name'].upper():
+                        name_matches.append(item)
+                        safe_print(f"[PRICECHARTING_API]   ✓ Name match: '{item['name']}'")
+                
+                if name_matches:
+                    safe_print(f"[PRICECHARTING_API] Filtered to {len(name_matches)} products matching card name")
+                    filtered_prices = name_matches
+                else:
+                    safe_print(f"[PRICECHARTING_API] No card name matches found")
+            
+            # Step 2: Filter by card number (if card number provided)
             if card_number:
                 import re
                 
