@@ -657,11 +657,36 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 # e.g., "#OP09-051" -> "OP09051", "001/024" -> "001024"
                 search_normalized = re.sub(r'[#\-/\s]', '', card_number).upper()
                 
-                safe_print(f"[PRICECHARTING_API] Looking for card number: '{card_number}' (normalized: '{search_normalized}')")
+                safe_print(f"[PRICECHARTING_API] Looking for card number: '{card_number}'")
                 
-                # Try to find products that contain this card number
+                # Generate multiple search variations
+                # e.g., "027/071" -> try "027/071", "027-071", "027071", "027", "27"
+                variations = set()  # Use set to avoid duplicates
+                
+                # Original format
+                variations.add(card_number.upper())
+                
+                # Normalized (no separators)
+                normalized = re.sub(r'[#\-/\s]', '', card_number).upper()
+                variations.add(normalized)
+                
+                # With dash instead of slash
+                if '/' in card_number:
+                    variations.add(card_number.replace('/', '-').upper())
+                
+                # Just the first number (before / or -)
+                first_num = re.split(r'[/\-]', card_number)[0].strip('#').strip()
+                variations.add(first_num.upper())
+                
+                # Without leading zeros (e.g., "027" -> "27")
+                first_num_no_zeros = first_num.lstrip('0') or '0'
+                variations.add(first_num_no_zeros.upper())
+                
+                safe_print(f"[PRICECHARTING_API] Trying variations: {list(variations)}")
+                
+                # Try to find products that contain any of these variations
                 number_matches = []
-                for item in valid_prices:
+                for item in filtered_prices:  # Search in filtered_prices, not valid_prices
                     # Normalize product name the same way
                     product_normalized = re.sub(r'[#\-/\s]', '', item['name']).upper()
                     
