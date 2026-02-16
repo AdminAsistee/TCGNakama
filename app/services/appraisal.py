@@ -647,13 +647,11 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             safe_print("[PRICECHARTING_API] No API key configured, skipping API")
             return None
         
-        # Build search query
+        # Build search query - only use card name and card number
         search_name = card_name.split('(')[0].strip()
         query_parts = [search_name]
         
-        if set_name and set_name != "Unknown":
-            query_parts.append(set_name)
-        
+        # Only add card number, skip set name for simpler queries
         if card_number:
             clean_card_number = card_number.replace('#', '')
             query_parts.append(clean_card_number)
