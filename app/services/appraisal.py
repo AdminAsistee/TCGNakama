@@ -74,53 +74,37 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
                 return {'error': 'No image data or URL provided'}
             
             # Build the prompt for card identification
-            prompt = """You are a trading card expert with extensive knowledge of all trading card game sets and expansions. Analyze this card image and extract the following information:
+            prompt = """Analyze this trading card image and extract the following information EXACTLY as it appears:
 
-1. **Card Name (Japanese)**: The Japanese name if visible on the card
-2. **Card Name (English)**: The English translation or romanized name
-3. **Set Code**: The EXACT set code/identifier as printed on the card
+1. **Card Name (Japanese)**: The Japanese name if visible
+2. **Card Name (English)**: The English name or romanization
+3. **Set Code**: The short set code visible on the card
+   - Pokémon: Look at bottom left near card number (e.g., "SV5M", "sA", "XY")
+   - One Piece: Extract from card number prefix (e.g., "OP12" from "OP12-008")
+   - Just read what you see - do NOT expand to full set names
    
-   CRITICAL RULES FOR SET CODE:
-   - Extract the set code EXACTLY as it appears on the card
-   - For Pokémon cards: Look at the BOTTOM LEFT of the card, near the card number
-     * The set code is usually 2-4 characters (e.g., "SV5M", "SV1", "XY", "sA")
-     * It appears just before or after the card number (e.g., "SV5M 023/071")
-     * DO NOT use full set names like "Shiny Treasure ex" - use ONLY the code like "SV5M" or "sA"
-   - For One Piece cards: Use the prefix from the card number (e.g., "OP12", "OP09", "ST01")
-   - DO NOT expand or translate set codes (keep "SV5M" as "SV5M", NOT "Cyber Judge")
-   - DO NOT use full set names (use "sA" NOT "Shiny Treasure ex")
-   - IGNORE text in brackets like [Memorial Collection], [Promo], [Alt Art] - these are VARIANTS
-   - IGNORE character affiliation text - these are CHARACTER INFO, not set codes
-   - Return the short set code/identifier exactly as scanned from the card
-   
-4. **Card Number**: The collector number (e.g., "001/024", "OP13-001", "OP09-051")
-5. **Rarity**: The rarity of the card (look for rarity symbols or text)
-6. **Year**: The copyright year if visible on the card
-7. **Manufacturer**: The publisher/manufacturer (e.g., "Nintendo", "Bandai", "Wizards of the Coast", "Konami")
+4. **Card Number**: The collector number (e.g., "023/071", "OP12-008")
+5. **Rarity**: Rarity symbol or text (Common, Rare, SR, etc.)
+6. **Year**: Copyright year if visible
+7. **Manufacturer**: Publisher name if visible
 
-IMPORTANT for Card Name:
-- If the card has both Japanese and English text, extract BOTH
-- If only Japanese is visible, provide the Japanese name and try to romanize it
-- If only English is visible, use that for both fields
+IMPORTANT:
+- Extract text EXACTLY as printed - no lookups, no expansions
+- For set code, just read the short code on the card
+- If something is not visible, use null
 
-For rarity, use these standard formats:
-- Pokémon: Common (circle), Uncommon (diamond), Rare (star), Holo Rare, Ultra Rare, Secret Rare
-- One Piece: C (Common), UC (Uncommon), R (Rare), SR (Super Rare), SAR (Special Art Rare), SEC (Secret)
-- Magic: Common, Uncommon, Rare, Mythic Rare
-- Yu-Gi-Oh!: Common, Rare, Super Rare, Ultra Rare, Secret Rare
-
-Return ONLY a JSON object with these exact keys (use null for missing information):
+Return ONLY a JSON object:
 {
   "card_name_japanese": "string or null",
   "card_name_english": "string or null",
-  "set_name": "string (in English)",
+  "set_name": "string (short code)",
   "card_number": "string",
   "rarity": "string",
   "year": "string or null",
   "manufacturer": "string or null"
 }
 
-Do not include any markdown formatting or code blocks, just the raw JSON."""
+No markdown, just raw JSON."""
 
             # Generate content with image
             response = model.generate_content([prompt, img])
