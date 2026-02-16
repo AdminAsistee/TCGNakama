@@ -9,6 +9,15 @@ SHOPIFY_STORE_URL = os.getenv("SHOPIFY_STORE_URL", "").rstrip("/")
 SHOPIFY_STOREFRONT_TOKEN = os.getenv("SHOPIFY_STOREFRONT_TOKEN")
 API_VERSION = "2024-01"
 
+def safe_print(message: str):
+    """Print with Unicode error handling for Windows cp932 codec."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        # Fallback: encode to ASCII with backslashreplace for Unicode chars
+        print(message.encode('ascii', 'backslashreplace').decode('ascii'))
+
+
 class ShopifyClient:
     _client = None
 
@@ -860,7 +869,7 @@ class ShopifyClient:
                 "title": product_data["title"],
                 "descriptionHtml": product_data.get("description", ""),
                 "vendor": product_data.get("vendor", "TCG Nakama"),
-                "productType": "Collectible Cards",
+                "productType": product_data.get("product_type", "Collectible Card"),
                 "tags": product_data.get("tags", [])
             }
         }
@@ -918,12 +927,17 @@ class ShopifyClient:
               }
             }
             """
+            # Ensure price is valid
+            price_value = product_data.get("price")
+            if price_value is None or price_value == "":
+                price_value = 0
+            
             variant_vars = {
                 "productId": product["id"],
                 "variants": [
                     {
                         "id": variant_id,
-                        "price": str(product_data["price"])
+                        "price": str(price_value)
                     }
                 ]
             }
@@ -1268,14 +1282,157 @@ class ShopifyClient:
                 
             result = inv_data.get("data", {}).get("inventorySetOnHandQuantities", {})
             if result.get("userErrors"):
-                print(f"Shopify User Error updating inventory: {result['userErrors']}")
-                return
-                
-            # Success if no errors
-            print(f"[SUCCESS] Inventory updated to {quantity} units")
+                print(f"User errors updating inventory: {result['userErrors']}")
+            else:
+                print(f"[SUCCESS] Inventory updated to {quantity}")
                 
         except Exception as e:
             print(f"Exception updating inventory: {str(e).encode('ascii', 'backslashreplace').decode()}")
+
+    async def _increment_inventory(self, admin_token: str, inventory_item_id: str, quantity_to_add: int):
+        """Increment inventory by getting current level and adding to it."""
+        admin_url = f"{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}/graphql.json"
+        headers = {
+            "X-Shopify-Access-Token": admin_token,
+            "Content-Type": "application/json",
+        }
+
+        client = self.get_client()
+        
+        try:
+            # Get location ID
+            location_query = "{ locations(first: 1) { edges { node { id } } } }"
+            loc_res = await client.post(admin_url, json={"query": location_query}, headers=headers)
+            loc_res.raise_for_status()
+            loc_data = loc_res.json()
+            
+            if "errors" in loc_data or not loc_data.get("data", {}).get("locations", {}).get("edges"):
+                print("Error fetching location")
+                return
+
+            location_id = loc_data["data"]["locations"]["edges"][0]["node"]["id"]
+            
+            # Get current inventory level
+            inventory_query = """
+            query getInventoryLevel($inventoryItemId: ID!, $locationId: ID!) {
+              inventoryLevel(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+                available
+              }
+            }
+            """
+            
+            inv_level_res = await client.post(
+                admin_url,
+                json={"query": inventory_query, "variables": {
+                    "inventoryItemId": inventory_item_id,
+                    "locationId": location_id
+                }},
+                headers=headers
+            )
+            inv_level_res.raise_for_status()
+            inv_level_data = inv_level_res.json()
+            
+            # Check for errors in the response
+            if "errors" in inv_level_data:
+                safe_print(f"[ERROR] GraphQL errors getting inventory level: {inv_level_data['errors']}")
+                safe_print(f"[ERROR] Inventory Item ID might be invalid: {inventory_item_id}")
+                return
+            
+            current_quantity = 0
+            if "data" in inv_level_data and inv_level_data["data"].get("inventoryLevel"):
+                current_quantity = inv_level_data["data"]["inventoryLevel"].get("available", 0)
+                safe_print(f"[DEBUG] Current inventory level: {current_quantity}")
+            else:
+                safe_print(f"[WARNING] Could not get inventory level, response: {inv_level_data}")
+                safe_print(f"[WARNING] Defaulting to current_quantity=0")
+            
+            # Calculate new total
+            new_quantity = current_quantity + quantity_to_add
+            
+            safe_print(f"[DEBUG] Incrementing inventory: current={current_quantity}, adding={quantity_to_add}, new={new_quantity}")
+            
+            # Set new inventory level
+            await self._update_inventory(admin_token, inventory_item_id, new_quantity)
+                
+        except Exception as e:
+            print(f"Exception incrementing inventory: {str(e).encode('ascii', 'backslashreplace').decode()}")
+
+    async def search_product_by_card(self, admin_token: str, card_number: str, card_name: str) -> Optional[dict]:
+        """
+        Search for a product by card number and name.
+        Returns product info with variant ID if found, None otherwise.
+        """
+        admin_url = f"{SHOPIFY_STORE_URL}/admin/api/{API_VERSION}/graphql.json"
+        headers = {
+            "X-Shopify-Access-Token": admin_token,
+            "Content-Type": "application/json",
+        }
+
+        # Search by title containing both card number and name
+        search_query = f"{card_number} {card_name}"
+        
+        query = """
+        query searchProducts($query: String!) {
+          products(first: 10, query: $query) {
+            edges {
+              node {
+                id
+                title
+                variants(first: 1) {
+                  edges {
+                    node {
+                      id
+                      price
+                      inventoryQuantity
+                      inventoryItem {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        
+        variables = {"query": search_query}
+        
+        client = self.get_client()
+        try:
+            response = await client.post(
+                admin_url,
+                json={"query": query, "variables": variables},
+                headers=headers
+            )
+            response.raise_for_status()
+            res_data = response.json()
+            
+            if "errors" in res_data:
+                print(f"Error searching products: {res_data['errors']}")
+                return None
+            
+            products = res_data.get("data", {}).get("products", {}).get("edges", [])
+            
+            if not products:
+                return None
+            
+            # Return the first matching product
+            product_node = products[0]["node"]
+            variant_node = product_node["variants"]["edges"][0]["node"]
+            
+            return {
+                "product_id": product_node["id"],
+                "variant_id": variant_node["id"],
+                "inventory_item_id": variant_node["inventoryItem"]["id"],
+                "title": product_node["title"],
+                "price": float(variant_node.get("price", 0)),
+                "current_quantity": variant_node.get("inventoryQuantity", 0)
+            }
+            
+        except Exception as e:
+            print(f"Exception searching for product: {str(e).encode('ascii', 'backslashreplace').decode()}")
+            return None
 
     async def update_product(self, product_id: str, title: str = None, description: str = None, 
                             price: float = None, tags: list = None, vendor: str = None,

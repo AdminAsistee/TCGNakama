@@ -1617,3 +1617,343 @@ async def reorder_banners(
 
 # Add missing import for io
 import io
+
+
+# ============================================================================
+# BULK UPLOAD - Complete Implementation
+# ============================================================================
+
+@router.get("/bulk-upload", response_class=HTMLResponse)
+async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_session)):
+    """Show bulk card upload page."""
+    return templates.TemplateResponse("admin/bulk_upload.html", {"request": request})
+
+
+@router.post("/bulk-upload/appraise")
+async def bulk_upload_appraise(
+    images: List[UploadFile] = File(...),
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """
+    Phase 1: Appraise multiple card images.
+    Returns appraisal data for each card with 'exists' flag.
+    """
+    results = []
+    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    
+    # Create temp directory for uploads
+    temp_dir = Path("app/static/uploads/temp")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    for idx, image_file in enumerate(images):
+        try:
+            # Save image temporarily
+            file_ext = Path(image_file.filename).suffix
+            temp_filename = f"bulk_{datetime.now().timestamp()}_{idx}{file_ext}"
+            temp_path = temp_dir / temp_filename
+            
+            # Read and save file
+            content = await image_file.read()
+            with open(temp_path, "wb") as f:
+                f.write(content)
+            
+            # Appraise the card using image bytes
+            appraisal_result = await appraisal.appraise_card_from_image(image_data=content)
+            
+            if appraisal_result.get("error"):
+                results.append({
+                    "error": appraisal_result["error"],
+                    "image_url": f"/static/uploads/temp/{temp_filename}",
+                    "filename": image_file.filename
+                })
+                continue
+            
+            # Extract card details
+            card_name = appraisal_result.get("card_name", "Unknown")
+            set_name = appraisal_result.get("set_name", "")
+            card_number = appraisal_result.get("card_number", "")
+            rarity = appraisal_result.get("rarity", "")
+            vendor = appraisal_result.get("manufacturer", "TCG Nakama")
+            
+            # Check if card exists in Shopify
+            exists = False
+            shopify_product_id = None
+            shopify_variant_id = None
+            shopify_inventory_item_id = None
+            price = None
+            current_quantity = 0
+            
+            if card_number and card_name and admin_token:
+                existing_product = await client.search_product_by_card(
+                    admin_token, 
+                    card_number, 
+                    card_name
+                )
+                if existing_product:
+                    exists = True
+                    shopify_product_id = existing_product["product_id"]
+                    shopify_variant_id = existing_product["variant_id"]
+                    shopify_inventory_item_id = existing_product["inventory_item_id"]
+                    current_quantity = existing_product.get("current_quantity", 0)
+                    price = existing_product.get("price")
+            
+            # If card is new, fetch price from PriceCharting
+            if not exists:
+                try:
+                    price_result = await appraisal.get_market_value_jpy(
+                        card_name=card_name,
+                        rarity=rarity,
+                        set_name=set_name,
+                        card_number=card_number
+                    )
+                    if not price_result.get("error"):
+                        price = price_result.get("market_jpy")
+                except Exception as price_error:
+                    safe_print(f"[BULK_UPLOAD] Could not fetch price: {price_error}")
+            
+            results.append({
+                "card_name": card_name,
+                "set_name": set_name,
+                "card_number": card_number,
+                "rarity": rarity,
+                "vendor": vendor,
+                "price": price,
+                "exists": exists,
+                "shopify_product_id": shopify_product_id,
+                "shopify_variant_id": shopify_variant_id,
+                "shopify_inventory_item_id": shopify_inventory_item_id,
+                "current_quantity": current_quantity,
+                "image_url": f"/static/uploads/temp/{temp_filename}",
+                "temp_path": str(temp_path),
+                "filename": image_file.filename,
+                # Additional AI-extracted details for description
+                "year": appraisal_result.get("year"),
+                "card_name_japanese": appraisal_result.get("card_name_japanese"),
+                "card_name_english": appraisal_result.get("card_name_english")
+            })\
+            
+        except Exception as e:
+            safe_print(f"[BULK_UPLOAD] Error appraising {image_file.filename}: {e}")
+            results.append({
+                "error": str(e),
+                "image_url": "",
+                "filename": image_file.filename
+            })
+    
+    # Merge duplicates: group by card_number and sum quantities
+    merged_results = {}
+    for result in results:
+        # Skip error results
+        if "error" in result:
+            continue
+            
+        card_number = result.get("card_number", "")
+        card_name = result.get("card_name", "")
+        
+        # Use card_number as unique key, fallback to card_name if no number
+        # Make it case-insensitive by converting to lowercase
+        unique_key = (card_number if card_number else card_name).lower().strip()
+        
+        if unique_key in merged_results:
+            # Duplicate found - increment quantity
+            if result.get("exists"):
+                # For existing cards, we'll add +1 for each duplicate
+                merged_results[unique_key]["duplicate_count"] = merged_results[unique_key].get("duplicate_count", 1) + 1
+            else:
+                # For new cards, increment the quantity
+                merged_results[unique_key]["quantity"] = merged_results[unique_key].get("quantity", 1) + 1
+        else:
+            # First occurrence
+            if result.get("exists"):
+                result["duplicate_count"] = 1  # Track duplicates for existing cards
+            else:
+                result["quantity"] = 1  # Set initial quantity for new cards
+            merged_results[unique_key] = result
+    
+    # Convert back to list and update quantities for existing cards
+    final_results = []
+    for result in merged_results.values():
+        if result.get("exists") and result.get("duplicate_count", 1) > 1:
+            # For existing cards, show the total increment (e.g., "+2" instead of "+1")
+            result["quantity_increment"] = result["duplicate_count"]
+        final_results.append(result)
+    
+    # Add back error results
+    for result in results:
+        if "error" in result:
+            final_results.append(result)
+    
+    return JSONResponse(final_results)
+
+
+@router.post("/bulk-upload/confirm")
+async def bulk_confirm(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """
+    Phase 2: Confirm and add selected cards to Shopify.
+    For existing cards: increment inventory
+    For new cards: create product
+    """
+    body = await request.json()
+    selected_cards = body.get("cards", [])
+    
+    results = []
+    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    
+    for card in selected_cards:
+        try:
+            card_name = card.get("card_name")
+            set_name = card.get("set_name", "")
+            card_number = card.get("card_number", "")
+            rarity = card.get("rarity", "")
+            vendor = card.get("vendor", "TCG Nakama")
+            price = card.get("price", 0)
+            quantity = int(card.get("quantity", 1))
+            exists = card.get("exists", False)
+            shopify_inventory_item_id = card.get("shopify_inventory_item_id")
+            current_quantity = int(card.get("current_quantity", 0))
+            temp_path = card.get("temp_path")
+            
+            
+            if exists and shopify_inventory_item_id:
+                # Update existing product inventory
+                # Use duplicate_count if available (from merged duplicates), otherwise use quantity
+                increment = card.get("duplicate_count", card.get("quantity_increment", quantity))
+                new_quantity = current_quantity + increment
+                safe_print(f"[BULK_UPLOAD] Updating inventory for {card_name}: {current_quantity} + {increment} = {new_quantity}")
+                
+                try:
+                    await client._update_inventory(admin_token, shopify_inventory_item_id, new_quantity)
+                    results.append({
+                        "success": True,
+                        "card_name": card_name,
+                        "action": "inventory_updated",
+                        "quantity": quantity
+                    })
+                except Exception as inv_error:
+                    safe_print(f"[BULK_UPLOAD] Error updating inventory: {inv_error}")
+                    results.append({
+                        "success": False,
+                        "card_name": card_name,
+                        "error": f"Failed to update inventory: {str(inv_error)}"
+                    })
+            else:
+                # Create new product in Shopify
+                safe_print(f"[BULK_UPLOAD] Creating new product for {card_name}")
+                
+                try:
+                    # Prepare tags in the same format as add_card
+                    tags = [
+                        f"Set: {set_name}" if set_name else "Set: Unknown",
+                        f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
+                        f"Number: {card_number}" if card_number else "Number: Unknown",
+                        "Condition: Raw"  # Default condition for bulk upload
+                    ]
+                    
+                    
+                    # Build description HTML with all AI-extracted details
+                    card_name_jp = card.get("card_name_japanese", "")
+                    card_name_en = card.get("card_name_english", "")
+                    year = card.get("year", "")
+                    manufacturer = card.get("manufacturer", vendor)
+                    
+                    description_html = ""
+                    if card_name_jp:
+                        description_html += f"<p><strong>Japanese Name:</strong> {card_name_jp}</p>"
+                    if card_name_en:
+                        description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
+                    if set_name:
+                        description_html += f"<p><strong>Set:</strong> {set_name}</p>"
+                    if card_number:
+                        description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
+                    if rarity:
+                        description_html += f"<p><strong>Rarity:</strong> {rarity}</p>"
+                    if year:
+                        description_html += f"<p><strong>Year:</strong> {year}</p>"
+                    if manufacturer:
+                        description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
+                    description_html += "<p><strong>Condition:</strong> Raw</p>"
+                    
+                    # Collections can be empty
+                    collections = []
+                    
+                    # Handle image upload using staged uploads (same as add_card)
+                    all_images = []
+                    if temp_path and Path(temp_path).exists():
+                        try:
+                            with open(temp_path, "rb") as img_file:
+                                img_content = img_file.read()
+                                
+                            # Create staged upload
+                            filename = Path(temp_path).name
+                            target = await client.staged_uploads_create(
+                                admin_token=admin_token,
+                                filename=filename,
+                                mime_type="image/png",
+                                file_size=str(len(img_content))
+                            )
+                            
+                            # Upload file to staged target
+                            resource_url = await client.upload_file_to_staged_target(
+                                target=target,
+                                file_content=img_content,
+                                mime_type="image/png"
+                            )
+                            all_images.append(resource_url)
+                            safe_print(f"[BULK_UPLOAD] Uploaded image: {resource_url}")
+                        except Exception as img_error:
+                            safe_print(f"[BULK_UPLOAD] Error uploading image: {img_error}")
+                    
+                    product_data = {
+                        "title": card_name.strip(),
+                        "description": description_html,
+                        "price": price if price is not None else 0,  # Ensure price is never None
+                        "vendor": vendor if vendor else "TCG Nakama",
+                        "product_type": "Collectible Card",
+                        "tags": tags,
+                        "quantity": quantity,
+                        "images": all_images,
+                        "collections": collections
+                    }
+                    
+                    
+                    safe_print(f"[BULK_UPLOAD] Product data to send: {product_data}")
+                    created_product = await client.create_product(admin_token, product_data)
+                    safe_print(f"[BULK_UPLOAD] Product created successfully: {created_product['id']}")
+                    
+                    results.append({
+                        "success": True,
+                        "card_name": card_name,
+                        "action": "product_created",
+                        "product_id": created_product["id"]
+                    })
+                except Exception as create_error:
+                    safe_print(f"[BULK_UPLOAD] Error creating product for {card_name}: {create_error}")
+                    import traceback
+                    safe_print(f"[BULK_UPLOAD] Traceback: {traceback.format_exc()}")
+                    results.append({
+                        "success": False,
+                        "card_name": card_name,
+                        "error": f"Failed to create product: {str(create_error)}"
+                    })
+            
+            # Clean up temp file
+            if temp_path and Path(temp_path).exists():
+                try:
+                    Path(temp_path).unlink()
+                except Exception as cleanup_error:
+                    safe_print(f"[BULK_UPLOAD] Error cleaning up temp file: {cleanup_error}")
+                
+        except Exception as e:
+            safe_print(f"[BULK_UPLOAD] Error processing {card.get('card_name', 'unknown')}: {e}")
+            results.append({
+                "success": False,
+                "card_name": card.get("card_name", "Unknown"),
+                "error": str(e)
+            })
+    
+    return JSONResponse(results)

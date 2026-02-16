@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Upload - Admin{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Bulk Card Upload</h1>
+        <a href="/admin" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Upload Section -->
+    <div id="upload-phase" class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-2xl font-semibold mb-4">Upload Card Images</h2>
+        <p class="text-gray-600 mb-4">Upload images of your cards for bulk appraisal.</p>
+
+        <div id="dropzone"
+            class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors">
+            <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+            <div class="text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path
+                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <p class="mt-2">Click to select files or drag and drop</p>
+                <p class="text-sm text-gray-400">PNG, JPG, JPEG up to 10MB each</p>
+            </div>
+        </div>
+
+        <div id="file-list" class="mt-4 space-y-2"></div>
+
+        <button id="appraise-btn"
+            class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled>
+            Appraise Cards
+        </button>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="bg-white rounded-lg shadow-md p-6 hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-semibold">Appraisal Results</h2>
+            <div class="flex gap-2">
+                <button type="button" onclick="selectAllCards()"
+                    class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">Select All</button>
+                <button type="button" onclick="deselectAllCards()"
+                    class="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600">Deselect All</button>
+                <button type="button" onclick="deleteSelectedCards()"
+                    class="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600">Delete Selected</button>
+            </div>
+        </div>
+
+        <div id="results-table-container">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <input type="checkbox" id="select-all-checkbox" onchange="toggleAllCards(this)"
+                                class="w-4 h-4">
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Card Name</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Set</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rarity</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="results-tbody" class="bg-white divide-y divide-gray-200">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 flex gap-4">
+            <button id="confirm-btn"
+                class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled>
+                Confirm & Add Selected Cards
+            </button>
+            <button id="cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-700">Processing...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    let uploadedFiles = [];
+    let appraisalResults = [];
+
+    // File upload handling
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    const appraiseBtn = document.getElementById('appraise-btn');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-blue-500');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-blue-500');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-blue-500');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+        uploadedFiles = Array.from(files);
+        displayFileList();
+        appraiseBtn.disabled = uploadedFiles.length === 0;
+    }
+
+    function displayFileList() {
+        fileList.innerHTML = '';
+        uploadedFiles.forEach((file, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-gray-50 p-2 rounded';
+            div.innerHTML = `
+                <span class="text-sm text-gray-700">${file.name}</span>
+                <button onclick="removeFile(${index})" class="text-red-600 hover:text-red-800">Remove</button>
+            `;
+            fileList.appendChild(div);
+        });
+    }
+
+    function removeFile(index) {
+        uploadedFiles.splice(index, 1);
+        displayFileList();
+        appraiseBtn.disabled = uploadedFiles.length === 0;
+    }
+
+    // Appraise button handler
+    appraiseBtn.addEventListener('click', async () => {
+        if (uploadedFiles.length === 0) return;
+
+        const loading = document.getElementById('loading');
+        loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        uploadedFiles.forEach(file => {
+            formData.append('images', file);
+        });
+
+        try {
+            const response = await fetch('/admin/bulk-upload/appraise', {
+                method: 'POST',
+                body: formData
+            });
+
+
+            if (!response.ok) {
+                throw new Error('Appraisal failed');
+            }
+
+            const newResults = await response.json();
+
+            // Merge new results with existing results, detecting duplicates
+            newResults.forEach(newCard => {
+                if (newCard.error) {
+                    appraisalResults.push(newCard);
+                    return;
+                }
+
+                // Find existing card with same card_number (case-insensitive)
+                const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
+                const existingIndex = appraisalResults.findIndex(existing => {
+                    const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
+                    // Only merge if card numbers match AND exists status is the same
+                    return existingNumber === cardNumber && !existing.error && existing.exists === newCard.exists;
+                });
+
+                if (existingIndex !== -1) {
+                    // Duplicate found - merge quantities
+                    const existing = appraisalResults[existingIndex];
+                    if (existing.exists) {
+                        // For existing cards, increment duplicate_count
+                        existing.duplicate_count = (existing.duplicate_count || 1) + (newCard.duplicate_count || 1);
+                        existing.quantity_increment = existing.duplicate_count;
+                    } else {
+                        // For new cards, increment quantity
+                        existing.quantity = (existing.quantity || 1) + (newCard.quantity || 1);
+                    }
+                } else {
+                    // New unique card
+                    appraisalResults.push(newCard);
+                }
+            });
+            displayResults();
+
+            // Clear the file input and uploaded files
+            const fileInput = document.getElementById('card-images');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            uploadedFiles = [];
+            displayFileList();  // Update the UI to clear the file list
+            appraiseBtn.disabled = true;  // Disable appraise button since no files
+
+        } catch (error) {
+            alert('Error during appraisal: ' + error.message);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    });
+
+    function displayResults() {
+        const resultsSection = document.getElementById('results-section');
+        const tbody = document.getElementById('results-tbody');
+
+        tbody.innerHTML = '';
+
+        appraisalResults.forEach((result, index) => {
+            const row = document.createElement('tr');
+
+            if (result.error) {
+                row.innerHTML = `
+                    <td colspan="10" class="px-4 py-2 text-red-600">
+                        Error: ${result.error} (${result.filename})
+                    </td>
+                `;
+            } else {
+                row.innerHTML = `
+                    <td class="px-4 py-2">
+                        <input type="checkbox" class="card-checkbox w-4 h-4" data-index="${index}" checked>
+                    </td>
+                    <td class="px-4 py-2">
+                        <img src="${result.image_url}" class="w-16 h-16 object-cover rounded">
+                    </td>
+                    <td class="px-4 py-2 text-gray-900">${result.card_name || 'Unknown'}</td>
+                    <td class="px-4 py-2 text-gray-900">${result.set_name || '-'}</td>
+                    <td class="px-4 py-2 text-gray-900">${result.card_number || '-'}</td>
+                    <td class="px-4 py-2 text-gray-900">${result.rarity || '-'}</td>
+                    <td class="px-4 py-2 text-gray-900">¥${result.price || 'N/A'}</td>
+                    <td class="px-4 py-2">
+                        <span class="px-2 py-1 text-xs rounded ${result.exists ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+                            ${result.exists ? 'Exists' : 'New'}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        ${result.exists
+                        ? `<span class="text-gray-900 font-semibold">+${result.quantity_increment || result.duplicate_count || 1}</span>`
+                        : `<input type="number" value="${result.quantity || 1}" min="1" class="w-16 px-2 py-1 border rounded text-gray-900" data-index="${index}">`
+                    }
+                    </td>
+                    <td class="px-4 py-2">
+                        <button type="button" onclick="reappraiseCard(${index})" class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600">
+                            Reappraise
+                        </button>
+                    </td>
+                `;
+            }
+
+            tbody.appendChild(row);
+        });
+
+        resultsSection.classList.remove('hidden');
+        document.getElementById('confirm-btn').disabled = false;
+    }
+
+    // Confirm button handler
+    document.getElementById('confirm-btn').addEventListener('click', async () => {
+        const loading = document.getElementById('loading');
+        loading.classList.remove('hidden');
+
+        const cardsToConfirm = appraisalResults
+            .map((result, index) => ({ result, index }))
+            .filter(({ index }) => {
+                const checkbox = document.querySelector(`.card-checkbox[data-index="${index}"]`);
+                return checkbox && checkbox.checked;
+            })
+            .map(({ result, index }) => {
+                // For existing cards, always use quantity = 1 (adds +1 to inventory)
+                // For new cards, use the user-specified quantity
+                let quantity = 1;
+                if (!result.exists) {
+                    const quantityInput = document.querySelector(`input[type="number"][data-index="${index}"]`);
+                    if (quantityInput) {
+                        const parsedQty = parseInt(quantityInput.value);
+                        quantity = (!isNaN(parsedQty) && parsedQty > 0) ? parsedQty : 1;
+                    }
+                }
+
+                return {
+                    ...result,
+                    quantity: quantity
+                };
+            });
+
+        if (cardsToConfirm.length === 0) {
+            alert('No cards selected');
+            loading.classList.add('hidden');
+            return;
+        }
+
+
+        try {
+            console.log('[BULK] Confirm button clicked');
+            console.log('[BULK] Cards to confirm:', cardsToConfirm);
+
+            const response = await fetch('/admin/bulk-upload/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cards: cardsToConfirm })
+            });
+
+            console.log('[BULK] Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[BULK] Error response:', errorText);
+                throw new Error('Confirmation failed');
+            }
+
+            const results = await response.json();
+            console.log('[BULK] Results:', results);
+
+            alert('Cards processed successfully!');
+            window.location.reload();
+        } catch (error) {
+            console.error('[BULK] Error:', error);
+            alert('Error during confirmation: ' + error.message);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    });
+
+    // Cancel button handler
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+        window.location.reload();
+    });
+
+    // Select/Deselect all cards
+    function toggleAllCards(checkbox) {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    function selectAllCards() {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        checkboxes.forEach(cb => cb.checked = true);
+        document.getElementById('select-all-checkbox').checked = true;
+    }
+
+    function deselectAllCards() {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+        document.getElementById('select-all-checkbox').checked = false;
+    }
+
+    // Delete selected cards
+    function deleteSelectedCards() {
+        const checkboxes = document.querySelectorAll('.card-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert('No cards selected');
+            return;
+        }
+
+        if (!confirm(`Delete ${checkboxes.length} selected card(s)?`)) {
+            return;
+        }
+
+        // Get indices to delete (in reverse order to avoid index shifting)
+        const indicesToDelete = Array.from(checkboxes)
+            .map(cb => parseInt(cb.dataset.index))
+            .sort((a, b) => b - a);
+
+        // Remove from appraisalResults
+        indicesToDelete.forEach(index => {
+            appraisalResults.splice(index, 1);
+        });
+
+        // Refresh display
+        displayResults();
+    }
+
+    // Reappraise a single card
+    async function reappraiseCard(index) {
+        const result = appraisalResults[index];
+        if (!result) return;
+
+        const loading = document.getElementById('loading');
+        loading.classList.remove('hidden');
+
+        try {
+            // Get the image file from temp path
+            const imageUrl = result.image_url;
+
+            // Fetch the image
+            const imageResponse = await fetch(imageUrl);
+            const imageBlob = await imageResponse.blob();
+
+            // Create FormData and send for reappraisal
+            const formData = new FormData();
+            formData.append('images', imageBlob, result.filename);
+
+            const response = await fetch('/admin/bulk-upload/appraise', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Reappraisal failed');
+            }
+
+
+            const newResults = await response.json();
+            if (newResults.length > 0) {
+                const newCard = newResults[0];
+
+                // Check if the new result matches a different existing card
+                const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
+                const duplicateIndex = appraisalResults.findIndex((existing, idx) => {
+                    if (idx === index || existing.error) return false;
+                    const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
+                    return existingNumber === cardNumber && existing.exists === newCard.exists;
+                });
+
+                if (duplicateIndex !== -1) {
+                    // Found a duplicate - merge quantities into the duplicate and remove current card
+                    const duplicate = appraisalResults[duplicateIndex];
+                    const currentQuantity = result.quantity || result.duplicate_count || 1;
+                    const newQuantity = newCard.quantity || newCard.duplicate_count || 1;
+
+                    if (duplicate.exists) {
+                        // For existing cards, add to duplicate_count
+                        duplicate.duplicate_count = (duplicate.duplicate_count || 1) + currentQuantity;
+                        duplicate.quantity_increment = duplicate.duplicate_count;
+                    } else {
+                        // For new cards, add to quantity
+                        duplicate.quantity = (duplicate.quantity || 1) + currentQuantity;
+                    }
+
+                    // Remove the current card from the array
+                    appraisalResults.splice(index, 1);
+                    alert('Card merged with existing duplicate!');
+                } else {
+                    // No duplicate found - update in place and preserve quantity
+                    const oldQuantity = result.quantity;
+                    const oldDuplicateCount = result.duplicate_count;
+                    const oldQuantityIncrement = result.quantity_increment;
+
+                    // Replace the old result with new one
+                    appraisalResults[index] = newCard;
+
+                    // Restore quantity fields
+                    if (oldQuantity !== undefined) {
+                        appraisalResults[index].quantity = oldQuantity;
+                    }
+                    if (oldDuplicateCount !== undefined) {
+                        appraisalResults[index].duplicate_count = oldDuplicateCount;
+                    }
+                    if (oldQuantityIncrement !== undefined) {
+                        appraisalResults[index].quantity_increment = oldQuantityIncrement;
+                    }
+
+                    alert('Card reappraised successfully!');
+                }
+
+                displayResults();
+            }
+        } catch (error) {
+            alert('Error reappraising card: ' + error.message);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock %}
