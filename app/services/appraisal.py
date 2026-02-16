@@ -79,7 +79,10 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
 1. **Card Name (Japanese)**: The Japanese name if visible
 2. **Card Name (English)**: The English name or romanization
 3. **Set Code**: The short set code visible on the card
-   - Pokémon: Look at bottom left near card number (e.g., "SV5M", "sA", "XY")
+   - Pokémon: Look at bottom left near card number (e.g., "SV5M", "sA", "s10b")
+     * The set code is usually in a small box or icon
+     * DO NOT include single letters after the set code (e.g., "F", "G", "H" are regulation marks, not part of set code)
+     * Example: If you see "s10b F 027/071", the set code is "s10b" (NOT "s10b F")
    - One Piece: Extract from card number prefix (e.g., "OP12" from "OP12-008")
    - Just read what you see - do NOT expand to full set names
    
