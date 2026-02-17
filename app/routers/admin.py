@@ -1797,6 +1797,23 @@ async def bulk_upload_appraise(
                 except Exception as price_error:
                     safe_print(f"[BULK_UPLOAD] Could not fetch price: {price_error}")
             
+            
+            # Encode image as base64 for reliable display (fixes 404 issues)
+            import base64
+            with open(temp_path, "rb") as f:
+                image_bytes = f.read()
+                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Detect MIME type from file extension
+            file_ext = Path(image_file.filename).suffix.lower()
+            mime_type = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+            }.get(file_ext, 'image/jpeg')
+            
             results.append({
                 "card_name": card_name,
                 "set_name": set_name,
@@ -1809,14 +1826,16 @@ async def bulk_upload_appraise(
                 "shopify_variant_id": shopify_variant_id,
                 "shopify_inventory_item_id": shopify_inventory_item_id,
                 "current_quantity": current_quantity,
-                "image_url": f"/static/uploads/temp/{temp_filename}",
+                "image_url": f"/static/uploads/temp/{temp_filename}",  # Keep for backward compatibility
+                "image_base64": image_base64,  # NEW: base64 encoded image
+                "image_mime_type": mime_type,  # NEW: MIME type for base64
                 "temp_path": str(temp_path.absolute()),  # Use absolute path
                 "filename": image_file.filename,
                 # Additional AI-extracted details for description
                 "year": appraisal_result.get("year"),
                 "card_name_japanese": appraisal_result.get("card_name_japanese"),
                 "card_name_english": appraisal_result.get("card_name_english")
-            })\
+            })
             
         except Exception as e:
             safe_print(f"[BULK_UPLOAD] Error appraising {image_file.filename}: {e}")

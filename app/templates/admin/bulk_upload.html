@@ -130,6 +130,13 @@
     });
 
     function handleFiles(files) {
+        // Limit to 50 cards per upload
+        if (files.length > 50) {
+            alert('Maximum 50 cards allowed per upload. Please select fewer files.');
+            fileInput.value = ''; // Clear file input
+            return;
+        }
+
         uploadedFiles = Array.from(files);
         displayFileList();
         appraiseBtn.disabled = uploadedFiles.length === 0;
@@ -244,12 +251,17 @@
                     </td>
                 `;
             } else {
+                // Use base64 image if available, fallback to URL
+                const imageSrc = result.image_base64
+                    ? `data:${result.image_mime_type || 'image/jpeg'};base64,${result.image_base64}`
+                    : result.image_url;
+
                 row.innerHTML = `
                     <td class="px-4 py-2">
                         <input type="checkbox" class="card-checkbox w-4 h-4" data-index="${index}" checked>
                     </td>
                     <td class="px-4 py-2">
-                        <img src="${result.image_url}" class="w-16 h-16 object-cover rounded">
+                        <img src="${imageSrc}" class="w-16 h-16 object-cover rounded">
                     </td>
                     <td class="px-4 py-2 text-gray-900">${result.card_name || 'Unknown'}</td>
                     <td class="px-4 py-2 text-gray-900">${result.set_name || '-'}</td>
@@ -407,18 +419,26 @@
         loading.classList.remove('hidden');
 
         try {
-            // Get the image file from temp path
-            const imageUrl = result.image_url;
+            let imageBlob;
 
-            // Fetch the image
-            const imageResponse = await fetch(imageUrl);
-
-            // Check if fetch was successful
-            if (!imageResponse.ok) {
-                throw new Error(`Image not found (${imageResponse.status}). The temp file may have been deleted. Please re-upload the image.`);
+            // Use base64 if available, otherwise fetch from URL
+            if (result.image_base64) {
+                // Convert base64 to blob
+                const byteCharacters = atob(result.image_base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                imageBlob = new Blob([byteArray], { type: result.image_mime_type || 'image/jpeg' });
+            } else {
+                // Fallback: fetch from temp file URL
+                const imageResponse = await fetch(result.image_url);
+                if (!imageResponse.ok) {
+                    throw new Error(`Image not found (${imageResponse.status}). The temp file may have been deleted. Please re-upload the image.`);
+                }
+                imageBlob = await imageResponse.blob();
             }
-
-            const imageBlob = await imageResponse.blob();
 
             // Verify blob size (should be larger than 1KB for a real image)
             if (imageBlob.size < 1024) {
