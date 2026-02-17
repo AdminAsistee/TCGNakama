@@ -461,19 +461,42 @@
 
             const newResults = await response.json();
             if (newResults && newResults.length > 0) {
-                // Update the result in place
                 const newResult = newResults[0];
 
-                // Preserve selection state
-                newResult.selected = result.selected;
+                // Check if this card is a duplicate of another card in the results
+                const cardNumber = (newResult.card_number || newResult.card_name || '').toLowerCase().trim();
+                const existingIndex = appraisalResults.findIndex((existing, idx) => {
+                    if (idx === index) return false; // Skip the card we're reappraising
+                    const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
+                    // Only merge if card numbers match AND exists status is the same
+                    return existingNumber === cardNumber && !existing.error && existing.exists === newResult.exists;
+                });
 
-                // Update in array
-                appraisalResults[index] = newResult;
+                if (existingIndex !== -1) {
+                    // Duplicate found - merge with existing card and remove the reappraised one
+                    const existing = appraisalResults[existingIndex];
+                    if (existing.exists) {
+                        // For existing cards, increment duplicate_count
+                        existing.duplicate_count = (existing.duplicate_count || 1) + (newResult.duplicate_count || 1);
+                        existing.quantity_increment = existing.duplicate_count;
+                    } else {
+                        // For new cards, increment quantity
+                        existing.quantity = (existing.quantity || 1) + (newResult.quantity || 1);
+                    }
+
+                    // Remove the reappraised card (it's now merged)
+                    appraisalResults.splice(index, 1);
+
+                    alert('Card reappraised and merged with existing duplicate!');
+                } else {
+                    // No duplicate - update in place
+                    newResult.selected = result.selected;
+                    appraisalResults[index] = newResult;
+                    alert('Card reappraised successfully!');
+                }
 
                 // Re-render the table
                 displayResults();
-
-                alert('Card reappraised successfully!');
             }
         } catch (error) {
             console.error('Reappraisal error:', error);

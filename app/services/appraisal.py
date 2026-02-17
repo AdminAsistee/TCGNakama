@@ -76,38 +76,87 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
             # Build the prompt for card identification
             prompt = """Analyze this trading card image and extract the following information EXACTLY as it appears:
 
-1. **Card Name (Japanese)**: The Japanese name if visible
-2. **Card Name (English)**: The English name or romanization
-3. **Set Code**: The short set code visible on the card
-   - Pokémon: Look at bottom left near card number (e.g., "SV5M", "sA", "s10b")
+1. **Card Type**: Identify the card type first
+   - If you see "TRAINER" header → return "Trainer"
+   - If you see "ENERGY" → return "Energy"
+   - Otherwise → return "Pokemon"
+
+2. **Card Name (Japanese)**: The Japanese name if visible
+3. **Card Name (English)**: ALWAYS provide the English name
+   - If you see English text on the card, extract it
+   - If only Japanese is visible, you MUST translate it or provide the known English name
+   - For Pokémon cards: Pikachu, Gengar, Ho-Oh, etc. - provide the English Pokémon name
+   - For Trainer cards: Translate the Japanese name (e.g., にせオーキドの逆襲 = Impostor Oak's Revenge)
+   - This field should NEVER be empty for known cards
+
+4. **Set Code**: The short set code visible on the card
+   - MODERN Pokémon (2016+): Look at bottom left near card number (e.g., "SV5M", "sA", "s10b")
      * The set code is usually in a small box or icon
      * DO NOT include single letters after the set code (e.g., "F", "G", "H" are regulation marks, not part of set code)
      * Example: If you see "s10b F 027/071", the set code is "s10b" (NOT "s10b F")
+   - PROMO cards: If the card number ends with "/P" (e.g., "010/P", "026/P"), use "PROMO" as the set name
+   - VINTAGE Pokémon (pre-2016): May not have a set code
+     * CRITICAL: If you see a rainbow/prismatic holographic effect on the card, use "Prism" as the set name
+     * Otherwise return "" if no set code found
    - One Piece: Extract from card number prefix (e.g., "OP12" from "OP12-008")
-   - Just read what you see - do NOT expand to full set names
    
-4. **Card Number**: The collector number (e.g., "023/071", "OP12-008")
-5. **Rarity**: Rarity symbol or text (Common, Rare, SR, etc.)
-6. **Year**: Copyright year if visible
-7. **Manufacturer**: Publisher name if visible
+5. **Card Number**: The collector number - CRITICAL RULES
+   - ONLY extract standard formats: "###/###", "###/P", or standalone numbers like "26"
+   - DO NOT extract ID formats like "ID: Z-06-#" or "ID: X-XX-X"
+   - IGNORE any text that starts with "ID:" completely
+   - Look at bottom right corner for the card number
+   - If you only see "ID: ..." format and NO standard number, return "" (empty string)
+   - Examples of VALID formats: "010/P", "027/071", "26", "094"
+   - Examples of INVALID formats: "ID: Z-06-#", "ID: anything"
 
-IMPORTANT:
-- Extract text EXACTLY as printed - no lookups, no expansions
-- For set code, just read the short code on the card
-- If something is not visible, use null
+6. **Rarity**: Rarity symbol or text (Common, Rare, SR, etc.)
+   - Look for: ◆ (Common), ● (Uncommon), ★ (Rare), R, C, U, SR, UR
+   - Trainer cards often have "R" in bottom corner
+   - IMPORTANT: If you detect Prism variant (see #7), the rarity is ALWAYS "Ultra Rare" or "★"
+
+7. **Special Variants**: CRITICAL - EXAMINE THE CARD VERY CAREFULLY
+   - **Prism Cards** - Look for MULTIPLE indicators:
+     * VISUAL: Rainbow/prismatic holographic pattern across the ENTIRE card surface
+     * The card background, borders, and text areas shimmer with rainbow colors
+     * NOT just the artwork - the WHOLE card has a rainbow sheen
+     * Common Prism cards: Gengar, Tyranitar, Celebi, Entei, Raikou, Suicune
+     * If the card is Gengar and looks vintage (pre-2003), it's VERY LIKELY Prism
+     * If you see ANY rainbow holographic effect, return "Prism"
+   - Crystal: Transparent/crystalline artwork effect (card looks see-through)
+   - Reverse Holo: Holographic background with normal artwork
+   - 1st Edition: "1st Edition" stamp visible
+   - Return as comma-separated string or ""
+
+8. **Year**: Copyright year if visible
+9. **Manufacturer**: Publisher name if visible
+
+IMPORTANT RULES:
+- ALWAYS provide English names for known Pokémon and Trainer cards
+- NEVER extract "ID:" format card numbers - only standard formats
+- If card number ends with "/P", set the set_name to "PROMO"
+- CRITICAL: For vintage Gengar cards, check VERY CAREFULLY for rainbow holographic effects (Prism)
+- If Prism variant detected, set rarity to "Ultra Rare" and set_name to "Prism"
+- Use "" (empty string) for missing data, NEVER use null
 
 Return ONLY a JSON object:
 {
-  "card_name_japanese": "string or null",
-  "card_name_english": "string or null",
-  "set_name": "string (short code)",
-  "card_number": "string",
-  "rarity": "string",
-  "year": "string or null",
-  "manufacturer": "string or null"
+  "card_type": "Pokemon" or "Trainer" or "Energy",
+  "card_name_japanese": "string or \"\"",
+  "card_name_english": "string or \"\"",
+  "set_name": "string or \"\"",
+  "card_number": "string or \"\"",
+  "rarity": "string or \"\"",
+  "special_variants": "string or \"\" (comma-separated)",
+  "year": "string or \"\"",
+  "manufacturer": "string or \"\""
 }
 
 No markdown, just raw JSON."""
+
+
+
+
+
 
             # Generate content with image
             response = model.generate_content([prompt, img])
@@ -125,6 +174,58 @@ No markdown, just raw JSON."""
             
             card_data = json.loads(response_text)
             
+            # Convert null values to empty strings
+            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants']:
+                if card_data.get(key) is None or card_data.get(key) == 'null':
+                    card_data[key] = ''
+            
+            # Post-processing: Filter out ID format card numbers
+            card_number = card_data.get('card_number', '')
+            if card_number and card_number.upper().startswith('ID:'):
+                # Remove ID format completely
+                card_data['card_number'] = ''
+                card_number = ''
+            
+            # Post-processing: Detect PROMO set from card number
+            set_name = card_data.get('set_name', '')
+            if card_number and card_number.endswith('/P') and not set_name:
+                card_data['set_name'] = 'PROMO'
+                set_name = 'PROMO'
+            
+            # Extract card type (new field)
+            card_type = card_data.get('card_type', 'Pokemon')
+            
+            # Extract and parse special variants
+            special_variants_str = card_data.get('special_variants', '')
+            special_variants = [v.strip() for v in special_variants_str.split(',') if v.strip()]
+            
+            # Get set name and card number
+            set_name = card_data.get('set_name', '')
+            card_number = card_data.get('card_number', '')
+            
+            # Post-processing: If Prism variant detected and no set name, use "Prism" as set name
+            if 'Prism' in special_variants and not set_name:
+                set_name = 'Prism'
+                card_data['set_name'] = 'Prism'
+            
+            # Heuristic: Detect likely Prism cards based on known Prism Pokemon
+            # This is a fallback when visual detection fails
+            prism_pokemon = ['gengar', 'tyranitar', 'celebi', 'entei', 'raikou', 'suicune', 
+                           'ho-oh', 'lugia', 'crobat', 'houndoom', 'kabutops', 'steelix']
+            card_name_en_lower = card_data.get('card_name_english', '').lower()
+            
+            # If it's a known Prism Pokemon, vintage (no modern set code), and no set name yet
+            # Check: no set name AND (no card number OR card number doesn't have modern format)
+            is_vintage = not card_number or '/' not in card_number
+            if (any(pokemon in card_name_en_lower for pokemon in prism_pokemon) and 
+                not set_name and 
+                is_vintage):
+                # Likely a Prism card
+                set_name = 'Prism'
+                card_data['set_name'] = 'Prism'
+                if 'Prism' not in special_variants:
+                    special_variants.append('Prism')
+
             
             # Map rarity to internal system
             rarity_mapping = {
@@ -151,6 +252,12 @@ No markdown, just raw JSON."""
                 # Yu-Gi-Oh!
                 'super rare': 'Epic',
                 'starlight rare': 'Ultra Rare',
+                # Vintage special variants
+                'prism': 'Ultra Rare',
+                'crystal': 'Ultra Rare',
+                'shining': 'Ultra Rare',
+                'gold star': 'Ultra Rare',
+                '★': 'Ultra Rare',
                 # Generic
                 'epic': 'Epic',
             }
@@ -163,49 +270,78 @@ No markdown, just raw JSON."""
             else:
                 mapped_rarity = 'Common'
             
-            # Build formatted card name: "Japanese / English [Set] #CardNumber"
+            # Upgrade rarity if special variants detected
+            if special_variants:
+                special_variant_lower = [v.lower() for v in special_variants]
+                if any(v in ['prism', 'crystal', 'shining', 'gold star'] for v in special_variant_lower):
+                    mapped_rarity = 'Ultra Rare'
+            
+            # Build formatted card name based on card type
             card_name_jp = card_data.get('card_name_japanese', '')
             card_name_en = card_data.get('card_name_english', '')
             set_name = card_data.get('set_name', '')
             card_number = card_data.get('card_number', '')
             
-            # Format the card name: "Japanese (English) - Set #CardNumber"
+            # Format the card name differently based on card type
             name_parts = []
-            if card_name_jp and card_name_en and card_name_jp != card_name_en:
-                # Both Japanese and English available
-                name_parts.append(f"{card_name_jp} ({card_name_en})")
-            elif card_name_jp:
-                # Only Japanese
-                name_parts.append(card_name_jp)
-            elif card_name_en:
-                # Only English
-                name_parts.append(card_name_en)
             
-            # Add set name with dash separator if available
-            if set_name:
-                name_parts.append(f"- {set_name}")
+            if card_type == 'Trainer':
+                # Trainer cards: "Japanese (English) #CardNumber"
+                if card_name_jp and card_name_en and card_name_jp != card_name_en:
+                    name_parts.append(f"{card_name_jp} ({card_name_en})")
+                elif card_name_jp:
+                    name_parts.append(card_name_jp)
+                elif card_name_en:
+                    name_parts.append(card_name_en)
+                
+                # Add card number if available (no "- Trainer" label)
+                if card_number:
+                    formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
+                    name_parts.append(formatted_number)
+                
+                formatted_card_name = ' '.join(name_parts) if name_parts else 'Unknown Trainer'
             
-            # Add card number with # prefix if available
-            if card_number:
-                # Ensure card number has # prefix
-                formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
-                name_parts.append(formatted_number)
+            else:
+                # Pokemon/Energy cards
+                if card_name_jp and card_name_en and card_name_jp != card_name_en:
+                    name_parts.append(f"{card_name_jp} ({card_name_en})")
+                elif card_name_jp:
+                    name_parts.append(card_name_jp)
+                elif card_name_en:
+                    name_parts.append(card_name_en)
+                
+                # Add set name if available, otherwise use fallback for vintage cards
+                if set_name:
+                    name_parts.append(f"- {set_name}")
+                elif card_data.get('year'):
+                    # Vintage card with year but no set code
+                    name_parts.append(f"- Vintage {card_data['year']}")
+                elif special_variants:
+                    # Special variant without set (e.g., Prism)
+                    name_parts.append(f"- {special_variants[0]}")
+                
+                # Add card number if available
+                if card_number:
+                    formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
+                    name_parts.append(formatted_number)
+                
+                formatted_card_name = ' '.join(name_parts) if name_parts else 'Unknown Card'
             
-            # Combine all parts
-            formatted_card_name = ' '.join(name_parts) if name_parts else 'Unknown Card'
-            
-            # Build result
+            # Build result with new fields
             result = {
                 'card_name': formatted_card_name,
-                'set_name': set_name,
-                'card_number': card_number,
+                'card_type': card_type,
+                'set_name': set_name if set_name else '',  # Ensure empty string, not None
+                'card_number': card_number if card_number else '',  # Ensure empty string, not None
                 'rarity': mapped_rarity,
-                'year': card_data.get('year'),
-                'manufacturer': card_data.get('manufacturer'),
+                'special_variants': special_variants,  # List of special variants
+                'year': card_data.get('year', ''),
+                'manufacturer': card_data.get('manufacturer', ''),
                 'raw_rarity': extracted_rarity,  # Include original for debugging
                 'card_name_japanese': card_name_jp,  # Keep for reference
                 'card_name_english': card_name_en   # Keep for reference
             }
+
             
             safe_print(f"[APPRAISE_IMAGE] Extracted: {result}")
             return result
@@ -768,13 +904,19 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
         from bs4 import BeautifulSoup
         import re
         
-        search_name = card_name.split('(')[0].strip()
+        # Extract English name only (remove Japanese part)
+        if '(' in card_name and ')' in card_name:
+            # Format: "Japanese (English)" → extract "English"
+            english_part = card_name.split('(')[1].split(')')[0].strip()
+            search_name = english_part
+        else:
+            search_name = card_name.split('(')[0].strip()
         
         # Build SPECIFIC search query - must include card number
         # We want accurate pricing, not generic fallbacks
         query_parts = [search_name]
         
-        if set_name and set_name != "Unknown":
+        if set_name and set_name not in ["Unknown", ""]:
             query_parts.append(set_name)
         
         # Require card number to make search specific
@@ -782,8 +924,11 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
             safe_print(f"[APPRAISE] PriceCharting: Skipping - no card number")
             return None
         
-        # Strip # symbol from card number (PriceCharting doesn't use it)
-        clean_card_number = card_number.replace('#', '')
+        # Add # symbol to card number for PriceCharting
+        if not card_number.startswith('#'):
+            clean_card_number = f"#{card_number}"
+        else:
+            clean_card_number = card_number
         query_parts.append(clean_card_number)
         
         # Use proper URL encoding

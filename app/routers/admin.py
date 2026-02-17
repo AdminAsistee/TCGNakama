@@ -1845,7 +1845,7 @@ async def bulk_upload_appraise(
                 "filename": image_file.filename
             })
     
-    # Merge duplicates: group by card_number and sum quantities
+    # Merge duplicates: group by card_number and card_name combination
     merged_results = {}
     for result in results:
         # Skip error results
@@ -1854,10 +1854,23 @@ async def bulk_upload_appraise(
             
         card_number = result.get("card_number", "")
         card_name = result.get("card_name", "")
+        set_name = result.get("set_name", "")
         
-        # Use card_number as unique key, fallback to card_name if no number
-        # Make it case-insensitive by converting to lowercase
-        unique_key = (card_number if card_number else card_name).lower().strip()
+        # Create a unique key based on card number AND card name (for better matching)
+        # This handles cases where the same card gets slightly different appraisals
+        # Priority: card_number > (card_name + set_name) > card_name
+        if card_number:
+            # Use card number as primary key
+            unique_key = f"num:{card_number}".lower().strip()
+        elif card_name and set_name:
+            # Use card name + set combination
+            unique_key = f"name:{card_name}|set:{set_name}".lower().strip()
+        elif card_name:
+            # Fallback to just card name
+            unique_key = f"name:{card_name}".lower().strip()
+        else:
+            # No identifying information, treat as unique
+            unique_key = f"unique:{id(result)}"
         
         if unique_key in merged_results:
             # Duplicate found - increment quantity
