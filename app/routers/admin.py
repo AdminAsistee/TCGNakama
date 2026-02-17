@@ -2049,12 +2049,9 @@ async def bulk_confirm(
                         "error": f"Failed to create product: {str(create_error)}"
                     })
             
-            # Clean up temp file
-            if temp_path and Path(temp_path).exists():
-                try:
-                    Path(temp_path).unlink()
-                except Exception as cleanup_error:
-                    safe_print(f"[BULK_UPLOAD] Error cleaning up temp file: {cleanup_error}")
+            
+            # Don't delete temp files immediately - let the 3-day cleanup handle it
+            # This allows reappraisal to work without re-uploading images
                 
         except Exception as e:
             safe_print(f"[BULK_UPLOAD] Error processing {card.get('card_name', 'unknown')}: {e}")
