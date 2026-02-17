@@ -439,18 +439,27 @@
             }
 
             const newResults = await response.json();
-        }
+            if (newResults && newResults.length > 0) {
+                // Update the result in place
+                const newResult = newResults[0];
 
-        alert('Card reappraised successfully!');
-    }
+                // Preserve selection state
+                newResult.selected = result.selected;
 
-    displayResults();
+                // Update in array
+                appraisalResults[index] = newResult;
+
+                // Re-render the table
+                renderResults();
+
+                alert('Card reappraised successfully!');
             }
         } catch (error) {
-        alert('Error reappraising card: ' + error.message);
-    } finally {
-        loading.classList.add('hidden');
-    }
+            console.error('Reappraisal error:', error);
+            alert(`Failed to reappraise card: ${error.message}`);
+        } finally {
+            loading.classList.add('hidden');
+        }
     }
 </script>
 {% endblock %}
