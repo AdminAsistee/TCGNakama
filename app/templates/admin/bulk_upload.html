@@ -92,9 +92,10 @@
 
     <!-- Loading Indicator -->
     <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6">
+        <div class="bg-white rounded-lg p-6 min-w-[200px] text-center">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="mt-4 text-gray-700">Processing...</p>
+            <p id="loading-text" class="mt-4 text-gray-700">Processing...</p>
+            <p id="loading-progress" class="mt-2 text-sm text-gray-500"></p>
         </div>
     </div>
 </div>
@@ -167,57 +168,71 @@
         if (uploadedFiles.length === 0) return;
 
         const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const loadingProgress = document.getElementById('loading-progress');
         loading.classList.remove('hidden');
 
-        const formData = new FormData();
-        uploadedFiles.forEach(file => {
-            formData.append('images', file);
-        });
+        const totalCards = uploadedFiles.length;
+        let processedCards = 0;
 
         try {
-            const response = await fetch('/admin/bulk-upload/appraise', {
-                method: 'POST',
-                body: formData
-            });
+            // Process cards one by one to show progress
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
 
+                // Update progress
+                processedCards = i + 1;
+                loadingText.textContent = 'Processing cards...';
+                loadingProgress.textContent = `${processedCards}/${totalCards}`;
 
-            if (!response.ok) {
-                throw new Error('Appraisal failed');
-            }
+                // Create FormData for single card
+                const formData = new FormData();
+                formData.append('images', file);
 
-            const newResults = await response.json();
-
-            // Merge new results with existing results, detecting duplicates
-            newResults.forEach(newCard => {
-                if (newCard.error) {
-                    appraisalResults.push(newCard);
-                    return;
-                }
-
-                // Find existing card with same card_number (case-insensitive)
-                const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
-                const existingIndex = appraisalResults.findIndex(existing => {
-                    const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
-                    // Only merge if card numbers match AND exists status is the same
-                    return existingNumber === cardNumber && !existing.error && existing.exists === newCard.exists;
+                const response = await fetch('/admin/bulk-upload/appraise', {
+                    method: 'POST',
+                    body: formData
                 });
 
-                if (existingIndex !== -1) {
-                    // Duplicate found - merge quantities
-                    const existing = appraisalResults[existingIndex];
-                    if (existing.exists) {
-                        // For existing cards, increment duplicate_count
-                        existing.duplicate_count = (existing.duplicate_count || 1) + (newCard.duplicate_count || 1);
-                        existing.quantity_increment = existing.duplicate_count;
-                    } else {
-                        // For new cards, increment quantity
-                        existing.quantity = (existing.quantity || 1) + (newCard.quantity || 1);
-                    }
-                } else {
-                    // New unique card
-                    appraisalResults.push(newCard);
+                if (!response.ok) {
+                    throw new Error(`Appraisal failed for ${file.name}`);
                 }
-            });
+
+                const newResults = await response.json();
+
+                // Merge new results with existing results, detecting duplicates
+                newResults.forEach(newCard => {
+                    if (newCard.error) {
+                        appraisalResults.push(newCard);
+                        return;
+                    }
+
+                    // Find existing card with same card_number (case-insensitive)
+                    const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
+                    const existingIndex = appraisalResults.findIndex(existing => {
+                        const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
+                        // Only merge if card numbers match AND exists status is the same
+                        return existingNumber === cardNumber && !existing.error && existing.exists === newCard.exists;
+                    });
+
+                    if (existingIndex !== -1) {
+                        // Duplicate found - merge quantities
+                        const existing = appraisalResults[existingIndex];
+                        if (existing.exists) {
+                            // For existing cards, increment duplicate_count
+                            existing.duplicate_count = (existing.duplicate_count || 1) + (newCard.duplicate_count || 1);
+                            existing.quantity_increment = existing.duplicate_count;
+                        } else {
+                            // For new cards, increment quantity
+                            existing.quantity = (existing.quantity || 1) + (newCard.quantity || 1);
+                        }
+                    } else {
+                        // New unique card
+                        appraisalResults.push(newCard);
+                    }
+                });
+            }
+
             displayResults();
 
             // Clear the file input and uploaded files
@@ -233,6 +248,7 @@
             alert('Error during appraisal: ' + error.message);
         } finally {
             loading.classList.add('hidden');
+            loadingProgress.textContent = '';
         }
     });
 
@@ -298,6 +314,8 @@
     // Confirm button handler
     document.getElementById('confirm-btn').addEventListener('click', async () => {
         const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const loadingProgress = document.getElementById('loading-progress');
         loading.classList.remove('hidden');
 
         const cardsToConfirm = appraisalResults
@@ -330,6 +348,9 @@
             return;
         }
 
+        // Update progress
+        loadingText.textContent = 'Adding cards to inventory...';
+        loadingProgress.textContent = `Processing ${cardsToConfirm.length} card(s)`;
 
         try {
             console.log('[BULK] Confirm button clicked');
@@ -417,7 +438,11 @@
         if (!result) return;
 
         const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const loadingProgress = document.getElementById('loading-progress');
         loading.classList.remove('hidden');
+        loadingText.textContent = 'Reappraising card...';
+        loadingProgress.textContent = '';
 
         try {
             let imageBlob;
