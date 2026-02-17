@@ -1755,6 +1755,7 @@ async def bulk_upload_appraise(
             
             # Extract card details
             card_name = appraisal_result.get("card_name", "Unknown")
+            card_name_english = appraisal_result.get("card_name_english", card_name)  # Use English name for PriceCharting
             set_name = appraisal_result.get("set_name", "")
             card_number = appraisal_result.get("card_number", "")
             rarity = appraisal_result.get("rarity", "")
@@ -1786,7 +1787,7 @@ async def bulk_upload_appraise(
             if not exists:
                 try:
                     price_result = await appraisal.get_market_value_jpy(
-                        card_name=card_name,
+                        card_name=card_name_english,  # Use English name for PriceCharting search
                         rarity=rarity,
                         set_name=set_name,
                         card_number=card_number
