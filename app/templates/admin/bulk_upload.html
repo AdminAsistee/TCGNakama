@@ -412,7 +412,18 @@
 
             // Fetch the image
             const imageResponse = await fetch(imageUrl);
+
+            // Check if fetch was successful
+            if (!imageResponse.ok) {
+                throw new Error(`Image not found (${imageResponse.status}). The temp file may have been deleted. Please re-upload the image.`);
+            }
+
             const imageBlob = await imageResponse.blob();
+
+            // Verify blob size (should be larger than 1KB for a real image)
+            if (imageBlob.size < 1024) {
+                throw new Error('Image file is too small or corrupted. Please re-upload the image.');
+            }
 
             // Create FormData and send for reappraisal
             const formData = new FormData();
@@ -427,67 +438,19 @@
                 throw new Error('Reappraisal failed');
             }
 
-
             const newResults = await response.json();
-            if (newResults.length > 0) {
-                const newCard = newResults[0];
+        }
 
-                // Check if the new result matches a different existing card
-                const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
-                const duplicateIndex = appraisalResults.findIndex((existing, idx) => {
-                    if (idx === index || existing.error) return false;
-                    const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
-                    return existingNumber === cardNumber && existing.exists === newCard.exists;
-                });
+        alert('Card reappraised successfully!');
+    }
 
-                if (duplicateIndex !== -1) {
-                    // Found a duplicate - merge quantities into the duplicate and remove current card
-                    const duplicate = appraisalResults[duplicateIndex];
-                    const currentQuantity = result.quantity || result.duplicate_count || 1;
-                    const newQuantity = newCard.quantity || newCard.duplicate_count || 1;
-
-                    if (duplicate.exists) {
-                        // For existing cards, add to duplicate_count
-                        duplicate.duplicate_count = (duplicate.duplicate_count || 1) + currentQuantity;
-                        duplicate.quantity_increment = duplicate.duplicate_count;
-                    } else {
-                        // For new cards, add to quantity
-                        duplicate.quantity = (duplicate.quantity || 1) + currentQuantity;
-                    }
-
-                    // Remove the current card from the array
-                    appraisalResults.splice(index, 1);
-                    alert('Card merged with existing duplicate!');
-                } else {
-                    // No duplicate found - update in place and preserve quantity
-                    const oldQuantity = result.quantity;
-                    const oldDuplicateCount = result.duplicate_count;
-                    const oldQuantityIncrement = result.quantity_increment;
-
-                    // Replace the old result with new one
-                    appraisalResults[index] = newCard;
-
-                    // Restore quantity fields
-                    if (oldQuantity !== undefined) {
-                        appraisalResults[index].quantity = oldQuantity;
-                    }
-                    if (oldDuplicateCount !== undefined) {
-                        appraisalResults[index].duplicate_count = oldDuplicateCount;
-                    }
-                    if (oldQuantityIncrement !== undefined) {
-                        appraisalResults[index].quantity_increment = oldQuantityIncrement;
-                    }
-
-                    alert('Card reappraised successfully!');
-                }
-
-                displayResults();
+    displayResults();
             }
         } catch (error) {
-            alert('Error reappraising card: ' + error.message);
-        } finally {
-            loading.classList.add('hidden');
-        }
+        alert('Error reappraising card: ' + error.message);
+    } finally {
+        loading.classList.add('hidden');
+    }
     }
 </script>
 {% endblock %}
