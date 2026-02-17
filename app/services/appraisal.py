@@ -1065,13 +1065,38 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
             
             safe_print(f"[APPRAISE] PriceCharting: Found {len(results)} total results")
             
-            # Pre-filter by card number to reduce noise
+            # Progressive filtering approach:
+            # 1. Filter by card name
+            # 2. Filter by set name (if provided)
+            # 3. Filter by card number
+            # 4. Use Gemini to filter variants
+            # 5. Filter by Japanese language
+            # 6. Select cheapest
+            
+            filtered_results = results
+            
+            # Step 1: Filter by card name (fuzzy match)
+            name_matches = [r for r in filtered_results if search_name.lower() in r['name'].lower()]
+            if name_matches:
+                safe_print(f"[APPRAISE] Filtered by card name '{search_name}': {len(name_matches)} matches")
+                filtered_results = name_matches
+            else:
+                safe_print(f"[APPRAISE] No card name matches for '{search_name}', keeping all results")
+            
+            # Step 2: Filter by set name (if provided)
+            if set_name and set_name not in ["Unknown", ""]:
+                set_matches = [r for r in filtered_results if set_name.lower() in r['name'].lower()]
+                if set_matches:
+                    safe_print(f"[APPRAISE] Filtered by set name '{set_name}': {len(set_matches)} matches")
+                    filtered_results = set_matches
+                else:
+                    safe_print(f"[APPRAISE] No set name matches for '{set_name}', keeping previous results")
+            
+            # Step 3: Filter by card number
             # Extract just the number part (e.g., "OP13-001" from "#OP13-001")
             clean_number = card_number.replace('#', '').strip()
             
             # Extract the main card number (before the slash if present)
-            # e.g., "014/071" -> "014" or "14"
-            # e.g., "OP13-001" -> "OP13-001"
             main_number = clean_number.split('/')[0] if '/' in clean_number else clean_number
             
             # Create variations to match (with and without leading zeros)
@@ -1087,11 +1112,9 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
             
             # Filter results that contain any variation of the card number
             number_matches = []
-            for result in results:
+            for result in filtered_results:
                 result_name = result['name']
                 # Check if any variation appears in the result name
-                # For One Piece cards (OP13-001), match anywhere in string
-                # For numeric cards (#14), require # prefix or space separator
                 for var in number_variations:
                     # If variation contains letters (e.g., OP13-001), match anywhere
                     if any(c.isalpha() for c in var):
@@ -1104,16 +1127,16 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                         break
             
             if number_matches:
-                safe_print(f"[APPRAISE] Pre-filtered to {len(number_matches)} results with card number variations: {number_variations}")
-                results_to_filter = number_matches
+                safe_print(f"[APPRAISE] Filtered by card number {number_variations}: {len(number_matches)} matches")
+                filtered_results = number_matches
             else:
-                # Fallback: if no card number matches, use all results
-                safe_print(f"[APPRAISE] No card number matches found for variations {number_variations}, using all results")
-                results_to_filter = results[:20] if len(results) > 20 else results
+                # Fallback: if no card number matches, use previous results (limit to 20)
+                safe_print(f"[APPRAISE] No card number matches for {number_variations}, using previous results")
+                filtered_results = filtered_results[:20] if len(filtered_results) > 20 else filtered_results
             
-            # Use Gemini to filter matching cards (variant filtering)
+            # Step 4: Use Gemini to filter matching cards (variant filtering)
             import asyncio
-            matching_results = await _gemini_filter_cards(search_query, results_to_filter)
+            matching_results = await _gemini_filter_cards(search_query, filtered_results)
             
             if not matching_results:
                 safe_print(f"[APPRAISE] PriceCharting: No matching cards after Gemini filtering")
@@ -1138,7 +1161,6 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                                 detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
                                 
                                 # Look for the "Used" price on detail page
-                                # It's usually in a span with id="used-price" or similar
                                 used_price_elem = detail_soup.find('span', id='used-price')
                                 if not used_price_elem:
                                     # Try alternative selectors
@@ -1159,11 +1181,11 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                 
                 return None
             
-            # Filter by language before selecting cheapest
+            # Step 5: Filter by language
             safe_print(f"[APPRAISE] PriceCharting: Filtering by language: {'Japanese' if is_japanese else 'English'}")
             matching_results = _filter_by_language(matching_results, is_japanese)
             
-            # Return cheapest from matching results
+            # Step 6: Return cheapest from matching results
             cheapest = min(matching_results, key=lambda x: x['price'])
             safe_print(f"[APPRAISE] PriceCharting: Selected '{cheapest['name']}' at ${cheapest['price']}")
             return cheapest['price']
