@@ -830,7 +830,23 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 else:
                     safe_print(f"[PRICECHARTING_API] No card name matches found")
             
-            # Step 2: Filter by card number (if card number provided)
+            # Step 2: Filter by set name (if provided)
+            if set_name and set_name not in ["Unknown", ""]:
+                safe_print(f"[PRICECHARTING_API] Filtering by set name: '{set_name}'")
+                set_matches = []
+                for item in filtered_prices:
+                    # Check if set name appears in product name (case-insensitive)
+                    if set_name.upper() in item['name'].upper():
+                        set_matches.append(item)
+                        safe_print(f"[PRICECHARTING_API]   ✓ Set match: '{item['name']}'")
+                
+                if set_matches:
+                    safe_print(f"[PRICECHARTING_API] Filtered to {len(set_matches)} products matching set name")
+                    filtered_prices = set_matches
+                else:
+                    safe_print(f"[PRICECHARTING_API] No set name matches found, keeping previous results")
+            
+            # Step 3: Filter by card number (if card number provided)
             if card_number:
                 import re
                 
