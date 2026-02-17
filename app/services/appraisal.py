@@ -6,7 +6,7 @@ Integrates card appraisal logic with real-time currency conversion.
 """
 
 import httpx
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 import asyncio
 import os
@@ -439,9 +439,8 @@ async def _gemini_filter_cards(search_query: str, results: list[dict]) -> list[d
     """
     try:
         import google.generativeai as genai
-import os
-from typing import Optional, Dict, Any, List
-import json
+        import os
+        import json
         import re
         
         api_key = os.getenv("GEMINI_API_KEY")
@@ -525,14 +524,11 @@ If no cards match, return an empty array: []
         matching_results = [results[i-1] for i in matching_indices if 0 < i <= len(results)]
         
         safe_print(f"[APPRAISE] Gemini filtered {len(results)} results to {len(matching_results)} matches")
-        return matching_results
-        
+        return matching_results if matching_results else results
+    
     except Exception as e:
         safe_print(f"[APPRAISE] Gemini filtering error: {e}, using all results")
         return results  # Fallback to all results
-    return None
-
-
 
 
 def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
