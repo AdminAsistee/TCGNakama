@@ -78,8 +78,10 @@ async def shutdown_event():
     await stop_background_tasks()
     print("[SHUTDOWN] Application shutdown complete")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Mount static files with absolute path
+from pathlib import Path
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Include routers
 # Include routers
