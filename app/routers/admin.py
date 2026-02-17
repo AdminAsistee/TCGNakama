@@ -1967,17 +1967,13 @@ async def bulk_confirm(
                         # Extract filename from stored path
                         temp_filename = Path(temp_path).name
                         
-                        # Simple production vs local check
-                        if os.path.exists("/workspace"):
-                            # Production environment (DigitalOcean)
-                            temp_file_path = Path(f"app/static/uploads/temp/{temp_filename}")
-                        else:
-                            # Local development
-                            current_dir = Path(__file__).parent.parent
-                            temp_file_path = current_dir / "static" / "uploads" / "temp" / temp_filename
+                        # Use the SAME path construction as when saving (line 1715)
+                        temp_dir = Path("app/static/uploads/temp")
+                        temp_file_path = temp_dir / temp_filename
                         
                         safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
                         safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
+                        safe_print(f"[BULK_UPLOAD] Absolute path: {temp_file_path.absolute()}")
                         
                         if temp_file_path.exists():
                             try:
