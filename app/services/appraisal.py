@@ -1084,13 +1084,17 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                 safe_print(f"[APPRAISE] No card name matches for '{search_name}', keeping all results")
             
             # Step 2: Filter by set name (if provided)
+            safe_print(f"[APPRAISE] Set name provided: '{set_name}'")
             if set_name and set_name not in ["Unknown", ""]:
+                safe_print(f"[APPRAISE] Attempting to filter by set name '{set_name}'")
                 set_matches = [r for r in filtered_results if set_name.lower() in r['name'].lower()]
                 if set_matches:
                     safe_print(f"[APPRAISE] Filtered by set name '{set_name}': {len(set_matches)} matches")
                     filtered_results = set_matches
                 else:
                     safe_print(f"[APPRAISE] No set name matches for '{set_name}', keeping previous results")
+            else:
+                safe_print(f"[APPRAISE] Skipping set name filter (set_name='{set_name}')")
             
             # Step 3: Filter by card number
             # Extract just the number part (e.g., "OP13-001" from "#OP13-001")
