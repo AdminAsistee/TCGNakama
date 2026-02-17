@@ -549,14 +549,16 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
     english_keywords = ['english', 'eng']
     
     if is_japanese:
-        # Filter for Japanese versions
-        filtered = [r for r in results if any(kw in r['name'].lower() for kw in japanese_keywords)]
-        if filtered:
-            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} Japanese matches found")
+        # For Japanese cards, EXCLUDE English-specific listings
+        # (Don't require "Japanese" keyword, just avoid "English" keyword)
+        filtered = [r for r in results if 
+                   not any(kw in r['name'].lower() for kw in english_keywords)]
+        if filtered and len(filtered) < len(results):
+            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} non-English matches found")
         else:
-            safe_print(f"[PRICECHARTING] Language filter: No Japanese matches, using all {len(results)} results")
+            safe_print(f"[PRICECHARTING] Language filter: No English listings to exclude, using all {len(results)} results")
     else:
-        # Filter for English versions (or exclude Japanese)
+        # For English cards, prefer English listings or exclude Japanese
         filtered = [r for r in results if 
                    any(kw in r['name'].lower() for kw in english_keywords) or
                    not any(kw in r['name'].lower() for kw in japanese_keywords)]
@@ -574,6 +576,7 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
     try:
         import httpx
         import os
+        import re
         from urllib.parse import quote_plus
         
         # Check if API key is configured
@@ -667,10 +670,15 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             
             # Step 1: Filter by card name first
             filtered_prices = valid_prices
-            card_name_english = card_name.split('(')[0].strip()  # Extract English name before parentheses
+            
+            # Extract just the card name, removing card number and set info
+            # Examples: "Pikachu - 26 #26" → "Pikachu", "Charizard - 4 #4" → "Charizard"
+            card_name_only = card_name.split('(')[0].strip()  # Remove Japanese name in parentheses
+            card_name_only = re.sub(r'\s*-\s*\d+.*$', '', card_name_only)  # Remove " - 26 #26"
+            card_name_only = re.sub(r'\s*#\d+.*$', '', card_name_only)  # Remove " #26"
+            card_name_english = card_name_only.strip()
+            
             if card_name_english:
-                import re
-                
                 safe_print(f"[PRICECHARTING_API] Filtering by card name: '{card_name_english}'")
                 
                 name_matches = []
