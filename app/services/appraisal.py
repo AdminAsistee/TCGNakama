@@ -439,8 +439,9 @@ async def _gemini_filter_cards(search_query: str, results: list[dict]) -> list[d
     """
     try:
         import google.generativeai as genai
-        import os
-        import json
+import os
+from typing import Optional, Dict, Any, List
+import json
         import re
         
         api_key = os.getenv("GEMINI_API_KEY")
