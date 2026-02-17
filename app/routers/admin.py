@@ -1711,9 +1711,14 @@ async def bulk_upload_appraise(
     admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
     client = ShopifyClient()
     
-    # Create temp directory for uploads
-    temp_dir = Path("app/static/uploads/temp")
+    # Create temp directory for uploads using absolute path
+    # This ensures files are saved/read from same location regardless of working directory
+    current_file_dir = Path(__file__).parent.parent  # app/ directory
+    temp_dir = current_file_dir / "static" / "uploads" / "temp"
     temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    safe_print(f"[BULK_UPLOAD] Temp directory: {temp_dir}")
+    safe_print(f"[BULK_UPLOAD] Temp directory absolute: {temp_dir.absolute()}")
     
     # Clean up old temp files (older than 3 days)
     cleanup_old_temp_files(temp_dir, days=3)
@@ -1967,8 +1972,9 @@ async def bulk_confirm(
                         # Extract filename from stored path
                         temp_filename = Path(temp_path).name
                         
-                        # Use the SAME path construction as when saving (line 1715)
-                        temp_dir = Path("app/static/uploads/temp")
+                        # Use the SAME absolute path construction as when saving
+                        current_file_dir = Path(__file__).parent.parent  # app/ directory
+                        temp_dir = current_file_dir / "static" / "uploads" / "temp"
                         temp_file_path = temp_dir / temp_filename
                         
                         safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
