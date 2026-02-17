@@ -1964,8 +1964,14 @@ async def bulk_confirm(
                     all_images = []
                     
                     if temp_path:
-                        # Convert string path to Path object
-                        temp_file_path = Path(temp_path)
+                        # Reconstruct path relative to app directory (works in both local and production)
+                        # Extract just the filename from the stored path
+                        temp_filename = Path(temp_path).name
+                        
+                        # Build path relative to current file location
+                        current_dir = Path(__file__).parent.parent  # Go up to app/ directory
+                        temp_file_path = current_dir / "static" / "uploads" / "temp" / temp_filename
+                        
                         safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
                         safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
                         safe_print(f"[BULK_UPLOAD] Path is absolute: {temp_file_path.is_absolute()}")
@@ -2000,7 +2006,8 @@ async def bulk_confirm(
                                 import traceback
                                 safe_print(traceback.format_exc())
                         else:
-                            safe_print(f"[BULK_UPLOAD] WARNING: Temp file not found at {temp_file_path}")
+                            safe_print(f"[BULK_UPLOAD] ERROR: Temp file not found at {temp_file_path}")
+                            safe_print(f"[BULK_UPLOAD] Original stored path was: {temp_path}")
                     else:
                         safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
                     
