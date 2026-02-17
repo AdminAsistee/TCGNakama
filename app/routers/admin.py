@@ -1675,7 +1675,7 @@ async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_sess
 
 
 
-def cleanup_old_temp_files(temp_dir: Path, days: int = 7):
+def cleanup_old_temp_files(temp_dir: Path, days: int = 3):
     """Delete temp files older than specified days"""
     try:
         import time
@@ -1715,8 +1715,8 @@ async def bulk_upload_appraise(
     temp_dir = Path("app/static/uploads/temp")
     temp_dir.mkdir(parents=True, exist_ok=True)
     
-    # Clean up old temp files (older than 7 days)
-    cleanup_old_temp_files(temp_dir, days=7)
+    # Clean up old temp files (older than 3 days)
+    cleanup_old_temp_files(temp_dir, days=3)
     
     for idx, image_file in enumerate(images):
         try:

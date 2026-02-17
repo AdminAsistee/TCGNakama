@@ -532,6 +532,46 @@ If no cards match, return an empty array: []
     return None
 
 
+
+
+def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
+    """
+    Filter PriceCharting results by language.
+    
+    Args:
+        results: List of price results with 'name' field
+        is_japanese: True for Japanese cards, False for English
+    
+    Returns:
+        Filtered list, or original list if no language matches found
+    """
+    if not results:
+        return results
+    
+    japanese_keywords = ['japanese', 'japan', 'jpn', '日本']
+    english_keywords = ['english', 'eng']
+    
+    if is_japanese:
+        # Filter for Japanese versions
+        filtered = [r for r in results if any(kw in r['name'].lower() for kw in japanese_keywords)]
+        if filtered:
+            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} Japanese matches found")
+        else:
+            safe_print(f"[PRICECHARTING] Language filter: No Japanese matches, using all {len(results)} results")
+    else:
+        # Filter for English versions (or exclude Japanese)
+        filtered = [r for r in results if 
+                   any(kw in r['name'].lower() for kw in english_keywords) or
+                   not any(kw in r['name'].lower() for kw in japanese_keywords)]
+        if filtered and len(filtered) < len(results):
+            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} English/non-Japanese matches found")
+        else:
+            safe_print(f"[PRICECHARTING] Language filter: Using all {len(results)} results")
+    
+    # Return filtered results if any found, otherwise return original
+    return filtered if filtered else results
+
+
 async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
     """Try to get price from PriceCharting API (official, no scraping)."""
     try:
@@ -701,6 +741,10 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                     filtered_prices = number_matches
                 else:
                     safe_print(f"[PRICECHARTING_API] No card number matches, using all {len(valid_prices)} results")
+            
+            # Step 3: Filter by language (Japanese vs English)
+            safe_print(f"[PRICECHARTING_API] Filtering by language: {'Japanese' if is_japanese else 'English'}")
+            filtered_prices = _filter_by_language(filtered_prices, is_japanese)
             
             # Select the cheapest price from filtered results
             cheapest = min(filtered_prices, key=lambda x: x['price'])
@@ -964,6 +1008,10 @@ async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: 
                             continue
                 
                 return None
+            
+            # Filter by language before selecting cheapest
+            safe_print(f"[APPRAISE] PriceCharting: Filtering by language: {'Japanese' if is_japanese else 'English'}")
+            matching_results = _filter_by_language(matching_results, is_japanese)
             
             # Return cheapest from matching results
             cheapest = min(matching_results, key=lambda x: x['price'])
