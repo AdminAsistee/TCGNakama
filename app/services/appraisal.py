@@ -307,9 +307,14 @@ Return ONLY this JSON (no markdown):
                 if set_name:
                     name_parts.append(f"- {set_name}")
                 elif card_data.get('year') and not re.match(r'^P-\d+$', card_number):
-                    # Vintage card with year but no set code
-                    # Skip for One Piece P-### cards (e.g. P-044) — they have a year but no set
-                    name_parts.append(f"- Vintage {card_data['year']}")
+                    # Only label as "Vintage" if it's actually a vintage card
+                    # Modern cards have "###/###" format; vintage cards have standalone numbers like "094"
+                    is_vintage_number = '/' not in card_number if card_number else True
+                    year = card_data['year']
+                    is_vintage_year = int(year) < 2003 if year.isdigit() else False
+                    if is_vintage_number and is_vintage_year:
+                        name_parts.append(f"- Vintage {year}")
+
                 elif special_variants:
                     # Special variant without set (e.g., Prism)
                     name_parts.append(f"- {special_variants[0]}")
