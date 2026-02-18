@@ -742,11 +742,14 @@ def _normalize_text(text: str) -> str:
 def _normalize_card_number(num: str) -> str:
     """
     Normalize a card number for comparison.
-    Strips leading '#', spaces, then strips leading zeros from each numeric segment.
-    e.g. '#No.094' -> 'no.94', '094' -> '94', 'OP09-051' -> 'op9-51'
+    Strips leading '#', 'No.' prefix, spaces, then strips leading zeros from each numeric segment.
+    e.g. '#No.094' -> '94', 'No.094' -> '94', '094' -> '94', 'OP09-051' -> 'op9-51'
     """
     import re
     n = num.strip().lstrip('#').lower()
+    # Strip 'no.' prefix (handles 'No.094', 'no.094')
+    if n.startswith('no.'):
+        n = n[3:]
     # Strip leading zeros from every run of digits
     n = re.sub(r'\b0+(\d)', r'\1', n)
     return n.strip()

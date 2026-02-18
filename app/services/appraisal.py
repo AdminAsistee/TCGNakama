@@ -100,8 +100,11 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
      * Example: If you see "s10b F 027/071", the set code is "s10b" (NOT "s10b F")
    - PROMO cards (Pokémon only): If the card number ends with "/P" (e.g., "010/P", "026/P"), use "PROMO" as the set name
    - VINTAGE Pokémon (pre-2016): May not have a set code
-     * CRITICAL: If you see a rainbow/prismatic holographic effect on the card, use "Prism" as the set name
-     * Otherwise return "" if no set code found
+     * Look for a set symbol/icon near the card number to identify the set
+     * Japanese Base Set: gold border, card number in "No.XXX" format, no set symbol -> set_name = "Base Set"
+     * Japanese Jungle: set symbol is a leaf -> set_name = "Jungle"
+     * Japanese Fossil: set symbol is a fossil -> set_name = "Fossil"
+     * If no set code or symbol found, return "" -- do NOT guess "Prism" just because the art is holographic
    - One Piece: Extract from card number prefix (e.g., "OP12" from "OP12-008")
      * IMPORTANT: One Piece cards with card numbers like "P-044", "P-001" etc. use "P" as a prefix in the card number itself - this is NOT a set code, leave set_name as ""
    
@@ -118,16 +121,19 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
 6. **Rarity**: Rarity symbol or text (Common, Rare, SR, etc.)
    - Look for: ◆ (Common), ● (Uncommon), ★ (Rare), R, C, U, SR, UR
    - Trainer cards often have "R" in bottom corner
-   - IMPORTANT: If you detect Prism variant (see #7), the rarity is ALWAYS "Ultra Rare" or "★"
+   - IMPORTANT: If you detect Prism Star variant (see #7), the rarity is ALWAYS "Ultra Rare"
 
 7. **Special Variants**: CRITICAL - EXAMINE THE CARD VERY CAREFULLY
-   - **Prism Cards** - Look for MULTIPLE indicators:
-     * VISUAL: Rainbow/prismatic holographic pattern across the ENTIRE card surface
-     * The card background, borders, and text areas shimmer with rainbow colors
-     * NOT just the artwork - the WHOLE card has a rainbow sheen
-     * Common Prism cards: Gengar, Tyranitar, Celebi, Entei, Raikou, Suicune
-     * If the card is Gengar and looks vintage (pre-2003), it's VERY LIKELY Prism
-     * If you see ANY rainbow holographic effect, return "Prism"
+   - **Holo Rare** (NOT a special variant -- this is just the standard holo rarity):
+     * Sparkly/foil artwork ONLY inside the art box
+     * Card borders, text boxes, and background are NORMAL (not rainbow)
+     * Very common in Base Set, Jungle, Fossil, and many other sets
+     * Do NOT call this "Prism" -- it is just a Holo Rare card
+   - **Prism Star** (Sun & Moon era, 2017-2019 ONLY):
+     * Has "Prism Star" IN THE CARD NAME itself (e.g., "Gengar Prism Star")
+     * Rainbow holographic effect across the ENTIRE card -- borders, text boxes, AND art
+     * Only appears in Sun & Moon sets (SM era)
+     * If you do NOT see "Prism Star" in the name, it is NOT a Prism Star card
    - Crystal: Transparent/crystalline artwork effect (card looks see-through)
    - Reverse Holo: Holographic background with normal artwork
    - 1st Edition: "1st Edition" stamp visible
@@ -141,8 +147,9 @@ IMPORTANT RULES:
 - NEVER extract "ID:" format card numbers - only standard formats
 - If card number ends with "/P" (Pokémon PROMO format like "010/P"), set the set_name to "PROMO"
 - If card number starts with "P-" (One Piece format like "P-044"), do NOT set set_name - leave it as ""
-- CRITICAL: For vintage Gengar cards, check VERY CAREFULLY for rainbow holographic effects (Prism)
-- If Prism variant detected, set rarity to "Ultra Rare" and set_name to "Prism"
+- CRITICAL: Do NOT confuse Holo Rare (sparkly art only) with Prism Star. A vintage Gengar with sparkly art is a Holo Rare from Base Set, NOT a Prism card.
+- If Prism Star variant detected ("Prism Star" in card name), set rarity to "Ultra Rare" and set_name to "Prism"
+- For Japanese Base Set cards (gold border, No.XXX number, no set symbol): set_name = "Base Set"
 - Use "" (empty string) for missing data, NEVER use null
 
 Return ONLY a JSON object:
