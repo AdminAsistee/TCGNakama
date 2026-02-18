@@ -671,8 +671,13 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
     """
     Filter PriceCharting results by language.
     
+    Filter order:
+    1. Check product title (name) for language keyword
+    2. Fall back to console-name (set name from PriceCharting) for language keyword
+    3. Last resort: exclude opposite-language listings
+    
     Args:
-        results: List of price results with 'name' field
+        results: List of price results with 'name' and 'console_name' fields
         is_japanese: True for Japanese cards, False for English
     
     Returns:
@@ -681,30 +686,62 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
     if not results:
         return results
     
-    japanese_keywords = ['japanese', 'japan', 'jpn', '日本']
+    japanese_keywords = ['japanese', 'japan', 'jpn', '\u65e5\u672c']
     english_keywords = ['english', 'eng']
     
-    if is_japanese:
-        # For Japanese cards, EXCLUDE English-specific listings
-        # (Don't require "Japanese" keyword, just avoid "English" keyword)
-        filtered = [r for r in results if 
-                   not any(kw in r['name'].lower() for kw in english_keywords)]
-        if filtered and len(filtered) < len(results):
-            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} non-English matches found")
-        else:
-            safe_print(f"[PRICECHARTING] Language filter: No English listings to exclude, using all {len(results)} results")
-    else:
-        # For English cards, prefer English listings or exclude Japanese
-        filtered = [r for r in results if 
-                   any(kw in r['name'].lower() for kw in english_keywords) or
-                   not any(kw in r['name'].lower() for kw in japanese_keywords)]
-        if filtered and len(filtered) < len(results):
-            safe_print(f"[PRICECHARTING] Language filter: {len(filtered)} English/non-Japanese matches found")
-        else:
-            safe_print(f"[PRICECHARTING] Language filter: Using all {len(results)} results")
+    def has_japanese_label(r):
+        name = r['name'].lower()
+        console = r.get('console_name', '').lower()
+        return any(kw in name for kw in japanese_keywords) or any(kw in console for kw in japanese_keywords)
     
-    # Return filtered results if any found, otherwise return original
-    return filtered if filtered else results
+    def has_english_label(r):
+        name = r['name'].lower()
+        console = r.get('console_name', '').lower()
+        return any(kw in name for kw in english_keywords) or any(kw in console for kw in english_keywords)
+    
+    if is_japanese:
+        # Step 1: Try title first for Japanese keyword
+        title_matches = [r for r in results if any(kw in r['name'].lower() for kw in japanese_keywords)]
+        if title_matches:
+            safe_print(f"[PRICECHARTING] Language filter (Japanese) via title: {len(title_matches)} matches")
+            return title_matches
+        
+        # Step 2: Fall back to console-name (set name)
+        console_matches = [r for r in results if any(kw in r.get('console_name', '').lower() for kw in japanese_keywords)]
+        if console_matches:
+            safe_print(f"[PRICECHARTING] Language filter (Japanese) via console-name: {len(console_matches)} matches")
+            return console_matches
+        
+        # Step 3: Last resort - exclude English-labeled listings
+        non_english = [r for r in results if not has_english_label(r)]
+        if non_english and len(non_english) < len(results):
+            safe_print(f"[PRICECHARTING] Language filter (Japanese) fallback - excluded English: {len(non_english)} remain")
+            return non_english
+        
+        safe_print(f"[PRICECHARTING] Language filter: No language labels found, keeping all {len(results)} results")
+        return results
+    
+    else:
+        # Step 1: Try title first for English keyword
+        title_matches = [r for r in results if any(kw in r['name'].lower() for kw in english_keywords)]
+        if title_matches:
+            safe_print(f"[PRICECHARTING] Language filter (English) via title: {len(title_matches)} matches")
+            return title_matches
+        
+        # Step 2: Fall back to console-name (set name)
+        console_matches = [r for r in results if any(kw in r.get('console_name', '').lower() for kw in english_keywords)]
+        if console_matches:
+            safe_print(f"[PRICECHARTING] Language filter (English) via console-name: {len(console_matches)} matches")
+            return console_matches
+        
+        # Step 3: Last resort - exclude Japanese-labeled listings
+        non_japanese = [r for r in results if not has_japanese_label(r)]
+        if non_japanese and len(non_japanese) < len(results):
+            safe_print(f"[PRICECHARTING] Language filter (English) fallback - excluded Japanese: {len(non_japanese)} remain")
+            return non_japanese
+        
+        safe_print(f"[PRICECHARTING] Language filter: No language labels found, keeping all {len(results)} results")
+        return results
 
 
 async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
@@ -762,6 +799,7 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             valid_prices = []
             for product in products:
                 product_name = product.get('product-name', 'Unknown')
+                console_name = product.get('console-name', '')  # Set name from PriceCharting
                 
                 # Try to get price (prefer loose-price for single cards)
                 price = None
@@ -794,10 +832,11 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
                 if price and price > 0:
                     valid_prices.append({
                         'name': product_name,
+                        'console_name': console_name,  # Store set name for language filtering
                         'price': price,
                         'type': price_type
                     })
-                    safe_print(f"[PRICECHARTING_API]   - '{product_name}' = ${price} ({price_type})")
+                    safe_print(f"[PRICECHARTING_API]   - '{product_name}' | Set: '{console_name}' = ${price} ({price_type})")
             
             if not valid_prices:
                 safe_print(f"[PRICECHARTING_API] No valid prices found")
