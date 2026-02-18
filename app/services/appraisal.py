@@ -184,7 +184,16 @@ Return ONLY this JSON (no markdown):
                 # Gemini incorrectly set PROMO for a One Piece P-### card — clear it
                 card_data['set_name'] = ''
                 set_name = ''
-            
+
+            # Post-processing: Strip regulation marks mistaken for set names
+            # English Pokémon cards print a single regulation letter (D, E, F, G, H) near the set symbol
+            # These are NOT set names — clear them if that's all we got
+            REGULATION_MARKS = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'}
+            if set_name.strip().lower() in REGULATION_MARKS:
+                safe_print(f"[APPRAISE] Clearing regulation mark '{set_name}' mistaken for set name")
+                card_data['set_name'] = ''
+                set_name = ''
+
             # Extract card type (new field)
             card_type = card_data.get('card_type', 'Pokemon')
             
