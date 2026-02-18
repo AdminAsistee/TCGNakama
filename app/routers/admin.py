@@ -661,6 +661,7 @@ async def estimate_market_value(
     set_name: str = "",
     card_number: str = "",
     rarity: str = "",
+    is_japanese: bool = False,
     admin: str = Depends(get_admin_session)
 ):
     """
@@ -678,7 +679,11 @@ async def estimate_market_value(
         safe_print(f"[ESTIMATE] set_name: '{set_name}'")
         safe_print(f"[ESTIMATE] card_number: '{card_number}'")
         safe_print(f"[ESTIMATE] rarity: '{rarity}'")
+        safe_print(f"[ESTIMATE] is_japanese: {is_japanese}")
         safe_print(f"[ESTIMATE] ==========================================")
+        
+        # Build variants list from language
+        variants = ['Japanese'] if is_japanese else None
         
         # Call the market value estimation service
         # card_name is already clean English name from AI extraction
@@ -687,7 +692,7 @@ async def estimate_market_value(
             rarity=rarity,
             set_name=set_name,
             card_number=card_number,
-            variants=None,  # No variant detection from image appraisal
+            variants=variants,
             force_refresh=True  # Always get fresh data for new cards
         )
         
@@ -1756,10 +1761,15 @@ async def bulk_upload_appraise(
             # Extract card details
             card_name = appraisal_result.get("card_name", "Unknown")
             card_name_english = appraisal_result.get("card_name_english", card_name)  # Use English name for PriceCharting
+            card_name_japanese = appraisal_result.get("card_name_japanese", "")  # Japanese name if present
             set_name = appraisal_result.get("set_name", "")
             card_number = appraisal_result.get("card_number", "")
             rarity = appraisal_result.get("rarity", "")
             vendor = appraisal_result.get("manufacturer", "TCG Nakama")
+            
+            # Detect language: card is Japanese if it has a Japanese name
+            is_japanese = bool(card_name_japanese)
+            safe_print(f"[BULK_UPLOAD] Language detected: {'Japanese' if is_japanese else 'English'} (jp_name='{card_name_japanese}')")
             
             # Check if card exists in Shopify
             exists = False
@@ -1790,7 +1800,8 @@ async def bulk_upload_appraise(
                         card_name=card_name_english,  # Use English name for PriceCharting search
                         rarity=rarity,
                         set_name=set_name,
-                        card_number=card_number
+                        card_number=card_number,
+                        variants=['Japanese'] if is_japanese else None  # Pass language for correct filtering
                     )
                     if not price_result.get("error"):
                         price = price_result.get("market_jpy")

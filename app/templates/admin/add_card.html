@@ -1048,6 +1048,11 @@
                 params.append('card_number', cardData.card_number || '');
                 params.append('rarity', cardData.rarity || '');
 
+                // Detect Japanese: card has a Japanese name
+                const isJapanese = !!(cardData.card_name_japanese && cardData.card_name_japanese.trim());
+                params.append('is_japanese', isJapanese);
+                console.log('[FETCH_MARKET_VALUE] is_japanese:', isJapanese);
+
                 // Call the market value estimation endpoint (create a temporary product-like structure)
                 const apiUrl = `/admin/estimate-market-value?${params.toString()}`;
                 console.log('[FETCH_MARKET_VALUE] Calling API:', apiUrl);
