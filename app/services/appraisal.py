@@ -56,7 +56,7 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
         async with _gemini_lock:
             genai.configure(api_key=api_key)
             # Use image-specific model (found in list_gemini_models.py output)
-            model = genai.GenerativeModel('gemini-2.5-flash-image')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             # Prepare image for Gemini
             if image_data:
@@ -73,8 +73,22 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
             else:
                 return {'error': 'No image data or URL provided'}
             
-            # Build the prompt for card identification
-            prompt = """Analyze this trading card image and extract the following information EXACTLY as it appears:
+            # === PASS 1: Free identification ===
+            # Ask Gemini to freely describe the card without any rules or constraints.
+            # This gives the model a chance to reason naturally before we apply strict extraction rules.
+            pass1_prompt = "Look at this trading card image and identify it. Tell me: what card is this, what set/series is it from, what is the card number, what is the rarity, and are there any special variants (like holographic, 1st edition, prism, etc.)? Be specific and detailed."
+            pass1_response = model.generate_content([pass1_prompt, img])
+            card_description = pass1_response.text.strip()
+            safe_print(f"[APPRAISE_IMAGE] Pass 1 (free ID): {card_description}")
+
+            # === PASS 2: Structured extraction using Pass 1 as context ===
+            prompt = f"""A trading card has been identified as follows:
+
+---
+{card_description}
+---
+
+Using the above identification as context, now extract the structured data from the card image. Follow these rules EXACTLY:
 
 1. **Card Type**: Identify the card type first
    - If you see "TRAINER" header → return "Trainer"
@@ -114,7 +128,7 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
    - IGNORE any text that starts with "ID:" completely
    - Look at bottom right corner for the card number
    - If you only see "ID: ..." format and NO standard number, return "" (empty string)
-   - Examples of VALID formats: "010/P", "027/071", "26", "094", "P-044"
+   - Examples of VALID formats: "010/P", "027/071", "26", "094", "No.094", "P-044"
    - Examples of INVALID formats: "ID: Z-06-#", "ID: anything"
    - CRITICAL: For One Piece cards with "P-###" format, extract the full "P-044" as card_number and leave set_name as ""
 
@@ -123,7 +137,7 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
    - Trainer cards often have "R" in bottom corner
    - IMPORTANT: If you detect Prism Star variant (see #7), the rarity is ALWAYS "Ultra Rare"
 
-7. **Special Variants**: CRITICAL - EXAMINE THE CARD VERY CAREFULLY
+7. **Special Variants**: CRITICAL - USE THE CONTEXT FROM PASS 1 ABOVE
    - **Holo Rare** (NOT a special variant -- this is just the standard holo rarity):
      * Sparkly/foil artwork ONLY inside the art box
      * Card borders, text boxes, and background are NORMAL (not rainbow)
@@ -153,7 +167,7 @@ IMPORTANT RULES:
 - Use "" (empty string) for missing data, NEVER use null
 
 Return ONLY a JSON object:
-{
+{{
   "card_type": "Pokemon" or "Trainer" or "Energy",
   "card_name_japanese": "string or \"\"",
   "card_name_english": "string or \"\"",
@@ -163,14 +177,9 @@ Return ONLY a JSON object:
   "special_variants": "string or \"\" (comma-separated)",
   "year": "string or \"\"",
   "manufacturer": "string or \"\""
-}
+}}
 
 No markdown, just raw JSON."""
-
-
-
-
-
 
             # Generate content with image
             response = model.generate_content([prompt, img])
