@@ -756,37 +756,60 @@ def _extract_card_fields(title: str):
     """
     Parse a Shopify product title into its components.
     Returns (clean_name, card_number_raw, set_name_raw).
-    clean_name  : base character/card name (no number, no set, no parentheses)
+    clean_name      : base character/card name (no number, no set, no parentheses)
     card_number_raw : raw card number string found in title, or None
     set_name_raw    : set name found after ' - ', or None
     """
     import re
     t = title
 
-    # Extract card number (various formats)
-    num_match = re.search(
-        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
-        t
-    )
-    card_number_raw = num_match.group(0) if num_match else None
-
-    # Remove card number from working copy
-    if card_number_raw:
-        t = t.replace(card_number_raw, '')
-
-    # Extract set name (everything after ' - ')
+    # Step 1: Split off the set name first (everything after ' - ')
+    # This prevents the set-name part from interfering with card number detection
     set_match = re.search(r'\s*[-–—]\s*(.+)$', t)
     set_name_raw = set_match.group(1).strip() if set_match else None
 
-    # Remove set name
-    if set_match:
-        t = t[:set_match.start()]
+    # If the "set name" is actually just a card number (e.g. "- #094"), treat it as the number
+    # and clear the set name
+    if set_name_raw:
+        set_is_number = re.fullmatch(
+            r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+            set_name_raw
+        )
+        if set_is_number:
+            # The "set name" is actually a card number — move it to card_number_raw
+            card_number_raw = set_name_raw
+            set_name_raw = None
+            if set_match:
+                t = t[:set_match.start()]
+        else:
+            # It's a real set name — remove it from working copy
+            if set_match:
+                t = t[:set_match.start()]
+            # Now look for card number in the remaining title
+            num_match = re.search(
+                r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+                t
+            )
+            card_number_raw = num_match.group(0) if num_match else None
+            if card_number_raw:
+                t = t.replace(card_number_raw, '')
+    else:
+        set_name_raw = None
+        # No set name — look for card number in the full title
+        num_match = re.search(
+            r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+            t
+        )
+        card_number_raw = num_match.group(0) if num_match else None
+        if card_number_raw:
+            t = t.replace(card_number_raw, '')
 
-    # Remove parentheses/brackets content
+    # Remove parentheses/brackets content (e.g. language translations)
     t = re.sub(r'\s*[\(\[].*?[\)\]]', '', t)
 
     clean_name = t.strip()
     return clean_name, card_number_raw, set_name_raw
+
 
 
 def _is_duplicate_card(
@@ -797,64 +820,91 @@ def _is_duplicate_card(
     log_prefix: str = "[DUPLICATE_CHECK]"
 ) -> bool:
     """
-    Symmetric duplicate check:
-    The form's combination of fields must exactly mirror the product title.
+    Check if a product title matches the form's card fields.
 
-    Rules:
-    - form_number provided  <-> product title must contain a card number
-    - form_set provided     <-> product title must contain a set name
-    - Each provided field is checked as a case-insensitive substring
-      (card numbers are leading-zero-normalized before comparison)
+    - card_name : exact match against the product title's clean name
+                  (parentheses/brackets stripped, case+accent insensitive)
+                  Prevents 'ゲンガー' matching 'ゲンガーex'
+    - card_number: if provided, must appear as substring in the raw product title
+                   (case-insensitive, leading-zero-normalized)
+    - set_name  : if provided, must appear as substring in the raw product title
+                  (case-insensitive)
+
+    If card_number is NOT provided, the product title must NOT contain a card number.
+    If set_name is NOT provided, the product title must NOT contain a set name (after ' - ').
+    This ensures symmetric matching so 'ゲンガー' doesn't match 'ゲンガー #094'.
     """
     import re
 
     has_form_number = bool(form_number and form_number.strip())
     has_form_set = bool(form_set and form_set.strip())
 
-    # Parse the product title
-    prod_clean_name, prod_number_raw, prod_set_raw = _extract_card_fields(product_title)
-
-    has_prod_number = prod_number_raw is not None
-    has_prod_set = prod_set_raw is not None
-
     safe_print(f"{log_prefix}   Product: '{product_title}'")
-    safe_print(f"{log_prefix}   Parsed  -> name='{prod_clean_name}', number='{prod_number_raw}', set='{prod_set_raw}'")
-    safe_print(f"{log_prefix}   Form    -> name='{form_name}', number='{form_number}', set='{form_set}'")
+    safe_print(f"{log_prefix}   Form -> name='{form_name}', number='{form_number}', set='{form_set}'")
 
-    # Symmetric shape check: both must have (or not have) number and set
-    if has_form_number != has_prod_number:
-        safe_print(f"{log_prefix}   Shape mismatch on card_number -> skip")
-        return False
-    if has_form_set != has_prod_set:
-        safe_print(f"{log_prefix}   Shape mismatch on set_name -> skip")
-        return False
+    norm_title = _normalize_text(product_title)
 
-    # Name check: exact equality after normalization (case-insensitive, accent-insensitive)
-    # Exact match prevents e.g. "ゲンガー" matching "ゲンガーex"
+    # --- Name check ---
+    # Strip parentheses/brackets from product title to get clean name, then compare exactly
+    clean_prod_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', product_title)
+    # Also strip card number and set name from product title for name comparison
+    clean_prod_name = re.sub(r'\s*[-–—]\s*.+$', '', clean_prod_name)  # remove set part
+    clean_prod_name = re.sub(
+        r'\s*(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        '', clean_prod_name
+    )
+    clean_prod_name = clean_prod_name.strip()
+
     norm_form_name = _normalize_text(form_name)
-    norm_prod_name = _normalize_text(prod_clean_name)
+    norm_prod_name = _normalize_text(clean_prod_name)
     if norm_form_name != norm_prod_name:
         safe_print(f"{log_prefix}   Name mismatch: '{norm_form_name}' vs '{norm_prod_name}' -> skip")
         return False
 
-    # Card number check: exact equality after leading-zero normalization
+    # --- Symmetric shape check using raw product title ---
+    # Detect if product title has a card number
+    prod_has_number = bool(re.search(
+        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        product_title
+    ))
+    # Detect if product title has a set name (text after ' - ' that isn't just a number)
+    set_part_match = re.search(r'\s*[-–—]\s*(.+)$', product_title)
+    set_part = set_part_match.group(1).strip() if set_part_match else None
+    # If the part after ' - ' is itself a card number pattern, it's not a set name
+    if set_part and re.fullmatch(
+        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        set_part
+    ):
+        set_part = None
+    prod_has_set = set_part is not None
+
+    if has_form_number != prod_has_number:
+        safe_print(f"{log_prefix}   Shape mismatch on number (form={has_form_number}, prod={prod_has_number}) -> skip")
+        return False
+    if has_form_set != prod_has_set:
+        safe_print(f"{log_prefix}   Shape mismatch on set (form={has_form_set}, prod={prod_has_set}) -> skip")
+        return False
+
+    # --- Card number check (substring, leading-zero-normalized) ---
+    # Only enforced when the form provides a card number.
     if has_form_number:
         norm_form_num = _normalize_card_number(form_number)
-        norm_prod_num = _normalize_card_number(prod_number_raw)
-        if norm_form_num != norm_prod_num:
-            safe_print(f"{log_prefix}   Number mismatch: '{norm_form_num}' vs '{norm_prod_num}' -> skip")
+        norm_title_nums = re.sub(r'\b0+(\d)', r'\1', product_title.lower())
+        if norm_form_num not in norm_title_nums:
+            safe_print(f"{log_prefix}   Number mismatch: '{norm_form_num}' not in title -> skip")
             return False
 
-    # Set name check: exact equality after normalization
+    # --- Set name check (substring, case-insensitive) ---
     if has_form_set:
         norm_form_set = _normalize_text(form_set)
-        norm_prod_set = _normalize_text(prod_set_raw)
-        if norm_form_set != norm_prod_set:
-            safe_print(f"{log_prefix}   Set mismatch: '{norm_form_set}' vs '{norm_prod_set}' -> skip")
+        if norm_form_set not in norm_title:
+            safe_print(f"{log_prefix}   Set mismatch: '{norm_form_set}' not in title -> skip")
             return False
 
     safe_print(f"{log_prefix}   ✓ MATCH")
     return True
+
+
 
 
 @router.get("/check-duplicate-card")
@@ -1963,56 +2013,68 @@ async def bulk_upload_appraise(
                 "filename": image_file.filename
             })
     
-    # Merge duplicates: group by card_number and card_name combination
-    merged_results = {}
+    # Merge duplicates within the batch using direct field comparison
+    # card_number, set_name, card_name come directly from the appraisal — no parsing needed
+    merged_results = []
     for result in results:
-        # Skip error results
         if "error" in result:
             continue
-            
-        card_number = result.get("card_number", "")
-        card_name = result.get("card_name", "")
-        set_name = result.get("set_name", "")
-        
-        # Create a unique key based on card number AND card name (for better matching)
-        # This handles cases where the same card gets slightly different appraisals
-        # Priority: card_number > (card_name + set_name) > card_name
-        if card_number:
-            # Use card number as primary key
-            unique_key = f"num:{card_number}".lower().strip()
-        elif card_name and set_name:
-            # Use card name + set combination
-            unique_key = f"name:{card_name}|set:{set_name}".lower().strip()
-        elif card_name:
-            # Fallback to just card name
-            unique_key = f"name:{card_name}".lower().strip()
-        else:
-            # No identifying information, treat as unique
-            unique_key = f"unique:{id(result)}"
-        
-        if unique_key in merged_results:
-            # Duplicate found - increment quantity
-            if result.get("exists"):
-                # For existing cards, we'll add +1 for each duplicate
-                merged_results[unique_key]["duplicate_count"] = merged_results[unique_key].get("duplicate_count", 1) + 1
+
+        card_name = (result.get("card_name") or "").strip()
+        card_number = (result.get("card_number") or "").strip() or None
+        set_name = (result.get("set_name") or "").strip() or None
+
+        # Check if this result matches any already-merged entry
+        matched = False
+        for merged in merged_results:
+            m_name   = (merged.get("card_name") or "").strip()
+            m_number = (merged.get("card_number") or "").strip() or None
+            m_set    = (merged.get("set_name") or "").strip() or None
+
+            # Names must match (case+accent insensitive)
+            if _normalize_text(card_name) != _normalize_text(m_name):
+                continue
+
+            # Card numbers: both must be present or both absent; if present, must normalize equal
+            if bool(card_number) != bool(m_number):
+                continue
+            if card_number and m_number:
+                if _normalize_card_number(card_number) != _normalize_card_number(m_number):
+                    continue
+
+            # Set names: both must be present or both absent; if present, must match
+            if bool(set_name) != bool(m_set):
+                continue
+            if set_name and m_set:
+                if _normalize_text(set_name) != _normalize_text(m_set):
+                    continue
+
+            # All fields match — merge into existing entry
+            if merged.get("exists"):
+                merged["duplicate_count"] = merged.get("duplicate_count", 1) + 1
             else:
-                # For new cards, increment the quantity
-                merged_results[unique_key]["quantity"] = merged_results[unique_key].get("quantity", 1) + 1
-        else:
-            # First occurrence
+                merged["quantity"] = merged.get("quantity", 1) + 1
+            safe_print(f"[BATCH_MERGE] Merged '{card_name}' #{card_number} into existing entry (qty={merged.get('quantity', merged.get('duplicate_count', 1))})")
+            matched = True
+            break
+
+        if not matched:
+            # First occurrence of this card in the batch
             if result.get("exists"):
-                result["duplicate_count"] = 1  # Track duplicates for existing cards
+                result["duplicate_count"] = 1
             else:
-                result["quantity"] = 1  # Set initial quantity for new cards
-            merged_results[unique_key] = result
+                result["quantity"] = 1
+            merged_results.append(result)
+
+
     
-    # Convert back to list and update quantities for existing cards
+    # Convert to final list and update quantities for existing cards
     final_results = []
-    for result in merged_results.values():
+    for result in merged_results:
         if result.get("exists") and result.get("duplicate_count", 1) > 1:
-            # For existing cards, show the total increment (e.g., "+2" instead of "+1")
             result["quantity_increment"] = result["duplicate_count"]
         final_results.append(result)
+
     
     # Add back error results
     for result in results:
