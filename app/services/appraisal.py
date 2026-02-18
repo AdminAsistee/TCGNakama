@@ -687,74 +687,75 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
     
     Filter order:
     1. Check product title (name) for language keyword
-    2. Fall back to console-name (set name from PriceCharting) for language keyword
-    3. Last resort: exclude opposite-language listings
-    
+    Logic:
+    - Japanese card: search for 'japanese' in BOTH title AND console name.
+      If found → keep those. If not found → keep only unlabeled results
+      (no language keyword at all), since PriceCharting often has no label
+      for Japanese-only sets (e.g. One Piece). Unlabeled = not English.
+    - English card: exclude anything with 'japanese' in title OR console name.
+      Unlabeled results are treated as English (PriceCharting default).
+
     Args:
         results: List of price results with 'name' and 'console_name' fields
         is_japanese: True for Japanese cards, False for English
-    
+
     Returns:
         Filtered list, or original list if no language matches found
     """
     if not results:
         return results
-    
-    japanese_keywords = ['japanese', 'japan', 'jpn', '\u65e5\u672c']
+
+    japanese_keywords = ['japanese', 'japan', 'jpn', '日本']
     english_keywords = ['english', 'eng']
-    
+
     def has_japanese_label(r):
+        """Check both title AND console name for Japanese keywords."""
         name = r['name'].lower()
         console = r.get('console_name', '').lower()
         return any(kw in name for kw in japanese_keywords) or any(kw in console for kw in japanese_keywords)
-    
+
     def has_english_label(r):
+        """Check both title AND console name for English keywords."""
         name = r['name'].lower()
         console = r.get('console_name', '').lower()
         return any(kw in name for kw in english_keywords) or any(kw in console for kw in english_keywords)
-    
+
+    def has_any_language_label(r):
+        return has_japanese_label(r) or has_english_label(r)
+
     if is_japanese:
-        # Step 1: Try title first for Japanese keyword
-        title_matches = [r for r in results if any(kw in r['name'].lower() for kw in japanese_keywords)]
-        if title_matches:
-            safe_print(f"[PRICECHARTING] Language filter (Japanese) via title: {len(title_matches)} matches")
-            return title_matches
-        
-        # Step 2: Fall back to console-name (set name)
-        console_matches = [r for r in results if any(kw in r.get('console_name', '').lower() for kw in japanese_keywords)]
-        if console_matches:
-            safe_print(f"[PRICECHARTING] Language filter (Japanese) via console-name: {len(console_matches)} matches")
-            return console_matches
-        
-        # Step 3: Last resort - exclude English-labeled listings
-        non_english = [r for r in results if not has_english_label(r)]
-        if non_english and len(non_english) < len(results):
-            safe_print(f"[PRICECHARTING] Language filter (Japanese) fallback - excluded English: {len(non_english)} remain")
-            return non_english
-        
-        safe_print(f"[PRICECHARTING] Language filter: No language labels found, keeping all {len(results)} results")
+        # Step 1: Find results explicitly labeled Japanese (title OR console name)
+        japanese_labeled = [r for r in results if has_japanese_label(r)]
+        if japanese_labeled:
+            safe_print(f"[PRICECHARTING] Language filter (Japanese): {len(japanese_labeled)} results labeled Japanese")
+            return japanese_labeled
+
+        # Step 2: No explicit Japanese label found.
+        # Keep only unlabeled results (no language keyword in title or console).
+        # Unlabeled in PriceCharting usually means it's the base/Japanese-only version.
+        unlabeled = [r for r in results if not has_any_language_label(r)]
+        if unlabeled:
+            safe_print(f"[PRICECHARTING] Language filter (Japanese): no Japanese label found, keeping {len(unlabeled)} unlabeled results (assumed Japanese/base)")
+            return unlabeled
+
+        # Step 3: All results have language labels but none are Japanese — return all as fallback
+        safe_print(f"[PRICECHARTING] Language filter (Japanese): no matching results, keeping all {len(results)} as fallback")
         return results
-    
+
     else:
-        # Step 1: Try title first for English keyword
-        title_matches = [r for r in results if any(kw in r['name'].lower() for kw in english_keywords)]
-        if title_matches:
-            safe_print(f"[PRICECHARTING] Language filter (English) via title: {len(title_matches)} matches")
-            return title_matches
-        
-        # Step 2: Fall back to console-name (set name)
-        console_matches = [r for r in results if any(kw in r.get('console_name', '').lower() for kw in english_keywords)]
-        if console_matches:
-            safe_print(f"[PRICECHARTING] Language filter (English) via console-name: {len(console_matches)} matches")
-            return console_matches
-        
-        # Step 3: Last resort - exclude Japanese-labeled listings
+        # English card: exclude anything explicitly labeled Japanese (title OR console name).
+        # Unlabeled results are treated as English (PriceCharting default).
         non_japanese = [r for r in results if not has_japanese_label(r)]
-        if non_japanese and len(non_japanese) < len(results):
-            safe_print(f"[PRICECHARTING] Language filter (English) fallback - excluded Japanese: {len(non_japanese)} remain")
+        if non_japanese:
+            excluded = len(results) - len(non_japanese)
+            if excluded > 0:
+                safe_print(f"[PRICECHARTING] Language filter (English): excluded {excluded} Japanese-labeled results, {len(non_japanese)} remain")
+            else:
+                safe_print(f"[PRICECHARTING] Language filter (English): no Japanese labels found, keeping all {len(results)} results")
             return non_japanese
-        
-        safe_print(f"[PRICECHARTING] Language filter: No language labels found, keeping all {len(results)} results")
+
+        # All results were Japanese-labeled — return all as fallback
+        safe_print(f"[PRICECHARTING] Language filter (English): all results are Japanese-labeled, keeping all {len(results)} as fallback")
         return results
 
 
