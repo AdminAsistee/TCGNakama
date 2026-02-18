@@ -94,20 +94,22 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
      * The set code is usually in a small box or icon
      * DO NOT include single letters after the set code (e.g., "F", "G", "H" are regulation marks, not part of set code)
      * Example: If you see "s10b F 027/071", the set code is "s10b" (NOT "s10b F")
-   - PROMO cards: If the card number ends with "/P" (e.g., "010/P", "026/P"), use "PROMO" as the set name
+   - PROMO cards (Pokémon only): If the card number ends with "/P" (e.g., "010/P", "026/P"), use "PROMO" as the set name
    - VINTAGE Pokémon (pre-2016): May not have a set code
      * CRITICAL: If you see a rainbow/prismatic holographic effect on the card, use "Prism" as the set name
      * Otherwise return "" if no set code found
    - One Piece: Extract from card number prefix (e.g., "OP12" from "OP12-008")
+     * IMPORTANT: One Piece cards with card numbers like "P-044", "P-001" etc. use "P" as a prefix in the card number itself - this is NOT a set code, leave set_name as ""
    
 5. **Card Number**: The collector number - CRITICAL RULES
-   - ONLY extract standard formats: "###/###", "###/P", or standalone numbers like "26"
+   - ONLY extract standard formats: "###/###", "###/P", "P-###" (One Piece promo), or standalone numbers like "26"
    - DO NOT extract ID formats like "ID: Z-06-#" or "ID: X-XX-X"
    - IGNORE any text that starts with "ID:" completely
    - Look at bottom right corner for the card number
    - If you only see "ID: ..." format and NO standard number, return "" (empty string)
-   - Examples of VALID formats: "010/P", "027/071", "26", "094"
+   - Examples of VALID formats: "010/P", "027/071", "26", "094", "P-044"
    - Examples of INVALID formats: "ID: Z-06-#", "ID: anything"
+   - CRITICAL: For One Piece cards with "P-###" format, extract the full "P-044" as card_number and leave set_name as ""
 
 6. **Rarity**: Rarity symbol or text (Common, Rare, SR, etc.)
    - Look for: ◆ (Common), ● (Uncommon), ★ (Rare), R, C, U, SR, UR
@@ -133,7 +135,8 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
 IMPORTANT RULES:
 - ALWAYS provide English names for known Pokémon and Trainer cards
 - NEVER extract "ID:" format card numbers - only standard formats
-- If card number ends with "/P", set the set_name to "PROMO"
+- If card number ends with "/P" (Pokémon PROMO format like "010/P"), set the set_name to "PROMO"
+- If card number starts with "P-" (One Piece format like "P-044"), do NOT set set_name - leave it as ""
 - CRITICAL: For vintage Gengar cards, check VERY CAREFULLY for rainbow holographic effects (Prism)
 - If Prism variant detected, set rarity to "Ultra Rare" and set_name to "Prism"
 - Use "" (empty string) for missing data, NEVER use null
@@ -187,10 +190,16 @@ No markdown, just raw JSON."""
                 card_number = ''
             
             # Post-processing: Detect PROMO set from card number
+            # Only applies to Pokémon PROMO format (e.g. "010/P"), NOT One Piece P-prefix (e.g. "P-044")
             set_name = card_data.get('set_name', '')
-            if card_number and card_number.endswith('/P') and not set_name:
+            is_op_promo = bool(re.match(r'^P-\d+$', card_number))  # One Piece P-044 format
+            if card_number and card_number.endswith('/P') and not set_name and not is_op_promo:
                 card_data['set_name'] = 'PROMO'
                 set_name = 'PROMO'
+            elif is_op_promo and set_name.upper() == 'PROMO':
+                # Gemini incorrectly set PROMO for a One Piece P-### card — clear it
+                card_data['set_name'] = ''
+                set_name = ''
             
             # Extract card type (new field)
             card_type = card_data.get('card_type', 'Pokemon')
