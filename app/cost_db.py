@@ -1,6 +1,6 @@
 """
 Local Cost Database
-Stores buy prices and grades for products. Falls back to Shopify cost if available in future.
+Stores buy prices, grades, and physical locations for products.
 Supports SQLite (local) and PostgreSQL (production).
 """
 
@@ -56,6 +56,25 @@ class ValueSnapshot(Base):
     product_count = Column(Integer, default=0)
     recorded_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class ProductLocation(Base):
+    """Physical location / status of a card in inventory."""
+    __tablename__ = "product_locations"
+    product_id = Column(String, primary_key=True)
+    location = Column(String, nullable=False, default="Folder")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Valid location categories
+VALID_LOCATIONS = [
+    "Display", "Folder", "Vault", "Grading", "Repair",
+    "Mercari", "Consignment", "Sold-Pending", "Archived"
+]
+
+# Locations excluded from active inventory (total_value, live_count, snapshots)
+INACTIVE_LOCATIONS = {"Archived", "Sold-Pending"}
+
+# Default location for cards not yet assigned
+DEFAULT_LOCATION = "Folder"
+
 def init_db():
     """Initialize the database and create tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
@@ -108,6 +127,42 @@ def get_all_grades() -> dict:
     with SessionLocal() as session:
         grades = session.query(ProductGrade).all()
         return {g.product_id: g.grade for g in grades}
+
+# --- Location CRUD ---
+
+def get_location(product_id: str) -> str:
+    """Get the location for a product. Returns DEFAULT_LOCATION if not set."""
+    with SessionLocal() as session:
+        loc = session.query(ProductLocation).filter(ProductLocation.product_id == product_id).first()
+        return loc.location if loc else DEFAULT_LOCATION
+
+def set_location(product_id: str, location: str) -> bool:
+    """Set or update the location for a product. Validates against VALID_LOCATIONS."""
+    if location not in VALID_LOCATIONS:
+        raise ValueError(f"Invalid location '{location}'. Must be one of: {VALID_LOCATIONS}")
+    with SessionLocal() as session:
+        item = session.query(ProductLocation).filter(ProductLocation.product_id == product_id).first()
+        if item:
+            item.location = location
+        else:
+            item = ProductLocation(product_id=product_id, location=location)
+            session.add(item)
+        session.commit()
+    return True
+
+def get_all_locations() -> dict:
+    """Get all product locations as a dictionary. Missing entries default to DEFAULT_LOCATION."""
+    with SessionLocal() as session:
+        locations = session.query(ProductLocation).all()
+        return {loc.product_id: loc.location for loc in locations}
+
+def is_active_location(product_id: str, all_locations: dict = None) -> bool:
+    """Check if a product is in an active (non-archived/sold) location."""
+    if all_locations is not None:
+        location = all_locations.get(product_id, DEFAULT_LOCATION)
+    else:
+        location = get_location(product_id)
+    return location not in INACTIVE_LOCATIONS
 
 def log_search(query: str, results_count: int = 0) -> bool:
     """Log a search query to the database."""

@@ -1,7 +1,7 @@
 """
 Database models for TCG Nakama.
 """
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from app.database import Base
@@ -49,3 +49,24 @@ class Banner(Base):
             "display_order": self.display_order,
             "is_active": self.is_active,
         }
+
+
+class PriceSnapshot(Base):
+    """Historical price data from PriceCharting for gainers/trending."""
+    __tablename__ = "price_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    product_id: Mapped[str] = mapped_column(String(100), index=True)
+    product_title: Mapped[str] = mapped_column(String(300))
+    market_usd: Mapped[float] = mapped_column(Float)
+    market_jpy: Mapped[int] = mapped_column(Integer)
+    exchange_rate: Mapped[float] = mapped_column(Float)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class SystemSetting(Base):
+    """Key-value store for admin-configurable settings."""
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(String(500))

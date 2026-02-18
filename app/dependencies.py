@@ -335,6 +335,7 @@ class ShopifyClient:
                   id
                   price { amount currencyCode }
                   availableForSale
+                  quantityAvailable
                 }
               }
             }
@@ -372,6 +373,37 @@ class ShopifyClient:
         except Exception as e:
             print(f"Error fetching product: {e}")
             return None
+
+    async def get_variant_availability(self, variant_id: str) -> dict:
+        """Lightweight check: returns {available: bool, quantity: int} for a variant."""
+        gql_query = """
+        query getVariant($id: ID!) {
+          node(id: $id) {
+            ... on ProductVariant {
+              id
+              availableForSale
+              quantityAvailable
+              product {
+                title
+                totalInventory
+              }
+            }
+          }
+        }
+        """
+        try:
+            data = await self._query(gql_query, {"id": variant_id})
+            node = data.get("node", {})
+            qty = node.get("quantityAvailable", 0)
+            return {
+                "available": node.get("availableForSale", False),
+                "quantity": qty if qty is not None else 0,
+                "product_title": node.get("product", {}).get("title", "Unknown"),
+                "total_inventory": node.get("product", {}).get("totalInventory", 0)
+            }
+        except Exception as e:
+            print(f"[INVENTORY] Error checking variant availability: {e}")
+            return {"available": False, "quantity": 0, "product_title": "Unknown", "total_inventory": 0}
 
     async def create_cart(self, variant_id: str, quantity: int = 1) -> dict:
         if variant_id.startswith("gid://shopify/ProductVariant/"):

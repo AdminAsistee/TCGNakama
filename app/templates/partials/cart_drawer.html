@@ -27,6 +27,18 @@
 
         <!-- Cart Items -->
         <div class="flex-grow overflow-y-auto p-6 space-y-6 hide-scrollbar">
+            {% if sold_out_items %}
+            <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-3 space-y-1">
+                <div class="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
+                    <span class="material-symbols-outlined text-sm">warning</span>
+                    Items Removed — Sold Out
+                </div>
+                {% for name in sold_out_items %}
+                <p class="text-xs text-red-300/80 pl-5">• {{ name }} is sold out and has been removed from your cart.
+                </p>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if items %}
             {% for item in items %}
             <div class="flex gap-4 group">

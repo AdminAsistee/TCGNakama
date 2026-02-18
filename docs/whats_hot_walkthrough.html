@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCG Nakama — Price Tracking Walkthrough</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.7;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                color: #1a1a1a;
+                padding: 20px;
+                font-size: 11pt;
+                line-height: 1.5;
+            }
+            h1 { color: #1a1a1a !important; border-bottom-color: #ddd !important; }
+            h2 { color: #333 !important; }
+            h3 { color: #444 !important; }
+            h4 { color: #555 !important; }
+            strong { color: #1a1a1a !important; }
+            a { color: #0066cc !important; }
+            table { border-color: #ddd !important; }
+            th { background: #f0f0f0 !important; color: #333 !important; border-color: #ddd !important; }
+            td { border-color: #ddd !important; color: #333 !important; }
+            pre { background: #f6f8fa !important; border-color: #ddd !important; color: #333 !important; }
+            code { background: #f0f0f0 !important; color: #333 !important; }
+            div[style*="border-left"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .mermaid { background: white !important; border-color: #ddd !important; }
+            .mermaid svg { max-width: 100% !important; }
+        }
+        
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #f0f6fc;
+            margin: 0 0 8px 0;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #21262d;
+        }
+        
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #e6edf3;
+            margin: 24px 0 12px 0;
+        }
+        
+        h4 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #8b949e;
+            margin: 16px 0 8px 0;
+        }
+        
+        p {
+            margin: 8px 0;
+        }
+        
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        strong {
+            color: #f0f6fc;
+        }
+        
+        code {
+            background: #1a2233;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #79c0ff;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #21262d;
+            margin: 24px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #161b22;
+            color: #f0f6fc;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px 14px;
+            border: 1px solid #30363d;
+            font-size: 13px;
+        }
+        
+        td {
+            padding: 10px 14px;
+            border: 1px solid #30363d;
+            font-size: 13px;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        ul, ol {
+            margin: 8px 0 8px 24px;
+        }
+        
+        li {
+            margin: 4px 0;
+        }
+        
+        /* Header banner */
+        .header-banner {
+            background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px 32px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        
+        .header-banner h1 {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-size: 24px;
+        }
+        
+        .header-banner .subtitle {
+            color: #8b949e;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        
+        .header-banner .meta {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+            font-size: 12px;
+            color: #8b949e;
+        }
+        
+        .print-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 100;
+        }
+        
+        .print-btn:hover {
+            background: #2ea043;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-banner">
+        <h1>📋 TCG Nakama — Implementation Walkthrough</h1>
+        <div class="subtitle">What's Hot: Price Tracking System</div>
+        <div class="meta">
+            <span>📅 Date: February 18, 2026</span>
+            <span>👤 Prepared by: Development Team</span>
+            <span>✅ Status: Completed</span>
+        </div>
+    </div>
+    
+    <h1>What's Hot — Price Tracking System</h1>
+<h2>Summary</h2>
+<p>Implemented a complete price tracking pipeline that fetches real market data from PriceCharting, stores historical snapshots in a local database, and surfaces the top gainers in the <strong>What's Hot</strong> section on the homepage.</p>
+<h2>Files Created</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/services/price_tracker.py">price_tracker.py</a></td>
+<td>Batch service — fetches prices from PriceCharting API, uses Gemini AI for disambiguation (&gt;3 results only), stores <code>PriceSnapshot</code> rows</td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/scheduler.py">scheduler.py</a></td>
+<td>APScheduler integration — schedules batch updates (daily/3-day/weekly at 3 AM JST), supports manual triggers</td>
+</tr>
+</tbody>
+</table>
+<h2>Files Modified</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/models.py">models.py</a></td>
+<td>Added <code>PriceSnapshot</code> and <code>SystemSetting</code> models</td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/database.py">database.py</a></td>
+<td>Imports new models in <code>init_db</code></td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/main.py">main.py</a></td>
+<td>Wired scheduler into startup/shutdown lifecycle</td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/routers/admin.py">admin.py</a></td>
+<td>Added 3 market data endpoints: <code>GET /market-data/status</code>, <code>POST /market-data/frequency</code>, <code>POST /market-data/run-now</code></td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/templates/admin/settings.html">settings.html</a></td>
+<td>Added Market Data section with frequency selector, Run Now button, and 6-stat status grid</td>
+</tr>
+<tr>
+<td><a href="file:///Users/saptayh/TCGNakama-1/app/routers/store.py">store.py</a></td>
+<td>Replaced mock <code>hot_picks</code> with <code>_get_hot_picks()</code> — queries <code>PriceSnapshot</code> for real gainers, falls back to mock data if no snapshots exist</td>
+</tr>
+</tbody>
+</table>
+<h2>Architecture</h2>
+<pre class="mermaid" style="background:#ffffff;border:1px solid #d0d7de;border-radius:8px;padding:24px;margin:16px 0;text-align:center">graph LR
+    A["APScheduler (3AM JST)"] --> B["price_tracker.py"]
+    B --> C["PriceCharting API"]
+    B --> D["Gemini AI (>3 results)"]
+    B --> E["Frankfurter API (USD→JPY)"]
+    B --> F["PriceSnapshot DB Table"]
+    G["store.py _get_hot_picks()"] --> F
+    G --> H["What's Hot UI"]
+    I["Admin Settings"] --> J["scheduler.py reschedule"]
+    I --> K["Manual Run Trigger"]</pre>
+
+<h2>Remaining Work</h2>
+<ul>
+<li><strong>Visual upgrade</strong> of the What's Hot section HTML/CSS in <code>index.html</code> (glassmorphism, trendlines, etc.) — not yet started</li>
+<li><strong>End-to-end verification</strong> — requires starting the server with valid API keys</li>
+</ul>
+    
+    <div style="margin-top:48px;padding-top:24px;border-top:2px solid #21262d;text-align:center">
+        <p style="color:#8b949e;font-size:12px">TCG Nakama — Price Tracking System Walkthrough • February 2026</p>
+    </div>
+    
+    <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', themeVariables: { fontSize: '15px', primaryColor: '#dbeafe', primaryBorderColor: '#3b82f6', primaryTextColor: '#1e293b', lineColor: '#64748b', secondaryColor: '#f0fdf4', tertiaryColor: '#fef3c7' } });
+    </script>
+</body>
+</html>

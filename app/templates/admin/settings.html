@@ -137,6 +137,89 @@
                 </div>
             </button>
         </section>
+
+        <!-- Market Data / Price Tracker Section -->
+        <section class="mt-2">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="material-symbols-outlined text-neon-green">trending_up</span>
+                <h2 class="text-sm font-bold tracking-[0.2em] text-white uppercase">Market Data (PriceCharting)</h2>
+            </div>
+
+            <div class="glass-panel rounded-xl p-5 space-y-5">
+                <!-- Frequency Selector -->
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Update Frequency
+                        </div>
+                        <div class="text-[10px] text-white/40">How often to refresh market prices from PriceCharting
+                        </div>
+                    </div>
+                    <select id="price-frequency"
+                        class="bg-white/5 border border-white/10 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-neon-blue"
+                        onchange="updateFrequency(this.value)">
+                        <option value="daily">Daily (3 AM)</option>
+                        <option value="every_3_days">Every 3 Days</option>
+                        <option value="weekly" selected>Weekly (Sunday)</option>
+                    </select>
+                </div>
+
+                <div class="border-t border-white/5"></div>
+
+                <!-- Run Now -->
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Manual Update</div>
+                        <div class="text-[10px] text-white/40">Trigger an immediate batch price update for all cards
+                        </div>
+                    </div>
+                    <button id="run-now-btn" onclick="runPriceUpdateNow()"
+                        class="px-4 py-2 rounded-lg bg-neon-green/20 text-neon-green text-xs font-bold uppercase tracking-wider hover:bg-neon-green/30 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span class="material-symbols-outlined text-sm" id="run-now-icon">play_arrow</span>
+                        <span id="run-now-text">Run Now</span>
+                    </button>
+                </div>
+
+                <div class="border-t border-white/5"></div>
+
+                <!-- Status Display -->
+                <div id="market-status" class="space-y-3">
+                    <div class="text-xs font-bold text-white/70 uppercase tracking-wider">Last Update</div>
+                    <div id="status-loading" class="text-xs text-white/40">Loading status...</div>
+
+                    <div id="status-details" class="hidden">
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Status</div>
+                                <div id="stat-status" class="font-bold text-white flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-white/30"></span> —
+                                </div>
+                            </div>
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Last Run</div>
+                                <div id="stat-last-run" class="font-bold text-white">Never</div>
+                            </div>
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Updated</div>
+                                <div id="stat-updated" class="font-bold text-neon-green">—</div>
+                            </div>
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Failed</div>
+                                <div id="stat-failed" class="font-bold text-danger-red">—</div>
+                            </div>
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Duration</div>
+                                <div id="stat-duration" class="font-bold text-white">—</div>
+                            </div>
+                            <div class="bg-white/5 rounded-lg p-3">
+                                <div class="text-white/40 mb-1">Total Cards</div>
+                                <div id="stat-total" class="font-bold text-white">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Add/Edit Banner Modal -->
@@ -443,6 +526,105 @@
                 alert('Error: ' + error.message);
             }
         }
+
+        // ============= MARKET DATA JS =============
+        let _statusInterval = null;
+
+        async function fetchMarketStatus() {
+            try {
+                const res = await fetch('/admin/market-data/status');
+                const d = await res.json();
+
+                document.getElementById('status-loading').classList.add('hidden');
+                document.getElementById('status-details').classList.remove('hidden');
+
+                // Frequency dropdown
+                document.getElementById('price-frequency').value = d.frequency || 'weekly';
+
+                // Status dot
+                const statusEl = document.getElementById('stat-status');
+                const isRunning = d.status === 'running';
+                const dotColor = isRunning ? 'bg-neon-green animate-pulse' : (d.status === 'failed' ? 'bg-danger-red' : 'bg-white/40');
+                const statusLabel = isRunning ? 'Running...' : (d.status === 'failed' ? 'Failed' : 'Idle');
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full ${dotColor}"></span> ${statusLabel}`;
+
+                // Toggle Run Now button
+                const btn = document.getElementById('run-now-btn');
+                const icon = document.getElementById('run-now-icon');
+                const text = document.getElementById('run-now-text');
+                if (isRunning) {
+                    btn.disabled = true;
+                    icon.textContent = 'sync';
+                    icon.classList.add('animate-spin');
+                    text.textContent = 'Running...';
+                } else {
+                    btn.disabled = false;
+                    icon.textContent = 'play_arrow';
+                    icon.classList.remove('animate-spin');
+                    text.textContent = 'Run Now';
+                }
+
+                // Stats
+                document.getElementById('stat-last-run').textContent = d.last_run ? new Date(d.last_run).toLocaleString() : 'Never';
+                document.getElementById('stat-updated').textContent = d.updated ?? '—';
+                document.getElementById('stat-failed').textContent = d.failed ?? '—';
+                document.getElementById('stat-duration').textContent = d.duration ? d.duration + 's' : '—';
+                document.getElementById('stat-total').textContent = d.total ?? '—';
+
+                // Auto-refresh while running
+                if (isRunning && !_statusInterval) {
+                    _statusInterval = setInterval(fetchMarketStatus, 5000);
+                } else if (!isRunning && _statusInterval) {
+                    clearInterval(_statusInterval);
+                    _statusInterval = null;
+                }
+            } catch (e) {
+                console.error('Market status error:', e);
+            }
+        }
+
+        async function updateFrequency(freq) {
+            try {
+                await fetch('/admin/market-data/frequency', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frequency: freq })
+                });
+            } catch (e) {
+                alert('Failed to update frequency: ' + e.message);
+            }
+        }
+
+        async function runPriceUpdateNow() {
+            const btn = document.getElementById('run-now-btn');
+            btn.disabled = true;
+            document.getElementById('run-now-icon').textContent = 'sync';
+            document.getElementById('run-now-icon').classList.add('animate-spin');
+            document.getElementById('run-now-text').textContent = 'Starting...';
+
+            try {
+                const res = await fetch('/admin/market-data/run-now', { method: 'POST' });
+                const d = await res.json();
+                if (d.status === 'already_running') {
+                    document.getElementById('run-now-text').textContent = 'Already running';
+                } else {
+                    document.getElementById('run-now-text').textContent = 'Running...';
+                }
+                // Start polling
+                if (!_statusInterval) {
+                    _statusInterval = setInterval(fetchMarketStatus, 5000);
+                }
+            } catch (e) {
+                btn.disabled = false;
+                document.getElementById('run-now-icon').textContent = 'play_arrow';
+                document.getElementById('run-now-icon').classList.remove('animate-spin');
+                document.getElementById('run-now-text').textContent = 'Run Now';
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        // Init market data status on page load
+        fetchMarketStatus();
     </script>
 </body>
 

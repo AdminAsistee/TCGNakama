@@ -15,7 +15,7 @@ app = FastAPI(title="TCG Nakama")
 async def startup_event():
     # Initialize database
     from app.database import init_db, SessionLocal
-    from app.models import Banner
+    from app.models import Banner, SystemSetting
     
     init_db()
     print("[STARTUP] Database tables initialized")
@@ -67,15 +67,17 @@ async def startup_event():
     # Start background Shopify sync (30-minute polling)
     start_background_tasks()
     
-    # Email report scheduler (DISABLED - enable when ready)
-    # from app.scheduler import start_scheduler
-    # start_scheduler()
-    # print("[STARTUP] Daily email report scheduler initialized")
+    # Start price tracker scheduler (PriceCharting batch updates)
+    from app.scheduler import start_scheduler as start_price_scheduler
+    start_price_scheduler()
+    print("[STARTUP] Price tracker scheduler initialized")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean shutdown of background tasks."""
     await stop_background_tasks()
+    from app.scheduler import stop_scheduler as stop_price_scheduler
+    stop_price_scheduler()
     print("[SHUTDOWN] Application shutdown complete")
 
 # Mount static files with absolute path
@@ -118,9 +120,8 @@ async def track_search(data: SearchTrack):
 @app.post("/api/trigger-report")
 async def trigger_report():
     """Manually trigger a daily report email (for testing)."""
-    from app.scheduler import trigger_report_now
-    await trigger_report_now()
-    return {"success": True, "message": "Report triggered - check console/email"}
+    # Legacy: email report trigger (disabled)
+    return {"success": False, "message": "Report trigger disabled"}
 
 if __name__ == "__main__":
     import uvicorn

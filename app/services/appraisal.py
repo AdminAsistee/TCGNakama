@@ -772,8 +772,15 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             safe_print("[PRICECHARTING_API] No API key configured, skipping API")
             return None
         
-        # Build search query
-        search_name = card_name.split('(')[0].strip()
+        # Build search query - extract English name if Japanese name has parenthesized English
+        search_name = card_name
+        paren_match = re.search(r'\(([^)]+)\)', card_name)
+        if paren_match:
+            # Use the English name in parentheses (e.g., "ジュラキュール (Dracule Mihawk)" -> "Dracule Mihawk")
+            search_name = paren_match.group(1).strip()
+        else:
+            search_name = card_name.split('(')[0].strip()
+        
         query_parts = [search_name]
         
         if set_name and set_name != "Unknown":
@@ -868,6 +875,7 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             card_name_english = card_name_only.strip()
             
             if card_name_english:
+                
                 safe_print(f"[PRICECHARTING_API] Filtering by card name: '{card_name_english}'")
                 
                 name_matches = []
@@ -901,7 +909,6 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             
             # Step 3: Filter by card number (if card number provided)
             if card_number:
-                import re
                 
                 # Normalize the search card number: remove common separators and symbols
                 # e.g., "#OP09-051" -> "OP09051", "001/024" -> "001024"
@@ -956,10 +963,25 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             safe_print(f"[PRICECHARTING_API] Filtering by language: {'Japanese' if is_japanese else 'English'}")
             filtered_prices = _filter_by_language(filtered_prices, is_japanese)
             
-            # Select the cheapest price from filtered results
-            cheapest = min(filtered_prices, key=lambda x: x['price'])
-            safe_print(f"[PRICECHARTING_API] Selected cheapest: '{cheapest['name']}' = ${cheapest['price']} ({cheapest['type']})")
-            return cheapest['price']
+            # Step 4: Use Gemini AI to filter results for the best match
+            search_desc = f"{search_name}"
+            if card_number:
+                search_desc += f" {card_number}"
+            if set_name and set_name != 'Unknown':
+                search_desc += f" {set_name}"
+            
+            gemini_filtered = await _gemini_filter_cards(search_desc, filtered_prices)
+            
+            if gemini_filtered:
+                # Use Gemini's best match (first result from filtered list)
+                best = gemini_filtered[0]
+                safe_print(f"[PRICECHARTING_API] Gemini selected: '{best['name']}' = ${best['price']} ({best.get('type', 'unknown')})")
+                return best['price']
+            else:
+                # Gemini found no matches — select cheapest from filtered results as fallback
+                cheapest = min(filtered_prices, key=lambda x: x['price'])
+                safe_print(f"[PRICECHARTING_API] Gemini no match, fallback cheapest: '{cheapest['name']}' = ${cheapest['price']} ({cheapest['type']})")
+                return cheapest['price']
     
     except Exception as e:
         safe_print(f"[PRICECHARTING_API] Error: {e}")

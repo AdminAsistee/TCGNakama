@@ -1,148 +1,162 @@
 """
-Scheduler Service for TCG Nakama
-Handles scheduled tasks like daily email reports using APScheduler.
+APScheduler integration for TCG Nakama.
+Manages scheduled price updates based on admin settings.
 """
-
-import os
 import asyncio
+import logging
 from datetime import datetime
-import pytz
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.email_service import send_email, generate_daily_report_html
-from app import cost_db
+from app.database import SessionLocal
+from app.models import SystemSetting
+
+logger = logging.getLogger("scheduler")
+
+# Module-level scheduler instance
+_scheduler: AsyncIOScheduler | None = None
+_batch_running = False
+
+# Frequency → cron mapping (all run at 3:00 AM JST)
+FREQUENCY_CRON = {
+    "daily":       CronTrigger(hour=3, minute=0, timezone="Asia/Tokyo"),
+    "every_3_days": CronTrigger(day="*/3", hour=3, minute=0, timezone="Asia/Tokyo"),
+    "weekly":      CronTrigger(day_of_week="sun", hour=3, minute=0, timezone="Asia/Tokyo"),
+}
+
+JOB_ID = "price_batch_update"
 
 
-# Global scheduler instance
-scheduler = None
-
-
-async def collect_report_data() -> dict:
-    """Collect analytics data for the daily report."""
-    from app.dependencies import get_shopify_client
-    from app.routers.admin import fetch_shopify_orders, analyze_top_spenders
-    
-    client = get_shopify_client()
-    
+def _get_setting(key: str, default: str = "") -> str:
+    """Read a SystemSetting value."""
+    db = SessionLocal()
     try:
-        products = await client.get_products()
-    except Exception:
-        products = []
-    
-    try:
-        orders = await fetch_shopify_orders(limit=50)
-    except Exception:
-        orders = []
-    
-    # Get grades from local DB
-    all_grades = cost_db.get_all_grades()
-    total_graded = len([g for g in all_grades.values() if g])
-    
-    # Get trending searches
-    trending_searches = cost_db.get_trending_searches(days=30, limit=5)
-    
-    # Calculate top spenders
-    top_spenders = analyze_top_spenders(orders)
-    
-    # Calculate PSA 10 candidates (simple version)
-    psa_candidates = []
-    for product in products:
-        product_id = product.get('id', '')
-        grade = all_grades.get(product_id)
-        if grade in ['S', 'A']:
-            score = 80 if grade == 'S' else 60
-            price = float(product.get('price', 0))
-            if price > 5000:
-                score += 15
-            psa_candidates.append({
-                'title': product.get('title', 'Unknown')[:40],
-                'grade': grade,
-                'score': min(score, 100)
-            })
-    
-    psa_candidates.sort(key=lambda x: x['score'], reverse=True)
-    
-    # Build top products list (by price)
-    top_products = sorted(products, key=lambda x: float(x.get('price', 0)), reverse=True)[:5]
-    top_products = [{'title': p.get('title', '')[:40], 'price': float(p.get('price', 0))} for p in top_products]
-    
-    return {
-        'total_products': len(products),
-        'total_orders': len(orders),
-        'total_graded': total_graded,
-        'top_products': top_products,
-        'top_spenders': top_spenders,
-        'trending_searches': trending_searches,
-        'psa_candidates': psa_candidates[:3]
-    }
+        row = db.query(SystemSetting).filter_by(key=key).first()
+        return row.value if row else default
+    finally:
+        db.close()
 
 
-async def send_daily_report():
-    """Send the daily analytics report email."""
-    jst = pytz.timezone("Asia/Tokyo")
-    now = datetime.now(jst)
-    print(f"[SCHEDULER] Running daily report at {now.strftime('%Y-%m-%d %H:%M:%S')} JST")
-    
+def _set_setting(key: str, value: str):
+    """Write a SystemSetting value."""
+    db = SessionLocal()
     try:
-        data = await collect_report_data()
-        html_content = generate_daily_report_html(data)
-        subject = f"📊 TCG Nakama Daily Report - {now.strftime('%Y/%m/%d')}"
-        
-        success = send_email(subject, html_content)
-        if success:
-            print("[SCHEDULER] Daily report sent successfully!")
+        row = db.query(SystemSetting).filter_by(key=key).first()
+        if row:
+            row.value = value
         else:
-            print("[SCHEDULER] Daily report failed to send (check SMTP config)")
+            db.add(SystemSetting(key=key, value=value))
+        db.commit()
+    finally:
+        db.close()
+
+
+async def _run_batch_job():
+    """Scheduled job: fetch products & run batch price update."""
+    global _batch_running
+    if _batch_running:
+        logger.warning("Batch already running, skipping this trigger")
+        return
+
+    _batch_running = True
+    _set_setting("price_tracker_status", "running")
+    logger.info("=== Scheduled price batch starting ===")
+
+    try:
+        # Import here to avoid circular imports
+        from app.dependencies import get_shopify_client
+        from app.services.price_tracker import run_batch_update
+
+        client = get_shopify_client()
+        products = await client.get_products()
+
+        if not products:
+            logger.warning("No products from Shopify, skipping batch")
+            _set_setting("price_tracker_status", "idle")
+            _batch_running = False
+            return
+
+        result = await run_batch_update(products)
+        logger.info(f"Batch result: {result}")
+        _set_setting("price_tracker_status", "idle")
+
     except Exception as e:
-        print(f"[SCHEDULER] Error generating daily report: {e}")
+        logger.error(f"Batch job failed: {e}", exc_info=True)
+        _set_setting("price_tracker_status", "failed")
+        _set_setting("price_tracker_last_error", str(e)[:500])
+    finally:
+        _batch_running = False
 
 
-def init_scheduler():
-    """Initialize the APScheduler with scheduled jobs."""
-    global scheduler
-    
-    if scheduler is not None:
-        print("[SCHEDULER] Already initialized")
-        return scheduler
-    
-    scheduler = AsyncIOScheduler(timezone=pytz.timezone("Asia/Tokyo"))
-    
-    # Schedule daily report at 9:00 AM JST
-    scheduler.add_job(
-        send_daily_report,
-        CronTrigger(hour=9, minute=0, timezone=pytz.timezone("Asia/Tokyo")),
-        id="daily_report",
-        name="Daily Analytics Report",
-        replace_existing=True
-    )
-    
-    print("[SCHEDULER] Initialized - Daily report scheduled for 9:00 AM JST")
-    return scheduler
+def get_scheduler() -> AsyncIOScheduler | None:
+    """Return the module-level scheduler instance."""
+    return _scheduler
+
+
+def is_batch_running() -> bool:
+    """Check if a batch job is currently running."""
+    return _batch_running
 
 
 def start_scheduler():
-    """Start the scheduler."""
-    global scheduler
-    
-    if scheduler is None:
-        scheduler = init_scheduler()
-    
-    if not scheduler.running:
-        scheduler.start()
-        print("[SCHEDULER] Started")
+    """Initialize and start the APScheduler."""
+    global _scheduler
+
+    _scheduler = AsyncIOScheduler()
+
+    # Read saved frequency or default to weekly
+    frequency = _get_setting("price_update_frequency", "weekly")
+    trigger = FREQUENCY_CRON.get(frequency, FREQUENCY_CRON["weekly"])
+
+    _scheduler.add_job(
+        _run_batch_job,
+        trigger=trigger,
+        id=JOB_ID,
+        replace_existing=True,
+        name="PriceCharting batch update",
+    )
+
+    _scheduler.start()
+    logger.info(f"Scheduler started (frequency={frequency})")
 
 
 def stop_scheduler():
-    """Stop the scheduler."""
-    global scheduler
+    """Shut down the scheduler gracefully."""
+    global _scheduler
+    if _scheduler:
+        _scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+        _scheduler = None
+
+
+def reschedule(frequency: str):
+    """
+    Update the batch job schedule (called when admin changes frequency).
     
-    if scheduler and scheduler.running:
-        scheduler.shutdown()
-        print("[SCHEDULER] Stopped")
+    Args:
+        frequency: One of 'daily', 'every_3_days', 'weekly'
+    """
+    global _scheduler
+    if not _scheduler:
+        logger.warning("Scheduler not running, cannot reschedule")
+        return
+
+    trigger = FREQUENCY_CRON.get(frequency)
+    if not trigger:
+        logger.error(f"Unknown frequency: {frequency}")
+        return
+
+    _scheduler.reschedule_job(JOB_ID, trigger=trigger)
+    _set_setting("price_update_frequency", frequency)
+    logger.info(f"Rescheduled to: {frequency}")
 
 
-async def trigger_report_now():
-    """Manually trigger the daily report (for testing)."""
-    print("[SCHEDULER] Manually triggering daily report...")
-    await send_daily_report()
+async def trigger_manual_run():
+    """Trigger an immediate batch run (from admin panel 'Run Now' button)."""
+    if _batch_running:
+        return {"status": "already_running"}
+
+    # Run in background so the HTTP response returns immediately
+    asyncio.create_task(_run_batch_job())
+    return {"status": "started"}

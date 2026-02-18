@@ -154,34 +154,48 @@
             </span>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {% for product in fresh_pulls %}
             <div
-                class="flex flex-col bg-surface rounded-xl border border-vault-border overflow-hidden hover:border-primary/30 transition-all group">
-                <!-- Listed Badge -->
-                <div class="relative">
+                class="flex flex-col bg-surface rounded-xl border border-white/[0.1] overflow-hidden hover:border-primary/30 transition-all group">
+                <!-- Card Image -->
+                <a href="/card/{{ product.id }}" class="relative block overflow-hidden rounded-t-xl"
+                    style="aspect-ratio: 5/7;">
+                    <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400"
+                        alt="{{ product.title }}"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        loading="lazy">
+                    <!-- Freshness Badge -->
                     <div
-                        class="absolute top-2 left-2 z-10 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-md px-1.5 py-0.5">
-                        <span class="w-1.5 h-1.5 bg-neon-green rounded-full"></span>
-                        <span class="text-[8px] font-bold text-white">Listed {{ product.listed_ago }}</span>
+                        class="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-md px-2 py-0.5 border border-white/10">
+                        {% if product.listed_ago == 'NEW ARRIVAL' %}
+                        <span class="w-1.5 h-1.5 bg-neon-green rounded-full live-pulse"></span>
+                        <span class="text-[8px] font-black text-neon-green uppercase tracking-wider">{{
+                            product.listed_ago }}</span>
+                        {% elif product.listed_ago == 'RECENT' %}
+                        <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                        <span class="text-[8px] font-black text-amber-400 uppercase tracking-wider">{{
+                            product.listed_ago }}</span>
+                        {% else %}
+                        <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                        <span class="text-[8px] font-bold text-gray-300 uppercase tracking-wider">{{ product.listed_ago
+                            }}</span>
+                        {% endif %}
                     </div>
-                    <div class="aspect-[3/4] overflow-hidden cursor-pointer" hx-get="/product/{{ product.id }}"
-                        hx-target="#modal-container" hx-swap="innerHTML">
-                        <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=300"
-                            alt="{{ product.title }}"
-                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            loading="lazy">
-                    </div>
-                </div>
+                </a>
 
-                <!-- Info -->
-                <div class="p-2 space-y-1">
-                    <p class="text-[11px] font-semibold text-white/90 truncate">{{ product.title }}</p>
-                    <div class="flex items-center justify-between">
+                <!-- Info & Action -->
+                <div class="px-3 py-2.5 flex flex-col gap-1.5">
+                    <a href="/card/{{ product.id }}" class="block min-w-0">
+                        <h4 class="text-[11px] md:text-xs font-bold text-white/90 leading-snug line-clamp-2">{{
+                            product.title }}</h4>
+                    </a>
+                    <div class="flex items-center justify-between pt-1.5 border-t border-white/5">
                         <span class="text-sm font-black text-primary">¥{{ "{:,.0f}".format(product.price) }}</span>
                         <button onclick="handleCartAction('{{ product.variant_id }}', 'add', event)"
-                            class="w-7 h-7 rounded-full bg-primary text-background-dark flex items-center justify-center hover:bg-primary-dark active:scale-90 transition-all">
-                            <span class="material-symbols-outlined text-sm font-bold">add</span>
+                            class="min-h-[44px] px-4 bg-primary hover:bg-primary/80 text-background-dark text-[10px] font-black rounded-lg transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wider active:scale-95">
+                            <span class="material-symbols-outlined text-base">add_shopping_cart</span>
+                            <span>Add</span>
                         </button>
                     </div>
                 </div>
@@ -190,50 +204,103 @@
         </div>
     </section>
 
-    <!-- ==================== WHAT'S HOT (INVESTOR FOCUS) ==================== -->
-    <section class="mt-10">
-        <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
-            📈 What's Hot <span class="text-sm font-normal text-gray-400">(Investor Focus)</span>
-        </h3>
+    <!-- ==================== WHAT'S HOT (MARKET GAINERS) ==================== -->
+    <section class="mt-10 md:mt-14">
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+                <span class="text-xl">🔥</span>
+                <div>
+                    <h3 class="text-base md:text-lg font-black tracking-tight text-white leading-none">What's Hot</h3>
+                    <p class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase mt-0.5">Market Gainers
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded border border-neon-green/20 bg-neon-green/5">
+                <span class="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse"></span>
+                <span class="text-[9px] font-bold text-neon-green uppercase tracking-wider">Live</span>
+            </div>
+        </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <!-- Compact Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {% for product in hot_picks %}
-            <div
-                class="flex flex-col bg-surface rounded-xl border border-vault-border overflow-hidden hover:border-primary/30 transition-all">
-                <!-- Hype Velocity Bar -->
-                <div class="hype-bar w-full" style="--hype: {{ product.hype_pct }}%"></div>
+            <div class="hot-card group relative rounded-lg overflow-hidden transition-all duration-200 hover:translate-y-[-2px]"
+                style="background: #0d1321; border: 1px solid rgba(255,255,255,0.08);">
 
-                <div class="p-3 flex flex-col gap-2">
-                    <div class="flex gap-2 items-start">
-                        <!-- Card Image -->
-                        <div class="w-16 sm:w-20 md:w-24 aspect-[3/4] rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
-                            hx-get="/product/{{ product.id }}" hx-target="#modal-container" hx-swap="innerHTML">
-                            <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=200"
+                <div class="flex items-stretch">
+                    <!-- LEFT: Rank Badge + Card Image -->
+                    <div class="relative flex-shrink-0 p-2 pr-0">
+                        <!-- Bold Rank Badge -->
+                        <span class="absolute top-1 left-1 z-10 flex items-center justify-center text-[10px] font-black leading-none rounded px-1.5 py-1
+                            {% if loop.index == 1 %}bg-yellow-500 text-black
+                            {% elif loop.index == 2 %}bg-gray-400 text-black
+                            {% elif loop.index == 3 %}bg-amber-700 text-white
+                            {% else %}bg-white/10 text-white/60 border border-white/10{% endif %}"
+                            style="{% if loop.index <= 3 %}box-shadow: 0 0 8px {% if loop.index == 1 %}rgba(234,179,8,0.4){% elif loop.index == 2 %}rgba(156,163,175,0.3){% else %}rgba(180,83,9,0.3){% endif %};{% endif %}">
+                            #{{ loop.index }}
+                        </span>
+                        <a href="/card/{{ product.id }}"
+                            class="block w-14 sm:w-16 aspect-[3/4] rounded overflow-hidden ring-1 ring-white/8">
+                            <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=160"
                                 alt="{{ product.title }}" class="w-full h-full object-cover" loading="lazy">
-                        </div>
-
-                        <!-- Info + Graph -->
-                        <div class="flex flex-col flex-1 min-w-0 justify-between h-full">
-                            <!-- Graph -->
-                            <div class="flex items-center justify-end gap-1">
-                                <svg class="mini-graph" width="50" height="24" viewBox="0 0 50 24">
-                                    <polyline fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round"
-                                        points="0,20 8,18 16,15 22,16 28,12 34,10 40,8 46,4 50,2" />
-                                </svg>
-                                <span class="text-[11px] font-bold text-neon-green">+{{ product.growth }}%</span>
-                            </div>
-
-                            <!-- Price -->
-                            <p class="text-sm md:text-base font-black text-white text-right mt-1">¥{{
-                                "{:,.0f}".format(product.price) }}</p>
-                        </div>
+                        </a>
                     </div>
 
-                    <!-- Buy Now Button -->
-                    <button onclick="handleCartAction('{{ product.variant_id }}', 'buy', event)"
-                        class="w-full py-1.5 bg-primary/10 border border-primary/30 text-primary text-xs font-black uppercase tracking-wider rounded-md hover:bg-primary/20 active:scale-95 transition-all">
-                        BUY NOW
-                    </button>
+                    <!-- CENTER + RIGHT: Metadata & Price -->
+                    <div class="flex-1 min-w-0 p-2 pl-2.5 flex flex-col justify-between">
+                        <!-- Top Row: Name + Price/Change -->
+                        <div class="flex items-start justify-between gap-1.5">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold text-white/80 leading-tight line-clamp-1">{{
+                                    product.title | truncate(32) }}</p>
+                                <p class="text-[9px] text-gray-600 mt-0.5 line-clamp-1">{{ product.collection if
+                                    product.collection else 'TCG' }}</p>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <p class="text-sm font-black text-white tabular-nums leading-none">¥{{
+                                    "{:,.0f}".format(product.price) }}</p>
+                                <span class="text-[10px] font-bold text-neon-green leading-none">▲ {{ product.growth
+                                    }}%</span>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Row: 7-Day Trend + Hype Meter + Buy -->
+                        <div class="flex items-end justify-between gap-2 mt-1.5">
+                            <!-- Sparkline with Label -->
+                            <div class="flex flex-col gap-0.5">
+                                <span class="text-[8px] font-semibold text-gray-600 uppercase tracking-wider">7-Day
+                                    Trend</span>
+                                <svg width="64" height="22" viewBox="0 0 64 22" class="mini-graph">
+                                    <defs>
+                                        <linearGradient id="hg{{ loop.index }}" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#22C55E" stop-opacity="0.2" />
+                                            <stop offset="100%" stop-color="#22C55E" stop-opacity="0" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path
+                                        d="M0,18 C8,16 14,14 20,13 C26,12 28,15 34,10 C40,6 46,5 52,3 C58,2 62,1 64,0 L64,22 L0,22 Z"
+                                        fill="url(#hg{{ loop.index }})" />
+                                    <polyline fill="none" stroke="#22C55E" stroke-width="1.2" stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        points="0,18 8,16 14,14 20,13 26,15 32,10 38,7 44,5 52,3 58,2 64,0"
+                                        style="filter: drop-shadow(0 0 3px rgba(34,197,94,0.5));" />
+                                </svg>
+                            </div>
+
+                            <!-- Compact Buy Button -->
+                            <button onclick="handleCartAction('{{ product.variant_id }}', 'buy', event)"
+                                class="flex-shrink-0 px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition-all active:scale-95
+                                    bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 hover:border-primary/50">
+                                BUY
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hover accent line -->
+                <div
+                    class="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-neon-green/0 via-neon-green/40 to-neon-green/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 </div>
             </div>
             {% endfor %}
@@ -484,8 +551,7 @@
         <div class="py-6">
 
 
-            <div id="product-grid"
-                class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8 relative">
+            <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative">
                 <!-- Loading Overlay -->
                 <div id="grid-loading"
                     class="htmx-indicator absolute inset-0 bg-background-dark/80 backdrop-blur-sm z-10 flex items-center justify-center">

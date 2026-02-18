@@ -6,7 +6,7 @@ from app.dependencies import get_shopify_client, ShopifyClient
 from app.routers.oauth import get_admin_token
 from app import cost_db
 from app.database import get_db
-from app.models import Banner
+from app.models import Banner, SystemSetting
 from app.services import appraisal
 from app.services.appraisal import safe_print
 from sqlalchemy.orm import Session
@@ -296,11 +296,12 @@ async def admin_dashboard(
     # Fetch real live data with search filters
     products = await client.get_products(query=query, rarity=rarity)
     
-    # Get all costs and grades from local database
+    # Get all costs, grades, and locations from local database
     all_costs = cost_db.get_all_costs()
     all_grades = cost_db.get_all_grades()
+    all_locations = cost_db.get_all_locations()
     
-    # Calculate "Days in Vault" and attach costs for each product
+    # Calculate "Days in Vault" and attach costs/grades/locations for each product
     now = datetime.now(timezone.utc)
     for p in products:
         # Days in Vault calculation
@@ -328,16 +329,22 @@ async def admin_dashboard(
         
         # Attach grade from local DB
         p['grade'] = all_grades.get(product_id)
+        
+        # Attach location from local DB (defaults to "Folder" if missing)
+        p['location'] = all_locations.get(product_id, cost_db.DEFAULT_LOCATION)
     
-    # Calculate stats
-    total_value = sum(p['price'] for p in products)
-    live_count = len(products)
+    # Global Inventory Filter: only "active" products count toward stats
+    active_products = [p for p in products if p['location'] not in cost_db.INACTIVE_LOCATIONS]
+    
+    # Calculate stats from ACTIVE products only
+    total_value = sum(p['price'] for p in active_products)
+    live_count = len(active_products)
     vip_threshold = 100000
-    vip_products = [p for p in products if p['price'] > vip_threshold]
+    vip_products = [p for p in active_products if p['price'] > vip_threshold]
     cart_value_vip = sum(p['price'] for p in vip_products)
 
-    # Save weekly value snapshot and get history
-    cost_db.save_value_snapshot(total_value, product_count=len(products))
+    # Save weekly value snapshot from ACTIVE inventory only
+    cost_db.save_value_snapshot(total_value, product_count=live_count)
     value_history = cost_db.get_value_history(limit=12)
 
     # Format currency for display
@@ -2106,3 +2113,66 @@ async def bulk_confirm(
             })
     
     return JSONResponse(results)
+
+
+# ============= MARKET DATA / PRICE TRACKER ENDPOINTS =============
+
+@router.get("/market-data/status")
+async def market_data_status(admin: str = Depends(get_admin_session), db: Session = Depends(get_db)):
+    """Return current price tracker status and last run metadata."""
+    from app.scheduler import is_batch_running
+
+    keys = [
+        "price_update_frequency",
+        "price_tracker_last_run",
+        "price_tracker_last_updated",
+        "price_tracker_last_failed",
+        "price_tracker_last_skipped",
+        "price_tracker_last_total",
+        "price_tracker_last_duration",
+        "price_tracker_status",
+        "price_tracker_last_error",
+    ]
+    settings = {}
+    for key in keys:
+        row = db.query(SystemSetting).filter_by(key=key).first()
+        settings[key] = row.value if row else None
+
+    return JSONResponse({
+        "frequency": settings.get("price_update_frequency", "weekly"),
+        "last_run": settings.get("price_tracker_last_run"),
+        "updated": settings.get("price_tracker_last_updated"),
+        "failed": settings.get("price_tracker_last_failed"),
+        "skipped": settings.get("price_tracker_last_skipped"),
+        "total": settings.get("price_tracker_last_total"),
+        "duration": settings.get("price_tracker_last_duration"),
+        "status": "running" if is_batch_running() else (settings.get("price_tracker_status") or "idle"),
+        "last_error": settings.get("price_tracker_last_error"),
+    })
+
+
+@router.post("/market-data/frequency")
+async def update_frequency(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+):
+    """Update the price update frequency schedule."""
+    data = await request.json()
+    frequency = data.get("frequency", "weekly")
+
+    if frequency not in ("daily", "every_3_days", "weekly"):
+        return JSONResponse({"success": False, "error": "Invalid frequency"}, status_code=400)
+
+    from app.scheduler import reschedule
+    reschedule(frequency)
+
+    return JSONResponse({"success": True, "frequency": frequency})
+
+
+@router.post("/market-data/run-now")
+async def run_now(admin: str = Depends(get_admin_session)):
+    """Trigger an immediate batch price update."""
+    from app.scheduler import trigger_manual_run
+    result = await trigger_manual_run()
+    return JSONResponse(result)
+

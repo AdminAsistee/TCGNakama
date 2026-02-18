@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- ==================== HEADER / NAVBAR (same as homepage) ==================== -->
+<header class="sticky top-0 z-50 bg-background-dark/90 backdrop-blur-md border-b border-white/5">
+    <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto">
+        <!-- Logo -->
+        <div class="flex items-center gap-2">
+            <a href="/" class="flex items-center gap-2">
+                <img src="/static/logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
+                <h1 class="text-lg font-bold tracking-tight text-primary">TCGNakama</h1>
+            </a>
+        </div>
+
+        <!-- Desktop Nav -->
+        <nav class="hidden md:flex items-center gap-6">
+            <a href="/" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Home</a>
+            <a href="/#all-cards-section"
+                class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Shop</a>
+            <span class="text-sm font-medium text-gray-600 cursor-default flex items-center gap-1.5">
+                Community
+                <span
+                    class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>
+            </span>
+        </nav>
+
+        <!-- Cart -->
+        <button id="cart-btn"
+            class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+            hx-get="/cart/drawer" hx-target="#cart-drawer-container">
+            <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
+            <span id="cart-count"
+                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center {{ '' if cart_count and cart_count > 0 else 'hidden' }}">{{
+                cart_count or 0 }}</span>
+        </button>
+    </div>
+</header>
+
+<!-- Toast Notification -->
+<div id="toast"
+    class="fixed top-20 left-1/2 -translate-x-1/2 z-[70] bg-surface border border-primary/30 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none">
+    <span class="material-symbols-outlined text-neon-green text-lg">check_circle</span>
+    <span id="toast-message">Link copied!</span>
+</div>
+
+<!-- Cart Drawer Container -->
+<div id="cart-drawer-container"></div>
+
+{% if product %}
+<main class="pb-24 md:pb-16 w-full">
+    <!-- Desktop: side-by-side layout -->
+    <div class="max-w-5xl mx-auto md:flex md:gap-8 md:px-8 md:pt-8">
+
+        <!-- ===== IMAGE SECTION ===== -->
+        <section
+            class="flex flex-col items-center mb-6 md:mb-0 md:w-[45%] md:sticky md:top-20 md:self-start relative group px-4 md:px-0">
+            <!-- Image Carousel -->
+            <div id="image-carousel"
+                class="relative w-full max-w-[320px] md:max-w-full aspect-[2/3] rounded-xl overflow-hidden shadow-[0_4px_20px_-2px_rgba(0,0,0,0.8)] bg-black border border-white/10">
+                {% if product.images and product.images|length > 0 %}
+                {% for img_url in product.images %}
+                <div class="carousel-slide absolute inset-0 transition-opacity duration-500 {% if loop.index0 == 0 %}opacity-100{% else %}opacity-0 pointer-events-none{% endif %}"
+                    data-index="{{ loop.index0 }}">
+                    <img alt="{{ product.title }}"
+                        class="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
+                        src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=800"
+                        loading="{% if loop.index0 == 0 %}eager{% else %}lazy{% endif %}" />
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="w-full h-full bg-gradient-to-tr from-black to-gray-900 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-6xl text-gray-700">image</span>
+                </div>
+                {% endif %}
+
+                <!-- Carousel Nav Arrows (only if multiple images) -->
+                {% if product.images and product.images|length > 1 %}
+                <button onclick="carouselNav(-1)"
+                    class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100 border border-white/10">
+                    <span class="material-symbols-outlined text-lg">chevron_left</span>
+                </button>
+                <button onclick="carouselNav(1)"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100 border border-white/10">
+                    <span class="material-symbols-outlined text-lg">chevron_right</span>
+                </button>
+                {% endif %}
+
+                <!-- Zoom icon -->
+                <div class="absolute bottom-3 right-3 bg-black/70 text-white p-1.5 rounded-full backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    onclick="openFullscreen()">
+                    <span class="material-symbols-outlined text-sm">zoom_in</span>
+                </div>
+            </div>
+
+            <!-- Decorative glow behind image -->
+            <div
+                class="absolute -z-10 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] bg-primary/5 blur-[80px] rounded-full">
+            </div>
+
+            <!-- Carousel Dots -->
+            {% if product.images and product.images|length > 1 %}
+            <div class="flex gap-1.5 mt-4" id="carousel-dots">
+                {% for img_url in product.images %}
+                <button onclick="goToSlide({{ loop.index0 }})"
+                    class="carousel-dot w-2 h-2 rounded-full transition-all duration-300 {% if loop.index0 == 0 %}bg-primary w-6{% else %}bg-white/20 hover:bg-white/40{% endif %}"
+                    data-index="{{ loop.index0 }}"></button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- ===== INFO SECTION ===== -->
+        <section class="px-4 md:px-0 md:w-[55%] md:pt-0 space-y-5">
+
+            <!-- Breadcrumb + Share -->
+            <div class="flex items-center justify-between mb-2">
+                <a href="/" class="flex items-center gap-1 text-xs text-gray-500 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined text-sm">arrow_back</span>
+                    Back to Shop
+                </a>
+                <button onclick="shareCard(event)" aria-label="Share"
+                    class="flex items-center gap-1 text-xs text-gray-500 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined text-sm">share</span>
+                    Share
+                </button>
+            </div>
+
+            <!-- Metadata Pills -->
+            <div class="flex flex-wrap gap-2">
+                {% if product.rarity %}
+                <span class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider
+                    {% if product.rarity in ['Ultra Rare', 'Secret Rare'] %}bg-purple-900/30 text-purple-300 border border-purple-500/20
+                    {% elif product.rarity == 'Rare' %}bg-yellow-900/30 text-yellow-300 border border-yellow-500/20
+                    {% elif product.rarity == 'Epic' %}bg-blue-900/30 text-blue-300 border border-blue-500/20
+                    {% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">
+                    {{ product.rarity }}
+                </span>
+                {% endif %}
+
+                {% if product.condition %}
+                <span
+                    class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-900/30 text-green-400 border border-green-500/20">
+                    {{ product.condition }}
+                </span>
+                {% endif %}
+
+                {% for tag in product.tags %}
+                {% if tag.lower().startswith('edition:') %}
+                <span
+                    class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-300 border border-white/10">
+                    {{ tag.split(':')[1].strip() }}
+                </span>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Title -->
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold leading-tight text-white">
+                    {{ product.title }}
+                </h1>
+                <p class="text-sm text-gray-400 font-medium tracking-wide uppercase mt-1">
+                    {{ product.set }}{% if product.card_number %} · {{ product.card_number }}{% endif %}
+                </p>
+            </div>
+
+            <!-- Price + Quantity -->
+            <div class="flex items-end justify-between py-4 border-y border-white/10">
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Price</span>
+                    <span class="text-3xl md:text-4xl font-bold text-primary font-display">¥{{
+                        "{:,}".format(product.price|int) }}</span>
+                    {% if market_data %}
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Market</span>
+                        <span class="text-sm font-bold text-gray-300">¥{{ "{:,}".format(market_data.market_jpy|int)
+                            }}</span>
+                        {% set diff_pct = ((product.price - market_data.market_jpy) / market_data.market_jpy * 100) if
+                        market_data.market_jpy > 0 else 0 %}
+                        {% if diff_pct > 5 %}
+                        <span class="text-[10px] font-bold text-neon-red flex items-center gap-0.5">
+                            <span class="material-symbols-outlined text-[12px]">arrow_upward</span>
+                            +{{ "{:.0f}".format(diff_pct) }}%
+                        </span>
+                        {% elif diff_pct < -5 %} <span
+                            class="text-[10px] font-bold text-neon-green flex items-center gap-0.5">
+                            <span class="material-symbols-outlined text-[12px]">arrow_downward</span>
+                            {{ "{:.0f}".format(diff_pct) }}%
+                            </span>
+                            {% else %}
+                            <span class="text-[10px] font-bold text-gray-500">≈ Market</span>
+                            {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% if product.totalInventory > 0 %}
+                <div class="flex items-center bg-white/5 rounded-lg border border-white/10 h-10 backdrop-blur-sm">
+                    <button onclick="updateQty('card-qty', -1)"
+                        class="w-10 h-full flex items-center justify-center text-gray-300 hover:text-primary hover:bg-white/5 rounded-l-lg transition-colors">
+                        <span class="material-symbols-outlined text-lg">remove</span>
+                    </button>
+                    <span id="card-qty" class="w-10 text-center font-bold text-white select-none">1</span>
+                    <button onclick="updateQty('card-qty', 1)"
+                        class="w-10 h-full flex items-center justify-center text-gray-300 hover:text-primary hover:bg-white/5 rounded-r-lg transition-colors">
+                        <span class="material-symbols-outlined text-lg">add</span>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Add to Cart Button / SOLD OUT -->
+            {% if product.totalInventory > 0 %}
+            <button id="btn-add-cart" onclick="handleCartAction('{{ product.variant_id }}', 'add', event, 'card-qty')"
+                class="w-full bg-primary hover:bg-yellow-300 text-black font-bold text-lg py-4 rounded-lg shadow-[0_0_15px_-3px_rgba(255,215,0,0.3)] flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                <span class="material-symbols-outlined">shopping_bag</span>
+                Add to Cart
+            </button>
+            {% else %}
+            <button disabled
+                class="w-full bg-gray-700/50 text-gray-400 font-bold text-lg py-4 rounded-lg border border-red-500/20 flex items-center justify-center gap-2 cursor-not-allowed">
+                <span class="material-symbols-outlined text-red-400">block</span>
+                SOLD OUT
+            </button>
+            {% endif %}
+
+            <!-- Trust Badges -->
+            <div class="flex justify-center gap-6 pt-1">
+                <div class="flex items-center gap-1.5 text-[11px] text-gray-400">
+                    <span class="material-symbols-outlined text-neon-green text-sm">verified</span>
+                    <span>Verified Authentic</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-[11px] text-gray-400">
+                    <span class="material-symbols-outlined text-primary text-sm">local_shipping</span>
+                    <span>Ships Tomorrow</span>
+                </div>
+            </div>
+
+            <!-- Card Details Section -->
+            <div class="pt-4">
+                <h2 class="text-lg font-bold text-white mb-3 pl-3 border-l-4 border-primary">Card Details</h2>
+
+                <!-- 2-Column Grid (desktop) / 1-Column (mobile) -->
+                <div class="rounded-lg border border-white/10 bg-black/20 backdrop-blur-sm overflow-hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 text-sm">
+                        {% if product.card_number %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Set Code</span>
+                            <span class="text-gray-200 font-mono">{{ product.card_number }}</span>
+                        </div>
+                        {% endif %}
+                        {% if product.set %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Set</span>
+                            <span class="text-gray-200">{{ product.set }}</span>
+                        </div>
+                        {% endif %}
+                        {% if product.collections and product.collections|length > 0 %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Collection</span>
+                            <span class="text-gray-200">{{ product.collections | join(', ') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if product.vendor %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Seller</span>
+                            <span class="text-gray-200">{{ product.vendor }}</span>
+                        </div>
+                        {% endif %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Stock</span>
+                            <span class="text-gray-200">
+                                {% if product.totalInventory and product.totalInventory > 0 %}
+                                <span class="flex items-center gap-1.5">
+                                    <span
+                                        class="w-2 h-2 rounded-full bg-neon-green shadow-[0_0_6px_rgba(34,197,94,0.6)]"></span>
+                                    {{ product.totalInventory }} available
+                                </span>
+                                {% else %}
+                                <span class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-neon-red"></span>
+                                    Sold Out
+                                </span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if product.condition %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
+                            <span class="text-gray-200">{{ product.condition }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Market Value — separated with distinct styling -->
+                    {% if market_data %}
+                    <div class="border-t border-primary/20 bg-primary/5">
+                        <div class="flex items-center justify-between py-3 px-4">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-base">monitoring</span>
+                                <span class="font-medium text-gray-400 text-sm">Market Value</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white text-sm">¥{{ "{:,}".format(market_data.market_jpy|int)
+                                    }}</span>
+                                <span class="text-gray-500 text-xs">(~${{ "{:.2f}".format(market_data.market_usd)
+                                    }})</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Price History Placeholder (future feature) -->
+            <!--
+            <div class="pt-4">
+                <h2 class="text-lg font-bold text-white mb-3 pl-3 border-l-4 border-primary">Price History</h2>
+                <div class="bg-black/40 rounded-xl p-6 border border-white/10 text-center">
+                    <span class="material-symbols-outlined text-3xl text-gray-600">trending_up</span>
+                    <p class="text-gray-500 text-sm mt-2">Price history coming soon</p>
+                </div>
+            </div>
+            -->
+
+        </section>
+    </div>
+
+    <!-- ===== FROM SAME COLLECTION ===== -->
+    {% if same_collection and same_collection|length > 0 %}
+    <section class="mt-10 px-4 max-w-5xl mx-auto">
+        <h2 class="text-lg font-bold text-white mb-4 pl-3 border-l-4 border-primary">From Same Collection</h2>
+        <div class="flex overflow-x-auto gap-3 pb-4 hide-scrollbar -mx-1 px-1">
+            {% for card in same_collection %}
+            <a href="/card/{{ card.id }}" class="flex-shrink-0 w-32 group cursor-pointer">
+                <div class="w-32 h-44 rounded-lg bg-black/40 border border-white/10 overflow-hidden mb-2 relative">
+                    <img alt="{{ card.title }}"
+                        class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        src="{{ card.image }}{% if '?' in card.image %}&{% else %}?{% endif %}width=300"
+                        loading="lazy" />
+                    <div
+                        class="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded text-[7px] font-bold text-white uppercase tracking-wider">
+                        {{ card.badge }}
+                    </div>
+                </div>
+                <p class="text-[11px] font-bold text-white truncate">{{ card.title }}</p>
+                <p class="text-[11px] text-primary font-bold">¥{{ "{:,}".format(card.price|int) }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</main>
+
+
+<!-- ===== MOBILE BOTTOM NAV (same as homepage) ===== -->
+<nav
+    class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-lg border-t border-white/10 safe-area-bottom">
+    <div class="flex items-center justify-around pt-2 pb-1">
+        <a href="/" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">home</span>
+            <span class="text-[9px] font-bold text-gray-500">Home</span>
+        </a>
+        <a href="/#all-cards-section" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">storefront</span>
+            <span class="text-[9px] font-bold text-gray-500">Shop</span>
+        </a>
+        {% if product.totalInventory > 0 %}
+        <button onclick="handleCartAction('{{ product.variant_id }}', 'add', event, 'card-qty')"
+            class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-primary text-xl">add_shopping_cart</span>
+            <span class="text-[9px] font-bold text-primary">Add</span>
+        </button>
+        {% else %}
+        <button disabled class="flex flex-col items-center gap-0.5 px-3 py-1 opacity-40 cursor-not-allowed">
+            <span class="material-symbols-outlined text-red-400 text-xl">block</span>
+            <span class="text-[9px] font-bold text-red-400">Sold</span>
+        </button>
+        {% endif %}
+        <button class="relative flex flex-col items-center gap-0.5 px-3 py-1" hx-get="/cart/drawer"
+            hx-target="#cart-drawer-container">
+            <span class="material-symbols-outlined text-gray-500 text-xl">shopping_cart</span>
+            <span class="text-[9px] font-bold text-gray-500">Cart</span>
+            <span id="cart-count-mobile"
+                class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center {{ '' if cart_count and cart_count > 0 else 'hidden' }}">{{
+                cart_count or 0 }}</span>
+        </button>
+    </div>
+</nav>
+
+{% else %}
+<!-- Product Not Found -->
+<main class="pt-24 pb-20 px-4 text-center min-h-screen flex flex-col items-center justify-center">
+    <span class="material-symbols-outlined text-6xl text-gray-600 mb-4">search_off</span>
+    <h1 class="text-2xl font-bold text-white mb-2">Card Not Found</h1>
+    <p class="text-gray-400 mb-6">This card may have been removed or sold.</p>
+    <a href="/" class="px-6 py-3 bg-primary hover:bg-yellow-300 text-black font-bold rounded-lg transition-colors">
+        Back to Marketplace
+    </a>
+</main>
+{% endif %}
+
+<!-- Fullscreen Image Overlay -->
+<div id="fullscreen-overlay"
+    class="fixed inset-0 z-[60] bg-black/95 backdrop-blur-lg items-center justify-center hidden"
+    onclick="closeFullscreen()">
+    <button onclick="closeFullscreen()"
+        class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
+        <span class="material-symbols-outlined text-2xl text-white">close</span>
+    </button>
+    <img id="fullscreen-image" src="" alt="Full size card"
+        class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
+</div>
+
+<!-- Card Details Scripts -->
+<script>
+    // ===== IMAGE CAROUSEL =====
+    let currentSlide = 0;
+    const totalSlides = {{ product.images| length if product and product.images else 0 }};
+
+    function goToSlide(index) {
+        if (index < 0 || index >= totalSlides) return;
+        const slides = document.querySelectorAll('.carousel-slide');
+        const dots = document.querySelectorAll('.carousel-dot');
+
+        slides.forEach((s, i) => {
+            s.classList.toggle('opacity-100', i === index);
+            s.classList.toggle('opacity-0', i !== index);
+            s.classList.toggle('pointer-events-none', i !== index);
+        });
+        dots.forEach((d, i) => {
+            d.classList.toggle('bg-primary', i === index);
+            d.classList.toggle('w-6', i === index);
+            d.classList.toggle('bg-white/20', i !== index);
+            d.classList.toggle('w-2', i !== index);
+        });
+        currentSlide = index;
+    }
+
+    function carouselNav(dir) {
+        let next = currentSlide + dir;
+        if (next < 0) next = totalSlides - 1;
+        if (next >= totalSlides) next = 0;
+        goToSlide(next);
+    }
+
+    // Touch swipe support
+    let touchStartX = 0;
+    const carousel = document.getElementById('image-carousel');
+    if (carousel) {
+        carousel.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+        carousel.addEventListener('touchend', (e) => {
+            const diff = touchStartX - e.changedTouches[0].screenX;
+            if (Math.abs(diff) > 50) {
+                carouselNav(diff > 0 ? 1 : -1);
+            }
+        }, { passive: true });
+    }
+
+    // ===== FULLSCREEN IMAGE =====
+    function openFullscreen() {
+        const slides = document.querySelectorAll('.carousel-slide img');
+        const currentImg = slides[currentSlide];
+        if (currentImg) {
+            document.getElementById('fullscreen-image').src = currentImg.src;
+            document.getElementById('fullscreen-overlay').classList.remove('hidden');
+            document.getElementById('fullscreen-overlay').classList.add('flex');
+        }
+    }
+    function closeFullscreen() {
+        document.getElementById('fullscreen-overlay').classList.add('hidden');
+        document.getElementById('fullscreen-overlay').classList.remove('flex');
+    }
+
+    // ===== SHARE CARD =====
+    async function shareCard(e) {
+        const shareData = {
+            title: '{{ product.title if product else "TCG Nakama" }}',
+            text: '{{ product.title if product else "" }} - ¥{{ "{:,}".format(product.price|int) if product else "" }}',
+            url: window.location.href
+        };
+        try {
+            if (navigator.share) {
+                await navigator.share(shareData);
+            } else {
+                await navigator.clipboard.writeText(window.location.href);
+                showToast('Link copied to clipboard!');
+            }
+        } catch (err) {
+            // Clipboard API may fail on non-HTTPS, fallback to manual copy
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = window.location.href;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('Link copied to clipboard!');
+            } catch (e2) {
+                showToast('Could not copy link');
+            }
+        }
+    }
+
+    // ===== TOAST NOTIFICATION =====
+    function showToast(message, duration = 2500) {
+        const toast = document.getElementById('toast');
+        const msgEl = document.getElementById('toast-message');
+        if (!toast || !msgEl) return;
+        msgEl.textContent = message;
+        toast.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+            toast.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+            toast.classList.remove('opacity-100', 'translate-y-0');
+        }, duration);
+    }
+
+    // ===== CART COUNT UPDATE HELPER =====
+    // Override handleCartAction's cart count update to handle the card details page
+    const origHandleCartAction = window.handleCartAction;
+    // Patch: ensure cart-count badge visibility updates after cart add
+    const origFetch = window.fetch;
+    window.fetch = async function (...args) {
+        const response = await origFetch.apply(this, args);
+        // Clone so we can read body without consuming it
+        if (args[0] && String(args[0]).includes('/cart/add')) {
+            const cloned = response.clone();
+            try {
+                const data = await cloned.json();
+                const badge = document.getElementById('cart-count');
+                const badgeMobile = document.getElementById('cart-count-mobile');
+                if (data.total_quantity > 0) {
+                    if (badge) {
+                        badge.textContent = data.total_quantity;
+                        badge.classList.remove('hidden');
+                        badge.classList.add('scale-125');
+                        setTimeout(() => badge.classList.remove('scale-125'), 500);
+                    }
+                    if (badgeMobile) {
+                        badgeMobile.textContent = data.total_quantity;
+                        badgeMobile.classList.remove('hidden');
+                    }
+                    showToast('Added to cart!');
+                }
+            } catch (e) { }
+            // Return original response for handleCartAction to consume
+            return response;
+        }
+        return response;
+    };
+</script>
+{% endblock %}

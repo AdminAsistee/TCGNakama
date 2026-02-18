@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCG Nakama — What's Hot Implementation Plan</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.7;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                color: #1a1a1a;
+                padding: 20px;
+                font-size: 11pt;
+                line-height: 1.5;
+            }
+            h1 { color: #1a1a1a !important; border-bottom-color: #ddd !important; }
+            h2 { color: #333 !important; }
+            h3 { color: #444 !important; }
+            h4 { color: #555 !important; }
+            strong { color: #1a1a1a !important; }
+            a { color: #0066cc !important; }
+            table { border-color: #ddd !important; }
+            th { background: #f0f0f0 !important; color: #333 !important; border-color: #ddd !important; }
+            td { border-color: #ddd !important; color: #333 !important; }
+            pre { background: #f6f8fa !important; border-color: #ddd !important; color: #333 !important; }
+            code { background: #f0f0f0 !important; color: #333 !important; }
+            div[style*="border-left"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .no-print { display: none !important; }
+        }
+        
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #f0f6fc;
+            margin: 0 0 8px 0;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #21262d;
+        }
+        
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #e6edf3;
+            margin: 24px 0 12px 0;
+        }
+        
+        h4 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #8b949e;
+            margin: 16px 0 8px 0;
+        }
+        
+        p {
+            margin: 8px 0;
+        }
+        
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        strong {
+            color: #f0f6fc;
+        }
+        
+        code {
+            background: #1a2233;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #79c0ff;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #21262d;
+            margin: 24px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #161b22;
+            color: #f0f6fc;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px 14px;
+            border: 1px solid #30363d;
+            font-size: 13px;
+        }
+        
+        td {
+            padding: 10px 14px;
+            border: 1px solid #30363d;
+            font-size: 13px;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        ul, ol {
+            margin: 8px 0 8px 24px;
+        }
+        
+        li {
+            margin: 4px 0;
+        }
+        
+        /* Header banner */
+        .header-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px 32px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        
+        .header-banner h1 {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-size: 24px;
+        }
+        
+        .header-banner .subtitle {
+            color: #8b949e;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        
+        .header-banner .meta {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+            font-size: 12px;
+            color: #8b949e;
+        }
+        
+        .print-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 100;
+        }
+        
+        .print-btn:hover {
+            background: #2ea043;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-banner">
+        <h1>📈 TCG Nakama — Implementation Plan</h1>
+        <div class="subtitle">What's Hot: Price Tracking & Visual Upgrade</div>
+        <div class="meta">
+            <span>📅 Date: February 18, 2026</span>
+            <span>👤 Prepared by: Development Team</span>
+            <span>📋 Status: Pending Approval</span>
+        </div>
+    </div>
+    
+    <h1>What's Hot — Price Tracking &amp; Visual Upgrade</h1>
+<p>Replace the mock "What's Hot" section with a real, data-driven investment ticker powered by PriceCharting market data. Add admin controls to manage update frequency, and upgrade the UI to a premium glassmorphism design.</p>
+<h2>User Review Required</h2>
+<div style="border-left:4px solid #8957e5;background:#8957e522;padding:12px 16px;border-radius:6px;margin:12px 0"><strong style="color:#8957e5">⚠️ IMPORTANT</strong><br/><strong>Scaling to 5,000 cards changes the architecture.</strong> PriceCharting API rate limit is <strong>1 request/second</strong>. A full update of 5,000 cards takes ~83 minutes. The plan uses progressive batching — only the newest/most active cards are updated each cycle, not the entire catalog.</div>
+<div style="border-left:4px solid #d29922;background:#d2992222;padding:12px 16px;border-radius:6px;margin:12px 0"><strong style="color:#d29922">⚠️ WARNING</strong><br/><strong>Gemini AI: Smart Ambiguity Mode (Option 3).</strong> For batch price updates, Gemini is only called when PriceCharting returns <strong>>3 ambiguous results</strong> for a card. Clear matches (≤3 results) use direct name/set/number matching. This reduces ~5,000 Gemini calls to ~500 per batch while maintaining accuracy for variant-heavy cards (alt art, foil, etc).</div>
+<div style="border-left:4px solid #da3633;background:#da363322;padding:12px 16px;border-radius:6px;margin:12px 0"><strong style="color:#da3633">🔴 CAUTION</strong><br/><strong>Exchange rate caching.</strong> Currently each call to `get_market_value_jpy()` also calls the Frankfurter currency API. In batch mode, we fetch the USD→JPY rate <strong>once per batch run</strong> and reuse it for all 5,000 cards.</div>
+<div style="border-left:4px solid #1f6feb;background:#1f6feb22;padding:12px 16px;border-radius:6px;margin:12px 0"><strong style="color:#1f6feb">ℹ️ NOTE</strong><br/><strong>Default frequency: Weekly.</strong> Conservative default to manage API costs while catalog grows. Admin can change to Daily or Every 3 Days via Settings.</div>
+<h2>Architecture Overview</h2>
+<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;margin:12px 0;font-family:monospace;font-size:12px;white-space:pre;color:#8b949e;overflow-x:auto">graph LR
+    A[APScheduler] -->|"Triggers based on<br/>Admin setting"| B[Price Tracker Service]
+    B -->|"1 req/sec"| C[PriceCharting API]
+    B -->|"1× per batch"| D[Frankfurter API]
+    B -->|"Stores snapshots"| E[(SQLite DB)]
+    E -->|"Query top 6<br/>gainers"| F[Store Router]
+    F -->|"Renders"| G["What's Hot UI"]
+    H[Admin Panel] -->|"Controls frequency"| A
+    H -->|"Manual trigger"| B</div>
+
+<h2>Proposed Changes</h2>
+<h3>Database Layer</h3>
+<p>New models added to the existing SQLAlchemy setup:</p>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/models.py">models.py</a></h4>
+<p>Add two new models:</p>
+<pre style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin:12px 0;font-size:12px;overflow-x:auto;color:#c9d1d9"><code>class PriceSnapshot(Base):
+    """Historical price data from PriceCharting for gainers/trending."""
+    __tablename__ = "price_snapshots"
+
+    id            = Column(Integer, primary_key=True)
+    product_id    = Column(String(100), index=True)   # Shopify product ID
+    product_title = Column(String(300))
+    market_usd    = Column(Float)                      # PriceCharting USD price
+    market_jpy    = Column(Integer)                    # Converted JPY price
+    exchange_rate = Column(Float)                      # USD/JPY rate used
+    recorded_at   = Column(DateTime, default=datetime.utcnow, index=True)
+
+class SystemSetting(Base):
+    """Key-value store for admin-configurable settings."""
+    __tablename__ = "system_settings"
+
+    key   = Column(String(100), primary_key=True)
+    value = Column(String(500))</code></pre>
+
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/database.py">database.py</a></h4>
+<p>Update <code>init_db()</code> to import new models.</p>
+<hr />
+<h3>Batch Price Service</h3>
+<p>A lightweight version of the appraisal service optimized for batch operations.</p>
+<h4>[NEW] <a href="file:///Users/saptayh/TCGNakama-1/app/services/price_tracker.py">price_tracker.py</a></h4>
+<p><strong>Key design decisions for 5,000-card scale:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Rate limit (1 req/sec)</strong></td>
+<td><code>asyncio.sleep(1.1)</code> between API calls</td>
+</tr>
+<tr>
+<td><strong>Full catalog = 83 min</strong></td>
+<td>Process in chunks of 500, with progress logging</td>
+</tr>
+<tr>
+<td><strong>Gemini costs</strong></td>
+<td><strong>Smart Ambiguity Mode</strong>: call Gemini only when PriceCharting returns &gt;3 results; direct match for ≤3 results. ~500 Gemini calls instead of 5,000</td>
+</tr>
+<tr>
+<td><strong>Currency API spam</strong></td>
+<td>Fetch exchange rate once at batch start, reuse</td>
+</tr>
+<tr>
+<td><strong>Failed API calls</strong></td>
+<td>Log error, skip card, continue batch</td>
+</tr>
+<tr>
+<td><strong>Existing data</strong></td>
+<td>Only update; never delete old snapshots</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Batch flow:</strong>
+1. Fetch all products from Shopify (already cached by <code>ShopifyClient</code>)
+2. Get USD→JPY rate once from Frankfurter API
+3. For each product (throttled 1/sec):
+   - Call PriceCharting API with card name + set + number
+   - Direct match (no Gemini) → get <code>loose-price</code> in USD
+   - Convert to JPY using cached rate
+   - Insert <code>PriceSnapshot</code> row
+4. Log summary: <code>X/5000 updated, Y failed, Z skipped</code></p>
+<hr />
+<h3>Scheduler</h3>
+<h4>[NEW] <a href="file:///Users/saptayh/TCGNakama-1/app/scheduler.py">scheduler.py</a></h4>
+<ul>
+<li>Uses <strong>APScheduler</strong> <code>AsyncIOScheduler</code> (runs inside uvicorn's event loop)</li>
+<li>Reads <code>price_update_frequency</code> from <code>SystemSetting</code> table</li>
+<li>Maps to cron interval: Daily = <code>0 0 * * *</code>, Every 3 Days = <code>0 0 */3 * *</code>, Weekly = <code>0 0 * * 0</code></li>
+<li>Graceful shutdown on app stop</li>
+<li>All schedules use JST timezone (<code>Asia/Tokyo</code>)</li>
+</ul>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/main.py">main.py</a></h4>
+<p>Add scheduler startup/shutdown in FastAPI lifespan events.</p>
+<p><strong>New dependency:</strong> <code>apscheduler&gt;=3.10</code></p>
+<hr />
+<h3>Admin Settings UI</h3>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/templates/admin/settings.html">settings.html</a></h4>
+<p>Add a new "Market Data" section below the existing "Banner Management" section:</p>
+<ul>
+<li><strong>Update Frequency dropdown:</strong> Daily / Every 3 Days / Weekly</li>
+<li><strong>Last Updated:</strong> timestamp of most recent successful batch</li>
+<li><strong>Cards Updated:</strong> count from last batch</li>
+<li><strong>"Run Now" button:</strong> manually trigger a batch (with confirmation modal)</li>
+<li><strong>Status indicator:</strong> Idle / Running / Failed</li>
+</ul>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/routers/admin.py">admin.py</a></h4>
+<p>New endpoints:
+- <code>GET /admin/settings/market-data</code> — read current settings + last run info
+- <code>POST /admin/settings/market-data</code> — save frequency setting
+- <code>POST /admin/settings/market-data/run</code> — trigger manual batch run</p>
+<hr />
+<h3>What's Hot Backend</h3>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/routers/store.py">store.py</a></h4>
+<p>Replace mock logic (line 72-75):</p>
+<pre style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin:12px 0;font-size:12px;overflow-x:auto;color:#c9d1d9"><span style="color:#f85149;background:#3a1a1a;display:block;padding:0 8px">-    hot_picks = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:6]</span><span style="color:#f85149;background:#3a1a1a;display:block;padding:0 8px">-    for hp in hot_picks:</span><span style="color:#f85149;background:#3a1a1a;display:block;padding:0 8px">-        hp['growth'] = round(random.uniform(1.5, 5.5), 1)</span><span style="color:#f85149;background:#3a1a1a;display:block;padding:0 8px">-        hp['hype_pct'] = random.randint(60, 95)</span><span style="color:#3fb950;background:#1a3a2a;display:block;padding:0 8px">+    hot_picks = get_top_gainers(db, products, limit=6)</span></pre>
+
+<p>New <code>get_top_gainers()</code> function:
+1. Query <code>price_snapshots</code> for each product: latest price vs. previous snapshot
+2. Calculate <code>% change = (latest - previous) / previous × 100</code>
+3. Sort by % change descending, take top 6
+4. For cards with <strong>no price history</strong>: set <code>label = "NEW MARKET DATA"</code>, <code>growth = None</code>
+5. For cards with <strong>&gt;5% gain</strong>: set <code>label = "BREAKOUT"</code>
+6. For all others with data: set <code>label = "TRENDING"</code>
+7. Attach last N price points as sparkline data</p>
+<hr />
+<h3>What's Hot Visual Upgrade</h3>
+<h4>[MODIFY] <a href="file:///Users/saptayh/TCGNakama-1/app/templates/index.html">index.html</a></h4>
+<p>Replace the current What's Hot section (lines 207-255) with:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Glassmorphism cards</strong></td>
+<td><code>bg-white/[0.03] backdrop-blur-sm border border-white/[0.08]</code></td>
+</tr>
+<tr>
+<td><strong>Enlarged sparkline</strong></td>
+<td>Full-width SVG below card info, height 48px, with real data points</td>
+</tr>
+<tr>
+<td><strong>Gain %</strong></td>
+<td>Large <code>#00FF41</code> green text next to price</td>
+</tr>
+<tr>
+<td><strong>Labels</strong></td>
+<td>"BREAKOUT" (red/orange) for &gt;5%, "TRENDING" (blue) for positive, "NEW MARKET DATA" (gray) fallback</td>
+</tr>
+<tr>
+<td><strong>Mobile layout</strong></td>
+<td><code>grid-cols-1</code> on mobile, <code>sm:grid-cols-2 lg:grid-cols-3</code> on desktop</td>
+</tr>
+<tr>
+<td><strong>Remove hype bar</strong></td>
+<td>Delete the fake red gradient bar at top</td>
+</tr>
+<tr>
+<td><strong>Buy Price</strong></td>
+<td>Show Shopify selling price as "Buy: ¥X" below market price</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Verification Plan</h2>
+<h3>Automated Tests</h3>
+<ol>
+<li><strong>Database:</strong> Run app, verify <code>price_snapshots</code> and <code>system_settings</code> tables created</li>
+<li><strong>Admin Settings:</strong> Navigate to <code>/admin/settings</code>, verify Market Data section renders</li>
+<li><strong>Manual Trigger:</strong> Click "Run Now", verify price snapshots are recorded in DB</li>
+<li><strong>What's Hot:</strong> Refresh homepage, verify cards show real data or "NEW MARKET DATA"</li>
+<li><strong>Sparklines:</strong> Verify SVG points match actual DB records</li>
+</ol>
+<h3>Manual Verification</h3>
+<ol>
+<li><strong>Scale test:</strong> Manually insert 100+ fake price snapshots to verify query performance</li>
+<li><strong>Error handling:</strong> Temporarily use an invalid API key, verify graceful fallback</li>
+<li><strong>Mobile:</strong> Verify 1-column layout on 375px viewport</li>
+<li><strong>Scheduler:</strong> Change frequency in admin, verify APScheduler reschedules</li>
+</ol>
+    
+    <div style="margin-top:48px;padding-top:24px;border-top:2px solid #21262d;text-align:center">
+        <div style="display:flex;justify-content:space-between;max-width:600px;margin:24px auto 0">
+            <div style="text-align:center;flex:1">
+                <div style="font-size:12px;color:#8b949e;margin-bottom:32px">Prepared By</div>
+                <div style="border-top:1px solid #30363d;padding-top:8px;font-size:13px;color:#f0f6fc">Development Team</div>
+            </div>
+            <div style="text-align:center;flex:1">
+                <div style="font-size:12px;color:#8b949e;margin-bottom:32px">Approved By</div>
+                <div style="border-top:1px solid #30363d;padding-top:8px;font-size:13px;color:#f0f6fc">Project Owner</div>
+            </div>
+            <div style="text-align:center;flex:1">
+                <div style="font-size:12px;color:#8b949e;margin-bottom:32px">Date</div>
+                <div style="border-top:1px solid #30363d;padding-top:8px;font-size:13px;color:#f0f6fc">_______________</div>
+            </div>
+        </div>
+    </div>
+    
+    <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+</body>
+</html>

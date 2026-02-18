@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from app.dependencies import get_shopify_client, ShopifyClient
 from app.database import get_db
 from typing import Optional, Union
-from app.models import Banner
+from app.models import Banner, PriceSnapshot
 from sqlalchemy.orm import Session
 from urllib.parse import quote, unquote
 from typing import Optional
@@ -15,27 +15,80 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _get_hot_picks(products: list, db: Session) -> list:
+    """Return top 6 gainers by comparing the 2 most-recent PriceSnapshot entries.
+    Falls back to mock data if no price snapshots exist."""
+    from sqlalchemy import func, desc
+
+    # Get product IDs
+    product_ids = [p.get('id', '') for p in products if p.get('id')]
+    if not product_ids:
+        return []
+
+    # For each product, grab the two most recent snapshots
+    # Sub-query: rank snapshots per product by captured_at DESC
+    gainers = []
+    for pid in product_ids:
+        snapshots = (
+            db.query(PriceSnapshot)
+            .filter(PriceSnapshot.product_id == pid)
+            .order_by(desc(PriceSnapshot.recorded_at))
+            .limit(2)
+            .all()
+        )
+        if len(snapshots) >= 2:
+            latest = snapshots[0].market_jpy or 0
+            previous = snapshots[1].market_jpy or 0
+            if previous > 0:
+                pct = round(((latest - previous) / previous) * 100, 1)
+                if pct > 0:
+                    gainers.append((pid, pct, latest))
+        elif len(snapshots) == 1:
+            # Only one snapshot → no comparison, skip or treat as 0% gain
+            pass
+
+    # Sort by % gain descending, take top 6
+    gainers.sort(key=lambda x: x[1], reverse=True)
+    top_ids = {g[0]: (g[1], g[2]) for g in gainers[:6]}
+
+    # If we have real gainers, build hot_picks from them
+    if top_ids:
+        hot_picks = []
+        for p in products:
+            pid = p.get('id', '')
+            if pid in top_ids:
+                p_copy = dict(p)
+                p_copy['growth'] = top_ids[pid][0]
+                p_copy['market_price'] = top_ids[pid][1]
+                hot_picks.append(p_copy)
+        # Re-sort by growth
+        hot_picks.sort(key=lambda x: x.get('growth', 0), reverse=True)
+        return hot_picks[:6]
+
+    # Fallback: no snapshot data yet → use highest-priced with mock growth
+    fallback = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:6]
+    for hp in fallback:
+        hp['growth'] = round(random.uniform(1.5, 5.5), 1)
+    return fallback
 
 
 def _calc_listed_ago(product: dict) -> str:
-    """Calculate human-readable time since product was listed."""
+    """Calculate smart marketplace label based on listing age."""
     created = product.get('createdAt', '')
     if not created:
-        return "Recently"
+        return "IN STOCK"
     try:
         created_dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
         delta = datetime.now(timezone.utc) - created_dt
-        minutes = int(delta.total_seconds() / 60)
-        if minutes < 1:
-            return "Just now"
-        elif minutes < 60:
-            return f"{minutes}m ago"
-        elif minutes < 1440:
-            return f"{minutes // 60}h ago"
+        hours = delta.total_seconds() / 3600
+        if hours <= 48:
+            return "NEW ARRIVAL"
+        elif hours <= 168:  # 7 days
+            return "RECENT"
         else:
-            return f"{minutes // 1440}d ago"
+            return "IN STOCK"
     except Exception:
-        return "Recently"
+        return "IN STOCK"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -68,13 +121,10 @@ async def read_root(
         p['listed_ago'] = _calc_listed_ago(p)
     
     # Fresh Pulls: newest 6 products (sorted by createdAt desc)
-    fresh_pulls = sorted(products, key=lambda x: x.get('createdAt', ''), reverse=True)[:6]
+    fresh_pulls = sorted(products, key=lambda x: x.get('createdAt', ''), reverse=True)[:8]
     
-    # What's Hot: top 6 highest priced products with growth indicators
-    hot_picks = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:6]
-    for hp in hot_picks:
-        hp['growth'] = round(random.uniform(1.5, 5.5), 1)
-        hp['hype_pct'] = random.randint(60, 95)
+    # What's Hot: top 6 gainers based on PriceSnapshot market data
+    hot_picks = _get_hot_picks(products, db)
     
     # Featured collection for hero banner
     featured_collection = collections[0] if collections else None
@@ -247,6 +297,76 @@ async def filter_products(
         "total_products": total_products
     })
 
+@router.get("/card/{product_id:path}", response_class=HTMLResponse)
+async def card_details_page(
+    request: Request,
+    product_id: str,
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Full-page card details view with market value and related cards."""
+    from app.dependencies import SHOPIFY_STORE_URL
+    product = await client.get_product(product_id)
+
+    if not product:
+        return templates.TemplateResponse("card_details.html", {
+            "request": request,
+            "product": None,
+            "market_data": None,
+            "same_collection": [],
+            "cart_count": 0,
+            "checkout_url": f"{SHOPIFY_STORE_URL}/cart"
+        })
+
+    # Fetch market value via appraisal service (non-blocking, with fallback)
+    market_data = None
+    try:
+        from app.services.appraisal import get_market_value_jpy
+        market_data = await get_market_value_jpy(
+            card_name=product.get("title", ""),
+            rarity=product.get("rarity", "Common"),
+            set_name=product.get("set", "Unknown"),
+            card_number=product.get("card_number", "")
+        )
+        if market_data and "error" in market_data:
+            market_data = None
+    except Exception as e:
+        print(f"[CARD_DETAILS] Market value fetch failed: {e}")
+        market_data = None
+
+    # Fetch same-collection products
+    same_collection = []
+    if product.get("collections"):
+        try:
+            all_products = await client.get_products()
+            same_collection = [
+                p for p in all_products
+                if p["id"] != product["id"]
+                and any(c in p.get("collections", []) for c in product["collections"])
+            ][:6]
+        except Exception:
+            pass
+
+    # Cart count
+    cart_id_raw = request.cookies.get("cart_id")
+    cart_id = unquote(cart_id_raw) if cart_id_raw else None
+    cart_count = 0
+    checkout_url = f"{SHOPIFY_STORE_URL}/cart"
+    if cart_id:
+        cart_data = await client.get_cart(cart_id)
+        if cart_data:
+            cart_count = cart_data.get("totalQuantity", 0)
+            checkout_url = cart_data.get("checkoutUrl", checkout_url)
+
+    return templates.TemplateResponse("card_details.html", {
+        "request": request,
+        "product": product,
+        "market_data": market_data,
+        "same_collection": same_collection,
+        "cart_count": cart_count,
+        "checkout_url": checkout_url
+    })
+
+
 @router.get("/product/{product_id:path}", response_class=HTMLResponse)
 async def get_product_details(
     request: Request,
@@ -307,6 +427,24 @@ async def add_to_cart(
     quantity: int = 1,
     client: ShopifyClient = Depends(get_shopify_client)
 ):
+    # --- INVENTORY GUARD: Check stock before adding ---
+    stock = await client.get_variant_availability(variant_id)
+    if not stock["available"] or stock["quantity"] <= 0:
+        print(f"[INVENTORY GUARD] Blocked add_to_cart: '{stock['product_title']}' is sold out (qty={stock['quantity']})")
+        return JSONResponse({
+            "status": "error",
+            "sold_out": True,
+            "message": "This item just sold out and is no longer available."
+        }, status_code=409)
+    
+    if quantity > stock["quantity"]:
+        print(f"[INVENTORY GUARD] Blocked add_to_cart: requested {quantity} but only {stock['quantity']} available")
+        return JSONResponse({
+            "status": "error",
+            "sold_out": False,
+            "message": f"Only {stock['quantity']} available. Please reduce quantity."
+        }, status_code=409)
+
     cart_id_raw = request.cookies.get("cart_id")
     cart_id = unquote(cart_id_raw) if cart_id_raw else None
     
@@ -347,9 +485,36 @@ async def get_cart_drawer(
     cart_data = await client.get_cart(cart_id) if cart_id else None
     context = _get_cart_context(cart_data)
     
+    # --- INVENTORY GUARD: Check each cart item's current stock ---
+    sold_out_items = []
+    active_items = []
+    for item in context.get("items", []):
+        if item.get("variant_id"):
+            stock = await client.get_variant_availability(item["variant_id"])
+            if not stock["available"] or stock["quantity"] <= 0:
+                sold_out_items.append(item["title"])
+                # Auto-remove from Shopify cart
+                if cart_id and item.get("line_id"):
+                    try:
+                        await client.update_cart_line(cart_id, item["line_id"], 0)
+                    except Exception as e:
+                        print(f"[INVENTORY GUARD] Failed to remove sold-out item from cart: {e}")
+            else:
+                active_items.append(item)
+        else:
+            active_items.append(item)
+    
+    # Recalculate totals if items were removed
+    if sold_out_items:
+        context["items"] = active_items
+        context["total_price"] = sum(i["price"] * i["quantity"] for i in active_items)
+        context["cart_count"] = sum(i["quantity"] for i in active_items)
+        print(f"[INVENTORY GUARD] Removed sold-out items from cart: {sold_out_items}")
+    
     return templates.TemplateResponse("partials/cart_drawer.html", {
         "request": request,
         **context,
+        "sold_out_items": sold_out_items,
         "checkout_url": cart_data.get("checkoutUrl") if cart_data else "#"
     })
 
