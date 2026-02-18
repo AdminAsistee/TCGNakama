@@ -73,60 +73,39 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
             else:
                 return {'error': 'No image data or URL provided'}
             
-            # === PASS 1: Short free identification ===
-            pass1_prompt = "Look at this trading card. In a few short sentences, identify: the card name, the set/series it's from, the card number, the rarity, any holographic effects, border style, and any special markings (e.g. 1st Edition, Prism Star in the name, set symbol)."
-            pass1_response = model.generate_content([pass1_prompt, img])
-            card_description = pass1_response.text.strip()
-            safe_print(f"[APPRAISE_IMAGE] Pass 1 (free ID): {card_description}")
+            # Single prompt — Gemini thinks internally then outputs ONLY JSON.
+            # The JSON parser extracts the last { } block so any leading reasoning text is ignored.
+            prompt = """Analyze this trading card image carefully, then output ONLY a JSON object with the fields below. Do not write any explanation — output JSON only.
 
-            # === PASS 2: Structured extraction using Pass 1 as context ===
-            prompt = f"""A trading card has been identified as follows:
----
-{card_description}
----
-Using the above as context, extract the structured data from the card image. Follow these rules EXACTLY:
+Before filling in the JSON, mentally note:
+- Card name, set/series, card number (exactly as printed), rarity symbol
+- Holographic effects (sparkly art box only? or full card rainbow?)
+- Border style, set symbol shape, any special markings
 
-1. **Card Type**: "TRAINER" header → "Trainer" | "ENERGY" → "Energy" | otherwise → "Pokemon"
+Then fill in:
 
-2. **Card Name (Japanese)**: Japanese name on the card
-   - One Piece: LARGE text at bottom center (NOT affiliation text below it)
-   - Pokémon: The Pokémon name
-
-3. **Card Name (English)**: ALWAYS provide — translate if needed
-   - Pokémon: Pikachu, Gengar, Ho-Oh, etc. | One Piece: サボ=Sabo, ルフィ=Luffy
-   - NEVER leave empty for known cards
-
-4. **Set Name**:
-   - MODERN Pokémon (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H)
-   - ENGLISH Pokémon (no set code printed): use the set identified in the description above — trust it
+1. card_type: "TRAINER" header → "Trainer" | "ENERGY" → "Energy" | otherwise → "Pokemon"
+2. card_name_japanese: Japanese name if visible, else ""
+3. card_name_english: ALWAYS provide English name — translate if needed. Never leave empty for known cards.
+4. set_name:
+   - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H)
+   - English Pokémon: identify the set from the set symbol icon on the card (e.g. crown = Chilling Reign, fusion symbol = Fusion Strike)
    - PROMO: card number ends with "/P" → "PROMO"
-   - VINTAGE (pre-2016): trust the identification above (e.g. "Base Set", "Jungle", "Carddass Vending")
-     * Do NOT guess "Prism" from holographic art alone
+   - Vintage (pre-2016): identify from set symbol or style (e.g. "Base Set", "Jungle", "Fossil", "Carddass Vending")
    - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → ""
-
-5. **Card Number**: bottom right corner
-   - Valid: "###/###", "###/P", "No.094", "094", "26", "P-044"
-   - Invalid: anything starting with "ID:"
-
-6. **Rarity**: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR
-
-7. **Special Variants**:
-   - Holo Rare = sparkly art in art box only, normal borders → NOT a special variant, do NOT call it "Prism"
-   - Prism Star = "Prism Star" literally IN the card name + full-card rainbow (Sun & Moon era ONLY)
+   - If truly unknown → ""
+5. card_number: bottom right corner. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". Invalid: "ID:..." → ""
+6. rarity: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR — or "" if not visible
+7. special_variants: comma-separated or ""
+   - Holo Rare (sparkly art box only, normal borders) → NOT a variant, do NOT write "Prism"
+   - Prism Star: ONLY if "Prism Star" is literally in the card name AND full-card rainbow effect
    - Crystal, Reverse Holo, 1st Edition if visible
-   - Return comma-separated or ""
+8. year: copyright year if visible, else ""
+9. manufacturer: publisher if visible, else ""
 
-8. **Year**: copyright year if visible
-9. **Manufacturer**: publisher if visible
-
-CRITICAL RULES:
-- Do NOT confuse Holo Rare with Prism Star — Prism Star MUST have "Prism Star" in the card name
-- For vintage and English cards, trust the Pass 1 identification for set name
-- Use "" for missing fields, NEVER null
-
-Return ONLY raw JSON, no markdown:
-{{
-  "card_type": "Pokemon",
+Output ONLY this JSON, nothing else:
+{
+  "card_type": "",
   "card_name_japanese": "",
   "card_name_english": "",
   "set_name": "",
@@ -135,29 +114,37 @@ Return ONLY raw JSON, no markdown:
   "special_variants": "",
   "year": "",
   "manufacturer": ""
-}}"""
+}"""
 
             # Generate content with image
             response = model.generate_content([prompt, img])
             response_text = response.text.strip()
 
-            
             safe_print(f"[APPRAISE_IMAGE] Gemini response: {response_text}")
-            
-            # Parse JSON response
-            # Remove markdown code blocks if present
+
+            # Parse JSON — extract the last { } block to handle any leading reasoning text
             import re
+
+            
+            # Convert null values to empty strings
+            # Robust JSON extraction: handle markdown blocks or leading reasoning text
             if "```" in response_text:
                 json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
                 if json_match:
                     response_text = json_match.group(1)
-            
+            else:
+                # Extract the last { } block in case model output reasoning text before JSON
+                json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(0)
+
             card_data = json.loads(response_text)
-            
+
             # Convert null values to empty strings
             for key in ['card_name_japanese', 'card_name_english', 'set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants']:
                 if card_data.get(key) is None or card_data.get(key) == 'null':
                     card_data[key] = ''
+
             
             # Post-processing: Filter out ID format card numbers
             card_number = card_data.get('card_number', '')
@@ -252,7 +239,9 @@ Return ONLY raw JSON, no markdown:
                 'crystal': 'Ultra Rare',
                 'shining': 'Ultra Rare',
                 'gold star': 'Ultra Rare',
-                '★': 'Ultra Rare',
+                '★': 'Rare',    # Single black star = Rare Holo (English) or Rare (Japanese)
+                '★★': 'Ultra Rare',   # Double star = Ultra Rare / ex / V cards
+                '★★★': 'Ultra Rare',  # Triple star = Secret Rare
                 # Generic
                 'epic': 'Epic',
             }
