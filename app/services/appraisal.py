@@ -322,8 +322,9 @@ No markdown, just raw JSON."""
                 # Add set name if available, otherwise use fallback for vintage cards
                 if set_name:
                     name_parts.append(f"- {set_name}")
-                elif card_data.get('year'):
+                elif card_data.get('year') and not re.match(r'^P-\d+$', card_number):
                     # Vintage card with year but no set code
+                    # Skip for One Piece P-### cards (e.g. P-044) — they have a year but no set
                     name_parts.append(f"- Vintage {card_data['year']}")
                 elif special_variants:
                     # Special variant without set (e.g., Prism)
