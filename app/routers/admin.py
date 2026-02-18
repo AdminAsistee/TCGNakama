@@ -731,6 +731,132 @@ async def estimate_market_value(
         }, status_code=500)
 
 
+
+def _normalize_text(text: str) -> str:
+    """Normalize text: lowercase, strip accents."""
+    import unicodedata
+    nfd = unicodedata.normalize('NFD', text.lower())
+    return ''.join(c for c in nfd if unicodedata.category(c) != 'Mn')
+
+
+def _normalize_card_number(num: str) -> str:
+    """
+    Normalize a card number for comparison.
+    Strips leading '#', spaces, then strips leading zeros from each numeric segment.
+    e.g. '#No.094' -> 'no.94', '094' -> '94', 'OP09-051' -> 'op9-51'
+    """
+    import re
+    n = num.strip().lstrip('#').lower()
+    # Strip leading zeros from every run of digits
+    n = re.sub(r'\b0+(\d)', r'\1', n)
+    return n.strip()
+
+
+def _extract_card_fields(title: str):
+    """
+    Parse a Shopify product title into its components.
+    Returns (clean_name, card_number_raw, set_name_raw).
+    clean_name  : base character/card name (no number, no set, no parentheses)
+    card_number_raw : raw card number string found in title, or None
+    set_name_raw    : set name found after ' - ', or None
+    """
+    import re
+    t = title
+
+    # Extract card number (various formats)
+    num_match = re.search(
+        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        t
+    )
+    card_number_raw = num_match.group(0) if num_match else None
+
+    # Remove card number from working copy
+    if card_number_raw:
+        t = t.replace(card_number_raw, '')
+
+    # Extract set name (everything after ' - ')
+    set_match = re.search(r'\s*[-–—]\s*(.+)$', t)
+    set_name_raw = set_match.group(1).strip() if set_match else None
+
+    # Remove set name
+    if set_match:
+        t = t[:set_match.start()]
+
+    # Remove parentheses/brackets content
+    t = re.sub(r'\s*[\(\[].*?[\)\]]', '', t)
+
+    clean_name = t.strip()
+    return clean_name, card_number_raw, set_name_raw
+
+
+def _is_duplicate_card(
+    form_name: str,
+    form_number: str,   # empty string or None = not provided
+    form_set: str,      # empty string or None = not provided
+    product_title: str,
+    log_prefix: str = "[DUPLICATE_CHECK]"
+) -> bool:
+    """
+    Symmetric duplicate check:
+    The form's combination of fields must exactly mirror the product title.
+
+    Rules:
+    - form_number provided  <-> product title must contain a card number
+    - form_set provided     <-> product title must contain a set name
+    - Each provided field is checked as a case-insensitive substring
+      (card numbers are leading-zero-normalized before comparison)
+    """
+    import re
+
+    has_form_number = bool(form_number and form_number.strip())
+    has_form_set = bool(form_set and form_set.strip())
+
+    # Parse the product title
+    prod_clean_name, prod_number_raw, prod_set_raw = _extract_card_fields(product_title)
+
+    has_prod_number = prod_number_raw is not None
+    has_prod_set = prod_set_raw is not None
+
+    safe_print(f"{log_prefix}   Product: '{product_title}'")
+    safe_print(f"{log_prefix}   Parsed  -> name='{prod_clean_name}', number='{prod_number_raw}', set='{prod_set_raw}'")
+    safe_print(f"{log_prefix}   Form    -> name='{form_name}', number='{form_number}', set='{form_set}'")
+
+    # Symmetric shape check: both must have (or not have) number and set
+    if has_form_number != has_prod_number:
+        safe_print(f"{log_prefix}   Shape mismatch on card_number -> skip")
+        return False
+    if has_form_set != has_prod_set:
+        safe_print(f"{log_prefix}   Shape mismatch on set_name -> skip")
+        return False
+
+    # Name check: exact equality after normalization (case-insensitive, accent-insensitive)
+    # Exact match prevents e.g. "ゲンガー" matching "ゲンガーex"
+    norm_form_name = _normalize_text(form_name)
+    norm_prod_name = _normalize_text(prod_clean_name)
+    if norm_form_name != norm_prod_name:
+        safe_print(f"{log_prefix}   Name mismatch: '{norm_form_name}' vs '{norm_prod_name}' -> skip")
+        return False
+
+    # Card number check: exact equality after leading-zero normalization
+    if has_form_number:
+        norm_form_num = _normalize_card_number(form_number)
+        norm_prod_num = _normalize_card_number(prod_number_raw)
+        if norm_form_num != norm_prod_num:
+            safe_print(f"{log_prefix}   Number mismatch: '{norm_form_num}' vs '{norm_prod_num}' -> skip")
+            return False
+
+    # Set name check: exact equality after normalization
+    if has_form_set:
+        norm_form_set = _normalize_text(form_set)
+        norm_prod_set = _normalize_text(prod_set_raw)
+        if norm_form_set != norm_prod_set:
+            safe_print(f"{log_prefix}   Set mismatch: '{norm_form_set}' vs '{norm_prod_set}' -> skip")
+            return False
+
+    safe_print(f"{log_prefix}   ✓ MATCH")
+    return True
+
+
 @router.get("/check-duplicate-card")
 async def check_duplicate_card(
     card_name: str,
@@ -742,121 +868,57 @@ async def check_duplicate_card(
 ):
     """
     Check if a card with the same name already exists in Shopify.
-    Returns duplicate status and product info if found.
-    Matches card name, and optionally card number and set name if provided.
-    Empty card_number or set_name are skipped (treated as 'don't care').
-    
-    Args:
-        card_name: The card name from the form field
-        card_number: The card number from the form field (takes priority over parsing from card_name)
-        set_name: The set name from the form field
-        current_product_id: Optional product ID being edited (will be excluded from duplicate check)
+    Uses symmetric matching: the form's combination of fields must exactly
+    mirror the product title (no more, no less).
+    Case-insensitive; card numbers are leading-zero-normalized.
     """
     try:
         import re
-        
-        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}', card_number: '{card_number}', set_name: '{set_name}'")
+
+        # Normalize empty strings to None
+        card_number = card_number.strip() if card_number else None
+        set_name = set_name.strip() if set_name else None
+
+        safe_print(f"[DUPLICATE_CHECK] Checking: name='{card_name}', number='{card_number}', set='{set_name}'")
         if current_product_id:
             safe_print(f"[DUPLICATE_CHECK] Excluding current product: {current_product_id}")
-        
-        # STEP 1: Use card_number from the form field if provided (user may have edited it after appraisal).
-        # Only fall back to parsing it from card_name if not supplied.
-        if not card_number:
-            # Extract card number pattern from the name string as fallback
-            # Supports: #027/071, #OP09-051, #ST01-001, 027/071, #123
-            # Order matters: longer/more specific patterns first!
-            card_number_pattern = re.search(r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#\d{1,4})', card_name)
-            card_number = card_number_pattern.group(0) if card_number_pattern else None
-        
-        # STEP 2: Extract the clean card name (remove everything except the character/card name)
-        # Start fresh from original input
-        clean_card_name = card_name
-        
-        # Remove the card number if found
+
+        # Clean the form card name (strip parentheses, set info, embedded card number)
+        clean_form_name = card_name
         if card_number:
-            clean_card_name = clean_card_name.replace(card_number, '')
-        
-        # Remove parentheses/brackets content (like language translations)
-        clean_card_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_card_name)
-        
-        # Remove set names (everything after dash)
-        clean_card_name = re.sub(r'\s*[-–—]\s*.*$', '', clean_card_name)
-        
-        # Clean up extra whitespace
-        clean_card_name = clean_card_name.strip()
-        
-        safe_print(f"[DUPLICATE_CHECK] Extracted - Name: '{clean_card_name}', Number: '{card_number}'")
-        
-        # Search strategy: Use card number if available (more specific), otherwise use card name
-        # This is much faster than fetching all products
-        if card_number:
-            search_query = card_number
-            safe_print(f"[DUPLICATE_CHECK] Searching by card number: '{search_query}'")
-        else:
-            search_query = clean_card_name
-            safe_print(f"[DUPLICATE_CHECK] Searching by card name: '{search_query}'")
-        
+            clean_form_name = clean_form_name.replace(card_number, '')
+        clean_form_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_form_name)
+        clean_form_name = re.sub(r'\s*[-–—]\s*.*$', '', clean_form_name)
+        clean_form_name = clean_form_name.strip()
+
+        safe_print(f"[DUPLICATE_CHECK] Clean form name: '{clean_form_name}'")
+
+        # Search Shopify: use card number if available (more specific), else card name
+        search_query = card_number if card_number else clean_form_name
+        safe_print(f"[DUPLICATE_CHECK] Shopify search query: '{search_query}'")
+
         products = await client.get_products(query=search_query)
-        
-        safe_print(f"[DUPLICATE_CHECK] Found {len(products)} products matching '{search_query}'")
-        
-        # Define Unicode normalization function (handles accented characters)
-        import unicodedata
-        def normalize_text(text):
-            # NFD = decompose accented chars, then filter out combining marks
-            nfd = unicodedata.normalize('NFD', text)
-            return ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
-        
-        # Check for match by card name and card number
-        matches_found = 0
+        safe_print(f"[DUPLICATE_CHECK] Found {len(products)} candidates")
+
         for product in products:
             product_id = str(product.get('id', ''))
             product_title = product.get('title', '')
-            product_title_lower = product_title.lower()
-            
-            # Skip if this is the current product being edited
+
             if current_product_id and product_id == current_product_id:
                 safe_print(f"[DUPLICATE_CHECK] Skipping current product: {product_title}")
                 continue
-            
-            # Check if card name is in the product title (accent-insensitive)
-            normalized_clean_name = normalize_text(clean_card_name.lower())
-            normalized_product_title = normalize_text(product_title_lower)
-            name_matches = normalized_clean_name in normalized_product_title
-            
-            # Check if card number is in the product title (only if card_number provided)
-            number_matches = True  # Skip if no card number
-            if card_number:
-                number_matches = card_number.upper() in product_title.upper()
-            
-            # Check if set name is in the product title (only if set_name provided)
-            set_matches = True  # Skip if no set name
-            if set_name:
-                set_matches = normalize_text(set_name.lower()) in normalized_product_title
-            
-            # Log each product check for debugging
-            if name_matches:
-                safe_print(f"[DUPLICATE_CHECK] Checking: {product_title}")
-                safe_print(f"[DUPLICATE_CHECK]   Clean name: '{clean_card_name}' -> normalized: '{normalized_clean_name}'")
-                safe_print(f"[DUPLICATE_CHECK]   Card number: '{card_number}' -> match: {number_matches}")
-                safe_print(f"[DUPLICATE_CHECK]   Set name: '{set_name}' -> match: {set_matches}")
-            
-            # All provided fields must match
-            if name_matches and number_matches and set_matches:
-                matches_found += 1
-                safe_print(f"[DUPLICATE_CHECK] ✓✓✓ DUPLICATE FOUND #{matches_found}: {product_title} (ID: {product.get('id')})")
+
+            if _is_duplicate_card(clean_form_name, card_number, set_name, product_title):
+                safe_print(f"[DUPLICATE_CHECK] ✓✓✓ DUPLICATE FOUND: {product_title} (ID: {product.get('id')})")
                 return JSONResponse({
                     'exists': True,
-                    'product_id': str(product.get('id')),
+                    'product_id': product_id,
                     'product_title': product_title
                 })
-        
-        safe_print(f"[DUPLICATE_CHECK] No duplicate found after checking {len(products)} products")
-        return JSONResponse({
-            'exists': False,
-            'product_id': None,
-            'product_title': None
-        })
+
+        safe_print(f"[DUPLICATE_CHECK] No duplicate found")
+        return JSONResponse({'exists': False, 'product_id': None, 'product_title': None})
+
     except Exception as e:
         safe_print(f"[DUPLICATE_CHECK] Error: {e}")
         return JSONResponse({
@@ -1795,19 +1857,48 @@ async def bulk_upload_appraise(
             price = None
             current_quantity = 0
             
-            if card_number and card_name and admin_token:
-                existing_product = await client.search_product_by_card(
-                    admin_token, 
-                    card_number, 
-                    card_name
-                )
-                if existing_product:
-                    exists = True
-                    shopify_product_id = existing_product["product_id"]
-                    shopify_variant_id = existing_product["variant_id"]
-                    shopify_inventory_item_id = existing_product["inventory_item_id"]
-                    current_quantity = existing_product.get("current_quantity", 0)
-                    price = existing_product.get("price")
+            if card_name:
+                # Normalize empty strings to None for symmetric matching
+                num = card_number.strip() if card_number else None
+                sname = set_name.strip() if set_name else None
+
+                # Clean the card name (strip parentheses, set info, embedded card number)
+                import re as _re
+                clean_bulk_name = card_name
+                if num:
+                    clean_bulk_name = clean_bulk_name.replace(num, '')
+                clean_bulk_name = _re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_bulk_name)
+                clean_bulk_name = _re.sub(r'\s*[-–—]\s*.*$', '', clean_bulk_name)
+                clean_bulk_name = clean_bulk_name.strip()
+
+                # Search Shopify: use card number if available, else card name
+                bulk_search_query = num if num else clean_bulk_name
+                safe_print(f"[BULK_UPLOAD] Duplicate check: name='{clean_bulk_name}', number='{num}', set='{sname}', query='{bulk_search_query}'")
+
+                bulk_products = await client.get_products(query=bulk_search_query)
+                safe_print(f"[BULK_UPLOAD] Found {len(bulk_products)} candidates for duplicate check")
+
+                for bp in bulk_products:
+                    bp_title = bp.get('title', '')
+                    if _is_duplicate_card(clean_bulk_name, num, sname, bp_title, log_prefix="[BULK_UPLOAD]"):
+                        safe_print(f"[BULK_UPLOAD] ✓ DUPLICATE FOUND: {bp_title}")
+                        exists = True
+                        # Use search_product_by_card to get full inventory details
+                        # (get_products doesn't return inventory_item_id)
+                        search_term = num if num else clean_bulk_name
+                        existing_product = await client.search_product_by_card(
+                            admin_token, search_term, clean_bulk_name
+                        )
+                        if existing_product:
+                            shopify_product_id = existing_product["product_id"]
+                            shopify_variant_id = existing_product["variant_id"]
+                            shopify_inventory_item_id = existing_product["inventory_item_id"]
+                            current_quantity = existing_product.get("current_quantity", 0)
+                            price = existing_product.get("price")
+                        break
+
+
+
             
             # If card is new, fetch price from PriceCharting
             if not exists:
