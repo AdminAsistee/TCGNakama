@@ -735,6 +735,7 @@ async def estimate_market_value(
 async def check_duplicate_card(
     card_name: str,
     card_number: Optional[str] = None,  # Card number from the form field (e.g. No.094, OP09-051)
+    set_name: Optional[str] = None,     # Set name from the form field (e.g. VSTAR Universe)
     current_product_id: Optional[str] = None,  # ID of product being edited (to exclude from check)
     admin: str = Depends(get_admin_session),
     client: ShopifyClient = Depends(get_shopify_client)
@@ -742,17 +743,19 @@ async def check_duplicate_card(
     """
     Check if a card with the same name already exists in Shopify.
     Returns duplicate status and product info if found.
-    Matches both card name and card number (e.g., "027/071") if present.
+    Matches card name, and optionally card number and set name if provided.
+    Empty card_number or set_name are skipped (treated as 'don't care').
     
     Args:
         card_name: The card name from the form field
         card_number: The card number from the form field (takes priority over parsing from card_name)
+        set_name: The set name from the form field
         current_product_id: Optional product ID being edited (will be excluded from duplicate check)
     """
     try:
         import re
         
-        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}', card_number: '{card_number}'")
+        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}', card_number: '{card_number}', set_name: '{set_name}'")
         if current_product_id:
             safe_print(f"[DUPLICATE_CHECK] Excluding current product: {current_product_id}")
         
@@ -821,20 +824,25 @@ async def check_duplicate_card(
             normalized_product_title = normalize_text(product_title_lower)
             name_matches = normalized_clean_name in normalized_product_title
             
-            # Check if card number is in the product title (if we have a card number)
-            number_matches = True  # Default to true if no card number
+            # Check if card number is in the product title (only if card_number provided)
+            number_matches = True  # Skip if no card number
             if card_number:
-                number_matches = card_number in product_title
+                number_matches = card_number.upper() in product_title.upper()
+            
+            # Check if set name is in the product title (only if set_name provided)
+            set_matches = True  # Skip if no set name
+            if set_name:
+                set_matches = normalize_text(set_name.lower()) in normalized_product_title
             
             # Log each product check for debugging
-            if name_matches or number_matches:
+            if name_matches:
                 safe_print(f"[DUPLICATE_CHECK] Checking: {product_title}")
                 safe_print(f"[DUPLICATE_CHECK]   Clean name: '{clean_card_name}' -> normalized: '{normalized_clean_name}'")
-                safe_print(f"[DUPLICATE_CHECK]   Card number: '{card_number}'")
-                safe_print(f"[DUPLICATE_CHECK]   Name match: {name_matches}, Number match: {number_matches}")
+                safe_print(f"[DUPLICATE_CHECK]   Card number: '{card_number}' -> match: {number_matches}")
+                safe_print(f"[DUPLICATE_CHECK]   Set name: '{set_name}' -> match: {set_matches}")
             
-            # Both must match
-            if name_matches and number_matches:
+            # All provided fields must match
+            if name_matches and number_matches and set_matches:
                 matches_found += 1
                 safe_print(f"[DUPLICATE_CHECK] ✓✓✓ DUPLICATE FOUND #{matches_found}: {product_title} (ID: {product.get('id')})")
                 return JSONResponse({
