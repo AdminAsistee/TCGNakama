@@ -106,11 +106,8 @@ STEP 2 — EXTRACT (follow these rules exactly):
 4. **Set Name**:
    - MODERN Pokémon (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters after it
    - PROMO: card number ends with "/P" → set_name = "PROMO"
-   - VINTAGE Pokémon (pre-2016):
-     * Gold border + "No.XXX" number + no set symbol → "Base Set"
-     * Leaf symbol → "Jungle"
-     * Fossil symbol → "Fossil"
-     * No symbol found → "" (do NOT guess "Prism" from holographic art alone)
+   - VINTAGE Pokémon (pre-2016): use your identification from STEP 1 — trust what you identified the set as (e.g. "Base Set", "Jungle", "Fossil", "Carddass Vending", "Neo Destiny", etc.)
+     * Do NOT guess "Prism" from holographic art alone
    - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → set_name = ""
 
 5. **Card Number**: bottom right corner
@@ -132,7 +129,7 @@ STEP 2 — EXTRACT (follow these rules exactly):
 CRITICAL RULES:
 - Do NOT confuse holographic art (Holo Rare) with Prism Star — they are completely different
 - Prism Star MUST have "Prism Star" in the card name itself
-- Japanese Base Set = gold border + No.XXX number → set_name = "Base Set"
+- For vintage cards, trust your STEP 1 identification for the set name — do not override it with assumptions
 - Use "" for missing fields, NEVER null
 
 Return ONLY this JSON (no markdown):
