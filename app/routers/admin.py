@@ -734,6 +734,7 @@ async def estimate_market_value(
 @router.get("/check-duplicate-card")
 async def check_duplicate_card(
     card_name: str,
+    card_number: Optional[str] = None,  # Card number from the form field (e.g. No.094, OP09-051)
     current_product_id: Optional[str] = None,  # ID of product being edited (to exclude from check)
     admin: str = Depends(get_admin_session),
     client: ShopifyClient = Depends(get_shopify_client)
@@ -744,25 +745,25 @@ async def check_duplicate_card(
     Matches both card name and card number (e.g., "027/071") if present.
     
     Args:
-        card_name: The card name to check
+        card_name: The card name from the form field
+        card_number: The card number from the form field (takes priority over parsing from card_name)
         current_product_id: Optional product ID being edited (will be excluded from duplicate check)
     """
     try:
         import re
         
-        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}'")
+        safe_print(f"[DUPLICATE_CHECK] Checking for duplicate: '{card_name}', card_number: '{card_number}'")
         if current_product_id:
             safe_print(f"[DUPLICATE_CHECK] Excluding current product: {current_product_id}")
         
-        # STEP 1: Extract card number FIRST from the original input
-        # Extract card number pattern - supports multiple formats:
-        # - Pokemon with hash: #027/071
-        # - One Piece: #OP09-051, #ST01-001
-        # - Pokemon without hash: 027/071
-        # - Simple numbered: #123
-        # Order matters: longer/more specific patterns first!
-        card_number_pattern = re.search(r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#\d{1,4})', card_name)
-        card_number = card_number_pattern.group(0) if card_number_pattern else None
+        # STEP 1: Use card_number from the form field if provided (user may have edited it after appraisal).
+        # Only fall back to parsing it from card_name if not supplied.
+        if not card_number:
+            # Extract card number pattern from the name string as fallback
+            # Supports: #027/071, #OP09-051, #ST01-001, 027/071, #123
+            # Order matters: longer/more specific patterns first!
+            card_number_pattern = re.search(r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#\d{1,4})', card_name)
+            card_number = card_number_pattern.group(0) if card_number_pattern else None
         
         # STEP 2: Extract the clean card name (remove everything except the character/card name)
         # Start fresh from original input

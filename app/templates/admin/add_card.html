@@ -642,8 +642,16 @@
             try {
                 console.log('[DUPLICATE CHECK] Calling duplicate check endpoint');
 
+                // Read card_number directly from the form field (user may have edited it after appraisal)
+                const cardNumberInput = document.querySelector('input[name="card_number"]');
+                const cardNumber = cardNumberInput ? cardNumberInput.value.trim() : '';
+                console.log('[DUPLICATE CHECK] Card number from form:', cardNumber);
+
                 // Build the API URL - include current product ID if in edit mode
                 let apiUrl = `/admin/check-duplicate-card?card_name=${encodeURIComponent(cardName)}`;
+                if (cardNumber) {
+                    apiUrl += `&card_number=${encodeURIComponent(cardNumber)}`;
+                }
                 if (editMode) {
                     const currentProductId = document.querySelector('input[name="product_id"]').value;
                     apiUrl += `&current_product_id=${encodeURIComponent(currentProductId)}`;
