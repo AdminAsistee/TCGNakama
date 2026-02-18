@@ -81,11 +81,15 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
    - If you see "ENERGY" → return "Energy"
    - Otherwise → return "Pokemon"
 
-2. **Card Name (Japanese)**: The Japanese name if visible
+2. **Card Name (Japanese)**: The Japanese character/card name if visible
+   - For One Piece cards: The character name is the LARGE text at the bottom center of the card (e.g., サボ, ルフィ, ゾロ)
+   - IMPORTANT: Do NOT extract the affiliation/faction text that appears BELOW the character name in smaller text (e.g., 革命軍, 麦わらの一味, 王下七武海) — that is the group/affiliation, NOT the card name
+   - For Pokémon cards: The Pokémon name printed on the card
 3. **Card Name (English)**: ALWAYS provide the English name
    - If you see English text on the card, extract it
    - If only Japanese is visible, you MUST translate it or provide the known English name
    - For Pokémon cards: Pikachu, Gengar, Ho-Oh, etc. - provide the English Pokémon name
+   - For One Piece cards: Translate the Japanese character name (e.g., サボ = Sabo, ルフィ = Luffy, ゾロ = Zoro)
    - For Trainer cards: Translate the Japanese name (e.g., にせオーキドの逆襲 = Impostor Oak's Revenge)
    - This field should NEVER be empty for known cards
 
