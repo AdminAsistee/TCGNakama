@@ -73,53 +73,46 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
             else:
                 return {'error': 'No image data or URL provided'}
             
-            # Single prompt with chain-of-thought: Gemini reasons freely first, then outputs JSON.
-            # This gives the same accuracy as two separate API calls but at half the latency.
-            prompt = """Analyze this trading card image. First, identify the card carefully — what card is it, what set is it from, what is the card number, rarity, and any special variants? Then, using your identification, extract the structured data below.
+            # === PASS 1: Short free identification ===
+            pass1_prompt = "Look at this trading card. In a few short sentences, identify: the card name, the set/series it's from, the card number, the rarity, any holographic effects, border style, and any special markings (e.g. 1st Edition, Prism Star in the name, set symbol)."
+            pass1_response = model.generate_content([pass1_prompt, img])
+            card_description = pass1_response.text.strip()
+            safe_print(f"[APPRAISE_IMAGE] Pass 1 (free ID): {card_description}")
 
-STEP 1 — IDENTIFY (think freely):
-Freely identify what this card is. Note down the following as you observe them:
-- Card name (Japanese and English if visible)
-- Set or series it belongs to
-- Card number (exactly as printed)
-- Rarity symbol or marking
-- Holographic effects (is it sparkly only in the art box, or across the entire card?)
-- Border style (gold, silver, normal?)
-- Any special markings (1st Edition stamp, "Prism Star" in the name, set symbol/icon, etc.)
+            # === PASS 2: Structured extraction using Pass 1 as context ===
+            prompt = f"""A trading card has been identified as follows:
+---
+{card_description}
+---
+Using the above as context, extract the structured data from the card image. Follow these rules EXACTLY:
 
-STEP 2 — EXTRACT (follow these rules exactly):
+1. **Card Type**: "TRAINER" header → "Trainer" | "ENERGY" → "Energy" | otherwise → "Pokemon"
 
-1. **Card Type**:
-   - "TRAINER" header → "Trainer"
-   - "ENERGY" → "Energy"
-   - Otherwise → "Pokemon"
-
-2. **Card Name (Japanese)**: The Japanese name printed on the card
-   - For One Piece: LARGE text at bottom center (NOT the affiliation text below it)
-   - For Pokémon: The Pokémon name
+2. **Card Name (Japanese)**: Japanese name on the card
+   - One Piece: LARGE text at bottom center (NOT affiliation text below it)
+   - Pokémon: The Pokémon name
 
 3. **Card Name (English)**: ALWAYS provide — translate if needed
-   - Pokémon: Pikachu, Gengar, Ho-Oh, etc.
-   - One Piece: サボ=Sabo, ルフィ=Luffy, ゾロ=Zoro
+   - Pokémon: Pikachu, Gengar, Ho-Oh, etc. | One Piece: サボ=Sabo, ルフィ=Luffy
    - NEVER leave empty for known cards
 
 4. **Set Name**:
-   - MODERN Pokémon (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters after it
-   - PROMO: card number ends with "/P" → set_name = "PROMO"
-   - VINTAGE Pokémon (pre-2016): use your identification from STEP 1 — trust what you identified the set as (e.g. "Base Set", "Jungle", "Fossil", "Carddass Vending", "Neo Destiny", etc.)
+   - MODERN Pokémon (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H)
+   - ENGLISH Pokémon (no set code printed): use the set identified in the description above — trust it
+   - PROMO: card number ends with "/P" → "PROMO"
+   - VINTAGE (pre-2016): trust the identification above (e.g. "Base Set", "Jungle", "Carddass Vending")
      * Do NOT guess "Prism" from holographic art alone
-   - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → set_name = ""
+   - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → ""
 
 5. **Card Number**: bottom right corner
    - Valid: "###/###", "###/P", "No.094", "094", "26", "P-044"
    - Invalid: anything starting with "ID:"
-   - One Piece "P-###" → card_number = "P-044", set_name = ""
 
 6. **Rarity**: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR
 
 7. **Special Variants**:
-   - Holo Rare = sparkly art inside art box only, normal borders → NOT a special variant, do NOT call it "Prism"
-   - Prism Star = "Prism Star" literally in the card name + full-card rainbow (Sun & Moon era 2017-2019 ONLY)
+   - Holo Rare = sparkly art in art box only, normal borders → NOT a special variant, do NOT call it "Prism"
+   - Prism Star = "Prism Star" literally IN the card name + full-card rainbow (Sun & Moon era ONLY)
    - Crystal, Reverse Holo, 1st Edition if visible
    - Return comma-separated or ""
 
@@ -127,14 +120,13 @@ STEP 2 — EXTRACT (follow these rules exactly):
 9. **Manufacturer**: publisher if visible
 
 CRITICAL RULES:
-- Do NOT confuse holographic art (Holo Rare) with Prism Star — they are completely different
-- Prism Star MUST have "Prism Star" in the card name itself
-- For vintage cards, trust your STEP 1 identification for the set name — do not override it with assumptions
+- Do NOT confuse Holo Rare with Prism Star — Prism Star MUST have "Prism Star" in the card name
+- For vintage and English cards, trust the Pass 1 identification for set name
 - Use "" for missing fields, NEVER null
 
-Return ONLY this JSON (no markdown):
-{
-  "card_type": "Pokemon" or "Trainer" or "Energy",
+Return ONLY raw JSON, no markdown:
+{{
+  "card_type": "Pokemon",
   "card_name_japanese": "",
   "card_name_english": "",
   "set_name": "",
@@ -143,11 +135,12 @@ Return ONLY this JSON (no markdown):
   "special_variants": "",
   "year": "",
   "manufacturer": ""
-}"""
+}}"""
 
             # Generate content with image
             response = model.generate_content([prompt, img])
             response_text = response.text.strip()
+
             
             safe_print(f"[APPRAISE_IMAGE] Gemini response: {response_text}")
             
