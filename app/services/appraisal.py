@@ -94,7 +94,7 @@ Then fill in:
    - Vintage (pre-2016): identify from set symbol or style (e.g. "Base Set", "Jungle", "Fossil", "Carddass Vending")
    - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → ""
    - If truly unknown → ""
-5. card_number: bottom right corner. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". Invalid: "ID:..." → ""
+5. card_number: bottom right corner. Extract ONLY the number — do NOT include rarity suffixes. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
 6. rarity: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR — or "" if not visible
 7. special_variants: comma-separated or ""
    - Holo Rare (sparkly art box only, normal borders) → NOT a variant, do NOT write "Prism"
@@ -152,6 +152,24 @@ Output ONLY this JSON, nothing else:
                 # Remove ID format completely
                 card_data['card_number'] = ''
                 card_number = ''
+
+            # Post-processing: Strip rarity suffixes from card number (e.g. "088/071 SR" → "088/071")
+            # Japanese cards often print the rarity label right after the card number
+            RARITY_SUFFIXES = re.compile(
+                r'\s+(SR|RR|UR|SAR|SSR|AR|HR|PR|C|U|R|TR|K|A)\s*$',
+                re.IGNORECASE
+            )
+            rarity_suffix_match = RARITY_SUFFIXES.search(card_number)
+            if rarity_suffix_match:
+                stripped_number = card_number[:rarity_suffix_match.start()].strip()
+                suffix_rarity = rarity_suffix_match.group(1).upper()
+                safe_print(f"[APPRAISE] Stripped rarity suffix '{suffix_rarity}' from card number '{card_number}' → '{stripped_number}'")
+                card_data['card_number'] = stripped_number
+                card_number = stripped_number
+                # Only override rarity if the model didn't already provide one
+                if not card_data.get('rarity'):
+                    card_data['rarity'] = suffix_rarity
+
             
             # Post-processing: Detect PROMO set from card number
             # Only applies to Pokémon PROMO format (e.g. "010/P"), NOT One Piece P-prefix (e.g. "P-044")
