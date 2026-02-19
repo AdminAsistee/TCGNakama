@@ -93,17 +93,27 @@ class ShopifyClient:
             v0 = variants[0]["node"]
             # Removed print statement that caused UnicodeEncodeError on Windows
 
-        # Calculate total inventory from all variants
-        total_inventory = 0
-        for edge in variants:
-            v_node = edge.get("node", {})
-            qty = v_node.get("quantityAvailable")
-            # If any variant is tracked (not None), we add it. 
-            # If it's None, it usually means "untracked" (unlimited).
-            # For this dashboard, let's treat None as 0 for summing, 
-            # or we could flag it. Let's stick to 0 for now as per previous fix.
-            if qty is not None:
-                total_inventory += qty
+        # Prefer Shopify's product-level totalInventory if available
+        shopify_total = node.get("totalInventory")
+        if shopify_total is not None:
+            total_inventory = shopify_total
+        else:
+            # Fallback: calculate total inventory from all variants
+            total_inventory = 0
+            for edge in variants:
+                v_node = edge.get("node", {})
+                qty = v_node.get("quantityAvailable")
+                # If any variant is tracked (not None), we add it. 
+                # If it's None, it usually means "untracked" (unlimited).
+                # For this dashboard, let's treat None as 0 for summing.
+                if qty is not None:
+                    total_inventory += qty
+
+        # Check if ANY variant is available (not just the first one)
+        any_available = any(
+            edge.get("node", {}).get("availableForSale")
+            for edge in variants
+        ) if variants else False
 
         return {
             "id": node["id"],
@@ -120,7 +130,7 @@ class ShopifyClient:
             "card_number": card_number,
             "totalInventory": total_inventory,
             "createdAt": node.get("createdAt"),
-            "status": "Sync" if variant.get("availableForSale") else "Sold Out",
+            "status": "Sync" if any_available else "Sold Out",
             "tags": node.get("tags", []),
             "images": [img["node"]["url"] for img in node.get("images", {}).get("edges", [])] if node.get("images", {}).get("edges") else ([node.get("featuredImage", {}).get("url")] if node.get("featuredImage") else ["https://images.pokemontcg.io/bg.jpg"]),
             "vendor": node.get("vendor", "TCG Nakama"),
@@ -151,6 +161,7 @@ class ShopifyClient:
                 tags
                 handle
                 createdAt
+                totalInventory
                 featuredImage {
                   url
                 }
@@ -268,11 +279,13 @@ class ShopifyClient:
                       }
                     }
                   }
-                  variants(first: 1) {
+                  totalInventory
+                  variants(first: 10) {
                     edges {
                       node {
                         id
                         availableForSale
+                        quantityAvailable
                         price {
                           amount
                           currencyCode
