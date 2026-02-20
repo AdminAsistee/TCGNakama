@@ -72,7 +72,14 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
                     img = Image.open(io.BytesIO(response.content))
             else:
                 return {'error': 'No image data or URL provided'}
-            
+
+            # Enhance image brightness and contrast so dark card text is more readable
+            from PIL import ImageEnhance
+            img = ImageEnhance.Brightness(img).enhance(1.3)   # 30% brighter
+            img = ImageEnhance.Contrast(img).enhance(1.2)     # 20% more contrast
+            safe_print("[APPRAISE_IMAGE] Image enhanced: brightness +30%, contrast +20%")
+
+
             # Single prompt — Gemini thinks internally then outputs ONLY JSON.
             # The JSON parser extracts the last { } block so any leading reasoning text is ignored.
             prompt = """Analyze this trading card image carefully, then output ONLY a JSON object with the fields below. Do not write any explanation — output JSON only.
