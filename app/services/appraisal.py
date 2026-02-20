@@ -98,7 +98,11 @@ Then fill in:
    - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H)
    - English Pokémon: identify the set from the set symbol icon on the card (e.g. crown = Chilling Reign, fusion symbol = Fusion Strike)
    - PROMO: card number ends with "/P" → "PROMO"
-   - Vintage (pre-2016): identify from set symbol or style (e.g. "Base Set", "Jungle", "Fossil", "Carddass Vending")
+   - Vintage Japanese sets — look carefully at the card layout:
+     * Topsun (1995): split diagonal colored background (e.g. half green / half red), Pokémon silhouettes as watermarks, number in top-left box, stat-only data box (type/height/weight/moves, NO HP or attack damage) → set_name = "Topsun"
+     * Carddass Vending (Bandai, 1997-2000): single solid color or gradient background, different art style, small card with stats → set_name = "Carddass Vending Part X"
+     * Base Set / Jungle / Fossil / Team Rocket / Neo: standard Pokémon TCG layout with HP and attacks
+     * Do NOT label a Topsun card as "Carddass Vending" — they are very different products
    - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → ""
    - If truly unknown → ""
 5. card_number: bottom right corner. Extract ONLY the number — do NOT include rarity suffixes. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
@@ -107,6 +111,7 @@ Then fill in:
    - Holo Rare (sparkly art box only, normal borders) → NOT a variant, do NOT write "Prism"
    - Prism Star: ONLY if "Prism Star" is literally in the card name AND full-card rainbow effect
    - Crystal, Reverse Holo, 1st Edition if visible
+   - Topsun cards: check the card back color if visible → "Blue Back" or "Green Back"
 8. year: copyright year if visible, else ""
 9. manufacturer: publisher if visible, else ""
 
