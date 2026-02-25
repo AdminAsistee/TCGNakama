@@ -65,7 +65,7 @@
                     class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
                     placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/filter"
                     hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-swap="innerHTML"
-                    hx-indicator="#search-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
+                    hx-indicator="#grid-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
             </div>
     </div>
     </label>
@@ -573,7 +573,7 @@
                 <p class="text-xs text-gray-400 leading-relaxed">TCGNakama.com is the premier marketplace for trading
                     card enthusiasts and investors.</p>
             </div>
-            <!-- Support -->
+            <!-- Support (Hidden for now)
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">Support</h4>
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -584,25 +584,26 @@
                     <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Returns</a>
                 </div>
             </div>
+            -->
             <!-- Social -->
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">Social</h4>
                 <div class="flex gap-3">
-                    <a href="#"
+                    <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank"
                         class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
                         <span class="material-symbols-outlined text-gray-400 text-sm">public</span>
                     </a>
-                    <a href="#"
+                    <a href="https://www.instagram.com/tcgnakama.official/" target="_blank"
                         class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
                         <span class="material-symbols-outlined text-gray-400 text-sm">photo_camera</span>
                     </a>
-                    <a href="#"
+                    <a href="https://www.youtube.com/@tcg-nakama" target="_blank"
                         class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
                         <span class="material-symbols-outlined text-gray-400 text-sm">smart_display</span>
                     </a>
                 </div>
             </div>
-            <!-- Newsletter -->
+            <!-- Newsletter (Hidden for now)
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">Newsletter</h4>
                 <div class="flex gap-2">
@@ -612,6 +613,7 @@
                         class="px-3 py-2 bg-primary text-background-dark text-xs font-bold rounded-lg hover:bg-primary-dark transition-colors">→</button>
                 </div>
             </div>
+            -->
         </div>
         <!-- Copyright + Merchant Login -->
         <div class="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-2">
@@ -1261,6 +1263,21 @@
             if (Math.abs(diff) > 50) { diff > 0 ? carouselNext() : carouselPrev(); }
         }, { passive: true });
     })();
+
+    // ───── Search Auto-Scroll Logic (Trigger only on Enter) ─────
+    (function () {
+        document.addEventListener('keydown', function (e) {
+            if (e.target.id === 'search-input' && e.key === 'Enter') {
+                const searchInput = e.target;
+                const section = document.getElementById('all-cards-section');
+
+                if (section && searchInput && searchInput.value.trim().length > 0) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    })();
+
 </script>
 
 {% endblock %}
