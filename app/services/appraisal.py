@@ -31,6 +31,56 @@ def safe_print(message: str):
         print(message.encode('ascii', 'backslashreplace').decode('ascii'))
 
 
+async def resolve_full_set_name(card_name: str, set_code: str, card_number: str = "") -> str:
+    """
+    Expand a TCG set code (e.g., 'OP12', 'SV5M') into its full descriptive name using Gemini AI.
+    """
+    if not set_code or len(set_code) < 2:
+        return set_code
+        
+    # Skip if it's already likely a full name
+    if len(set_code) > 10 and " " in set_code:
+        return set_code
+
+    try:
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or api_key == "your_api_key_here":
+            return set_code
+
+        # Use the fastest available model for this text-only task
+        async with _gemini_lock:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            
+            prompt = f"""Given this trading card info, expand the "Set Code" into its full, official set name.
+            
+            Card Name: {card_name}
+            Set Code: {set_code}
+            Card Number: {card_number}
+            
+            Rules:
+            1. Return ONLY the full set name string (e.g., "Romance Dawn", "Cyber Judge", "VSTAR Universe").
+            2. If the code is already a full name, return it as is.
+            3. If you absolutely cannot identify the set, return the original code "{set_code}".
+            4. Do not provide explanations or any other text.
+            """
+            
+            response = model.generate_content(prompt)
+            result = response.text.strip()
+            
+            # Clean up any quotes or markdown
+            result = result.replace('"', '').replace("'", "").strip()
+            
+            if result:
+                safe_print(f"[RESOLVE_SET] Code '{set_code}' -> Full Name '{result}'")
+                return result
+            return set_code
+    except Exception as e:
+        safe_print(f"[RESOLVE_SET] Error: {e}")
+        return set_code
+
+
 async def appraise_card_from_image(image_data: bytes = None, image_url: str = None) -> Dict:
     """
     Analyze a card image using Gemini AI vision to extract card details.
@@ -95,25 +145,33 @@ Then fill in:
 2. card_name_japanese: Japanese name if visible, else ""
 3. card_name_english: ALWAYS provide English name — translate if needed. Never leave empty for known cards.
 4. set_name:
-   - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H)
-   - English Pokémon: identify the set from the set symbol icon on the card (e.g. crown = Chilling Reign, fusion symbol = Fusion Strike)
-   - PROMO: card number ends with "/P" → "PROMO"
+   - Provide the short alphanumeric SET CODE or identifier.
+   - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H).
+   - English Pokémon: identify the set from the set symbol icon on the card (e.g. crown = Chilling Reign, fusion symbol = Fusion Strike) — provide the official 3-letter code if known.
+   - PROMO: use "PROMO" ONLY if (a) the word "PROMO" is physically printed on the card, OR (b) the card number ends with "/P". Do NOT infer "PROMO" from context alone.
    - Vintage Japanese sets — look carefully at the card layout:
-     * Topsun (1995): split diagonal colored background (e.g. half green / half red), Pokémon silhouettes as watermarks, number in top-left box, stat-only data box (type/height/weight/moves, NO HP or attack damage) → set_name = "Topsun"
-     * Carddass Vending (Bandai, 1997-2000): single solid color or gradient background, different art style, small card with stats → set_name = "Carddass Vending Part X"
-     * Base Set / Jungle / Fossil / Team Rocket / Neo: standard Pokémon TCG layout with HP and attacks
-     * Do NOT label a Topsun card as "Carddass Vending" — they are very different products
+     * Topsun (1995): number in top-left box, NO HP or attack damage → set_name = "Topsun"
+     * Carddass Vending (Bandai, 1997-2000): NO HP stat, NO attack damage numbers — only height/weight/type stats. Very different from standard TCG cards → set_name = "Carddass Vending Part X"
+     * Base Set / Jungle / Fossil / Team Rocket / Neo / Gym: standard Pokémon TCG layout WITH HP and attack damage numbers — these have NO set code → set_name = ""
    - One Piece: prefix from card number (e.g. "OP12" from "OP12-008"); "P-044" format → ""
-   - If truly unknown → ""
-5. card_number: bottom right corner. Extract ONLY the number — do NOT include rarity suffixes. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
-6. rarity: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR — or "" if not visible
-7. special_variants: comma-separated or ""
+   - If truly unknown -> "".
+5. full_set_name:
+   - Provide the full descriptive SET NAME (e.g., "Cyber Judge", "Fusion Strike", "Romance Dawn").
+   - Correct identification of the set name is critical.
+6. card_number: bottom right corner. Extract ONLY the number — do NOT include rarity suffixes. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
+7. rarity: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR — or "" if not visible
+8. special_variants: comma-separated or ""
    - Holo Rare (sparkly art box only, normal borders) → NOT a variant, do NOT write "Prism"
    - Prism Star: ONLY if "Prism Star" is literally in the card name AND full-card rainbow effect
    - Crystal, Reverse Holo, 1st Edition if visible
    - Topsun cards: check the card back color if visible → "Blue Back" or "Green Back"
-8. year: copyright year if visible, else ""
-9. manufacturer: publisher if visible, else ""
+9. card_condition: Evaluate the visual quality of the card:
+   - "Near Mint": No visible white edges on the back, clean surface, no creases.
+   - "Lightly Played": Minor whitening on edges, light surface scratches.
+   - "Mostly Played": Significant whitening, corner wear, or minor creases.
+   - Default to "Near Mint" if unsure.
+10. year: copyright year if visible, else ""
+11. manufacturer: provide the PUBLISHING COMPANY name if visible (e.g., "Nintendo", "Wizards of the Coast", "Bandai", "Konami"). DO NOT put the set name or full set name here.
 
 Output ONLY this JSON, nothing else:
 {
@@ -121,9 +179,11 @@ Output ONLY this JSON, nothing else:
   "card_name_japanese": "",
   "card_name_english": "",
   "set_name": "",
+  "full_set_name": "",
   "card_number": "",
   "rarity": "",
   "special_variants": "",
+  "card_condition": "",
   "year": "",
   "manufacturer": ""
 }"""
@@ -153,7 +213,7 @@ Output ONLY this JSON, nothing else:
             card_data = json.loads(response_text)
 
             # Convert null values to empty strings
-            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants']:
+            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'full_set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants', 'card_condition']:
                 if card_data.get(key) is None or card_data.get(key) == 'null':
                     card_data[key] = ''
 
@@ -239,6 +299,26 @@ Output ONLY this JSON, nothing else:
                     special_variants.append('Prism')
 
             
+            # Resolve/fallback for full set name
+            full_set_name = card_data.get('full_set_name', '')
+            # If we only have a code or if Gemini failed to provide a name
+            if (not full_set_name or full_set_name == set_name) and set_name:
+                resolved_name = await resolve_full_set_name(
+                    card_data.get('card_name_english', ''),
+                    set_name,
+                    card_number
+                )
+                if resolved_name:
+                    full_set_name = resolved_name
+            
+            # Final sanity check: if set_name (code) is a long string with spaces, it's likely the name mistakenly put there
+            if len(set_name) > 10 and " " in set_name and not full_set_name:
+                full_set_name = set_name
+            
+            # Store it back normalized
+            card_data['full_set_name'] = full_set_name
+
+            
             # Map rarity to internal system
             rarity_mapping = {
                 # Pokémon
@@ -308,10 +388,10 @@ Output ONLY this JSON, nothing else:
                 elif card_name_en:
                     name_parts.append(card_name_en)
                 
-                # Add card number if available (no "- Trainer" label)
+                # Add card number if available — always with a dash separator
                 if card_number:
                     formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
-                    name_parts.append(formatted_number)
+                    name_parts.append(f"- {formatted_number}")
                 
                 formatted_card_name = ' '.join(name_parts) if name_parts else 'Unknown Trainer'
             
@@ -340,10 +420,14 @@ Output ONLY this JSON, nothing else:
                     # Special variant without set (e.g., Prism)
                     name_parts.append(f"- {special_variants[0]}")
                 
-                # Add card number if available
+                # Add card number if available — always with a dash separator
                 if card_number:
                     formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
-                    name_parts.append(formatted_number)
+                    # If no set_name or other separator was added, prepend the dash
+                    if not set_name and not any(p.startswith('-') for p in name_parts):
+                        name_parts.append(f"- {formatted_number}")
+                    else:
+                        name_parts.append(formatted_number)
                 
                 formatted_card_name = ' '.join(name_parts) if name_parts else 'Unknown Card'
             
@@ -359,7 +443,9 @@ Output ONLY this JSON, nothing else:
                 'manufacturer': card_data.get('manufacturer', ''),
                 'raw_rarity': extracted_rarity,  # Include original for debugging
                 'card_name_japanese': card_name_jp,  # Keep for reference
-                'card_name_english': card_name_en   # Keep for reference
+                'card_name_english': card_name_en,   # Keep for reference
+                'card_condition': card_data.get('card_condition', 'Near Mint'),
+                'full_set_name': card_data.get('full_set_name', '')
             }
 
             

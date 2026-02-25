@@ -362,11 +362,19 @@
                     </div>
 
                     <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Set Name</label>
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Set Code</label>
                         <input name="set_name"
                             class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                            placeholder="e.g. s12a" type="text" value="{{ product.set if edit_mode else '' }}" />
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Full Set Name (AI
+                            Resolved)</label>
+                        <input name="full_set_name" id="full-set-name-input"
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
                             placeholder="e.g. VSTAR Universe" type="text"
-                            value="{{ product.set if edit_mode else '' }}" />
+                            value="{{ product.full_set_name if edit_mode else '' }}" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -397,20 +405,38 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Condition <span
-                                class="text-red-400">*</span></label>
-                        <select name="condition" required
-                            class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
-                            <option value="Booster Pack" {% if edit_mode and product.condition=='Booster Pack'
-                                %}selected{% endif %}>Booster Pack</option>
-                            <option value="Slab" {% if edit_mode and product.condition=='Slab' %}selected{% endif %}>
-                                Slab</option>
-                            <option value="Raw" {% if edit_mode and product.condition=='Raw' %}selected{% endif %}>Raw
-                            </option>
-                            <option value="Toploader" {% if edit_mode and product.condition=='Toploader' %}selected{%
-                                endif %}>Toploader</option>
-                        </select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Package Type
+                                <span class="text-red-400">*</span></label>
+                            <select name="condition" required
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
+                                <option value="Booster Pack" {% if edit_mode and product.condition=='Booster Pack'
+                                    %}selected{% endif %}>Booster Pack</option>
+                                <option value="Slab" {% if edit_mode and product.condition=='Slab' %}selected{% endif
+                                    %}>
+                                    Slab</option>
+                                <option value="Raw" {% if edit_mode and product.condition=='Raw' %}selected{% endif %}>
+                                    Raw
+                                </option>
+                                <option value="Toploader" {% if edit_mode and product.condition=='Toploader'
+                                    %}selected{% endif %}>Toploader</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Condition
+                                (Visual) <span class="text-red-400">*</span></label>
+                            <select name="card_condition" id="card-condition-select" required
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
+                                <option value="Near Mint" {% if edit_mode and product.card_condition=='Near Mint'
+                                    %}selected{% endif %}>Near Mint</option>
+                                <option value="Lightly Played" {% if edit_mode and
+                                    product.card_condition=='Lightly Played' %}selected{% endif %}>Lightly Played
+                                </option>
+                                <option value="Mostly Played" {% if edit_mode and
+                                    product.card_condition=='Mostly Played' %}selected{% endif %}>Mostly Played</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -932,6 +958,20 @@
                     if (data.card_number) {
                         document.querySelector('input[name="card_number"]').value = data.card_number;
                     }
+                    if (data.full_set_name) {
+                        document.querySelector('input[name="full_set_name"]').value = data.full_set_name;
+                    }
+                    if (data.card_condition) {
+                        const conditionSelect = document.querySelector('select[name="card_condition"]');
+                        if (conditionSelect) {
+                            // Find matching option (case insensitive)
+                            const options = Array.from(conditionSelect.options);
+                            const matchingOption = options.find(opt => opt.value.toLowerCase() === data.card_condition.toLowerCase());
+                            if (matchingOption) {
+                                conditionSelect.value = matchingOption.value;
+                            }
+                        }
+                    }
                     if (data.rarity) {
                         const raritySelect = document.querySelector('select[name="rarity"]');
                         // Try to find matching option
@@ -954,7 +994,13 @@
                         description += `• **English Name:** ${data.card_name_english}\n`;
                     }
                     if (data.set_name) {
-                        description += `• **Set:** ${data.set_name}\n`;
+                        description += `• **Set Code:** ${data.set_name}\n`;
+                    }
+                    if (data.full_set_name) {
+                        description += `• **Set Name:** ${data.full_set_name}\n`;
+                    }
+                    if (data.card_condition) {
+                        description += `• **Condition:** ${data.card_condition}\n`;
                     }
                     if (data.card_number) {
                         description += `• **Card Number:** ${data.card_number}\n`;
@@ -1056,7 +1102,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             {% if edit_mode and product.image_urls and product.image_urls | length > 1 %}
             const container = document.getElementById('url-fields-container');
-            const imageUrls = {{ product.image_urls| tojson
+            const imageUrls = {{ product.image_urls | tojson
         }};
 
         // Add additional URL fields for remaining images (first one is already in HTML)

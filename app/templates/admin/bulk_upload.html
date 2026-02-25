@@ -163,6 +163,9 @@
                                 Rarity</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                                Condition</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
                                 Price</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
@@ -435,6 +438,11 @@
                     <td class="px-4 py-3 text-white/70 text-xs">${result.set_name || '-'}</td>
                     <td class="px-4 py-3 text-white/70 text-xs font-mono">${result.card_number || '-'}</td>
                     <td class="px-4 py-3 text-white/70 text-xs">${result.rarity || '-'}</td>
+                    <td class="px-4 py-3 text-white/70 text-xs">
+                        <span class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                            ${result.card_condition || 'NM'}
+                        </span>
+                    </td>
                     <td class="px-4 py-3 text-neon-green font-mono text-xs">¥${result.price || 'N/A'}</td>
                     <td class="px-4 py-3">
                         <span class="px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded ${result.exists ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-neon-green/20 text-neon-green border border-neon-green/30'}">

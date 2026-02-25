@@ -867,7 +867,7 @@ def _is_duplicate_card(
     # --- Symmetric shape check using raw product title ---
     # Detect if product title has a card number
     prod_has_number = bool(re.search(
-        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\s*\d{1,4}|#\d{1,4})',
         product_title
     ))
     # Detect if product title has a set name (text after ' - ' that isn't just a number)
@@ -875,7 +875,7 @@ def _is_duplicate_card(
     set_part = set_part_match.group(1).strip() if set_part_match else None
     # If the part after ' - ' is itself a card number pattern, it's not a set name
     if set_part and re.fullmatch(
-        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\d{1,4}|#\d{1,4})',
+        r'(#\d{1,4}/\d{1,4}|#[A-Z]{2,4}\d{2,4}-\d{3}|\d{1,4}/\d{1,4}|#[A-Za-z]{0,4}\.?\s*\d{1,4}|#\d{1,4})',
         set_part
     ):
         set_part = None
@@ -1189,6 +1189,8 @@ async def add_card(
     card_number: str = Form(""),
     rarity: str = Form(...),
     condition: str = Form(...),
+    card_condition: str = Form("Near Mint"),
+    full_set_name: str = Form(""),
     description: str = Form(""),
     stock: int = Form(1),
     buy_price: Optional[float] = Form(None),
@@ -1236,9 +1238,11 @@ async def add_card(
     # Prepare tags for Shopify
     tags = [
         f"Set: {set_name}",
+        f"Set Name: {full_set_name}",
         f"Rarity: {rarity.capitalize()}",
         f"Number: {card_number}",
-        f"Condition: {condition}"
+        f"Condition: {condition}",
+        f"Card: {card_condition}"
     ]
     
     # Convert newlines to HTML breaks for description
@@ -1288,6 +1292,8 @@ async def update_card(
     card_number: str = Form(...),
     vendor: str = Form(...),
     condition: str = Form(...),
+    card_condition: str = Form("Near Mint"),
+    full_set_name: str = Form(""),
     description: str = Form(""),
     stock: int = Form(1),
     collections: List[str] = Form([]),
@@ -1349,13 +1355,15 @@ async def update_card(
     print(f"[DEBUG] NEW images to ADD: {new_images_to_add}")
     print(f"[DEBUG] Collections: {collections}")
     
-    # Prepare tags - ONLY include Set, Rarity, Number, Condition
+    # Prepare tags - ONLY include Set, Rarity, Number, Condition, Card
     # Do NOT include vendor or collections as they have their own fields
     tags = [
         f"Set: {set_name}",
+        f"Set Name: {full_set_name}",
         f"Rarity: {rarity.capitalize()}",
         f"Number: {card_number}",
-        f"Condition: {condition}"
+        f"Condition: {condition}",
+        f"Card: {card_condition}"
     ]
     
     description_html = description.replace('\n', '<br>')
