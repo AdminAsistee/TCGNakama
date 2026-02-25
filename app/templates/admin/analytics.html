@@ -82,7 +82,12 @@
                     Vault Intelligence
                 </h1>
             </div>
-            <div class="flex justify-end">
+            <div class="flex justify-end gap-3">
+                <a href="/" target="_blank"
+                    class="flex items-center gap-1 text-primary text-[10px] uppercase tracking-wider font-bold border border-primary/30 px-2 py-1 rounded hover:bg-primary/10 transition-colors">
+                    <span class="material-symbols-outlined text-sm">storefront</span>
+                    Marketplace
+                </a>
                 <a href="/admin/logout"
                     class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
                     <span class="material-symbols-outlined text-sm">logout</span>
@@ -270,6 +275,18 @@
                 <span
                     class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">add_circle</span>
                 <span class="text-[10px] font-bold uppercase tracking-wider">Add Card</span>
+            </button>
+            <button onclick="window.location.href='/admin/bulk-upload'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">upload_file</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+            </button>
+            <button onclick="window.location.href='/admin/audit/pagespeed'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">speed</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Audit</span>
             </button>
             <button class="flex flex-col items-center gap-1 text-primary group">
                 <span

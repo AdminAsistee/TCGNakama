@@ -17,7 +17,8 @@
     <a href="/card/{{ product.id }}" class="relative block overflow-hidden rounded-t-xl" style="aspect-ratio: 5/7;">
         <img alt="{{ product.title }}"
             class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
-            src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400" loading="lazy" />
+            src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp"
+            loading="lazy" />
         <!-- Rarity/Type Badge -->
         <div
             class="absolute top-2.5 left-2.5 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-black text-white/90 border border-white/10 uppercase tracking-widest">
@@ -45,10 +46,21 @@
             <h4 class="text-[11px] md:text-xs font-bold text-white/90 leading-snug line-clamp-2">{{ product.title }}
             </h4>
             <p class="text-[9px] md:text-[10px] text-gray-500 mt-0.5 truncate">{{ product.set }}</p>
+            {% if product.card_number and product.card_number != '#000' %}
+            <p class="text-[8px] text-gray-600 truncate">
+                {{ product.card_number }}{% if product.condition %} · {{ product.condition }}{% endif %}
+            </p>
+            {% endif %}
         </a>
 
         <div class="flex items-center justify-between pt-1.5 border-t border-white/5">
-            <p class="text-sm font-black text-primary">¥{{ "{:,}".format(product.price|int) }}</p>
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <p class="text-sm font-black text-primary">¥{{ "{:,}".format(product.price|int) }}</p>
+                <p class="text-[7px] text-gray-600 flex items-center gap-0.5">
+                    <span class="material-symbols-outlined text-neon-green" style="font-size:9px">verified</span>
+                    Authentic · Secure Ship
+                </p>
+            </div>
             {% if product.totalInventory > 0 %}
             <button onclick="handleCartAction('{{ product.variant_id }}', 'add', event)"
                 class="min-h-[44px] px-4 bg-primary hover:bg-primary/80 text-background-dark text-[10px] font-black rounded-lg transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wider active:scale-95">

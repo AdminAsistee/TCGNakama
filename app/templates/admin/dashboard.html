@@ -112,10 +112,9 @@
     class="bg-background-light dark:bg-background-dark font-display text-white selection:bg-primary selection:text-white pb-24">
     <header class="sticky top-0 z-50 glass-panel border-b border-glass-border">
         <div class="flex items-center p-4 justify-between h-16">
-            <button
-                class="text-white/80 hover:text-white transition-colors flex items-center justify-center rounded-lg active:bg-white/10 p-2 -ml-2">
-                <span class="material-symbols-outlined text-[28px]">menu</span>
-            </button>
+            <div class="flex items-center -ml-2 mr-4">
+                <img src="/static/logo.png" alt="TCG Nakama Logo" class="h-8 w-auto object-contain">
+            </div>
             <h1
                 class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                 Collector Intelligence
@@ -139,7 +138,7 @@
                 Marketplace
             </a>
             <a href="/admin/logout"
-                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
+                class="flex items-center ml-3 gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
                 <span class="material-symbols-outlined text-sm">logout</span>
                 Logout
             </a>
@@ -735,7 +734,13 @@
                 class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
                 <span
                     class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">upload_file</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Bulk Upload</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+            </button>
+            <button onclick="window.location.href='/admin/audit/pagespeed'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span
+                    class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">speed</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Audit</span>
             </button>
             <button onclick="window.location.href='/admin/analytics'"
                 class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">

@@ -1,7 +1,7 @@
 """
 Database models for TCG Nakama.
 """
-from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from app.database import Base
@@ -70,3 +70,19 @@ class SystemSetting(Base):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(String(500))
+
+
+class PageSpeedAudit(Base):
+    """PageSpeed Insights audit results."""
+    __tablename__ = "pagespeed_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    url: Mapped[str] = mapped_column(String(500))
+    strategy: Mapped[str] = mapped_column(String(10))  # "mobile" or "desktop"
+    performance_score: Mapped[int] = mapped_column(Integer)
+    accessibility_score: Mapped[int] = mapped_column(Integer)
+    best_practices_score: Mapped[int] = mapped_column(Integer)
+    seo_score: Mapped[int] = mapped_column(Integer)
+    opportunities_json: Mapped[str] = mapped_column(Text, default="{}")
+    full_response_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

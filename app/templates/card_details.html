@@ -63,7 +63,7 @@
                     data-index="{{ loop.index0 }}">
                     <img alt="{{ product.title }}"
                         class="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
-                        src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=800"
+                        src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=800&format=webp"
                         loading="{% if loop.index0 == 0 %}eager{% else %}lazy{% endif %}" />
                 </div>
                 {% endfor %}
@@ -138,10 +138,11 @@
                 {% endif %}
 
                 {% if product.condition %}
-                <span
-                    class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-900/30 text-green-400 border border-green-500/20">
+                <button onclick="openConditionGuide()"
+                    class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-900/30 text-green-400 border border-green-500/20 hover:bg-green-900/50 transition-colors cursor-pointer flex items-center gap-1">
                     {{ product.condition }}
-                </span>
+                    <span class="material-symbols-outlined text-[12px] text-green-500/70">info</span>
+                </button>
                 {% endif %}
 
                 {% for tag in product.tags %}
@@ -224,14 +225,18 @@
             {% endif %}
 
             <!-- Trust Badges -->
-            <div class="flex justify-center gap-6 pt-1">
+            <div class="flex flex-wrap justify-center gap-4 md:gap-6 pt-1">
                 <div class="flex items-center gap-1.5 text-[11px] text-gray-400">
                     <span class="material-symbols-outlined text-neon-green text-sm">verified</span>
-                    <span>Verified Authentic</span>
+                    <span>Authenticity Guaranteed</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-[11px] text-gray-400">
+                    <span class="material-symbols-outlined text-accent-blue text-sm">shield</span>
+                    <span>Secure Shipping</span>
                 </div>
                 <div class="flex items-center gap-1.5 text-[11px] text-gray-400">
                     <span class="material-symbols-outlined text-primary text-sm">local_shipping</span>
-                    <span>Ships Tomorrow</span>
+                    <span>Ships Next Day</span>
                 </div>
             </div>
 
@@ -292,7 +297,11 @@
                         <div
                             class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                             <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
-                            <span class="text-gray-200">{{ product.condition }}</span>
+                            <span class="text-gray-200 flex items-center gap-2">
+                                {{ product.condition }}
+                                <button onclick="openConditionGuide()"
+                                    class="text-[10px] text-primary hover:underline">What's this?</button>
+                            </span>
                         </div>
                         {% endif %}
                     </div>
@@ -405,6 +414,100 @@
 </main>
 {% endif %}
 
+<!-- Condition Guide Modal -->
+<div id="condition-modal" class="fixed inset-0 z-[65] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeConditionGuide()"></div>
+    <div class="relative bg-surface border border-primary/20 rounded-xl max-w-md mx-4 p-6 shadow-2xl max-h-[80vh] overflow-y-auto"
+        style="backdrop-filter: blur(20px);">
+        <button onclick="closeConditionGuide()" class="absolute top-3 right-3 text-gray-400 hover:text-white">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">grading</span>
+            TCG Condition Guide
+        </h3>
+        <!-- Package Types Section -->
+        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">📦 Package Type</h4>
+        <div class="space-y-2 mb-5 text-sm">
+            <div class="flex gap-3 p-2.5 rounded-lg bg-purple-900/10 border border-purple-500/10">
+                <span class="material-symbols-outlined text-purple-400 text-base shrink-0 mt-0.5">inventory_2</span>
+                <div><span class="font-medium text-white text-xs">Booster Pack</span>
+                    <p class="text-gray-400 text-[10px] mt-0.5">Factory-sealed booster pack. Card is inside the original
+                        packaging and has never been opened.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-2.5 rounded-lg bg-cyan-900/10 border border-cyan-500/10">
+                <span class="material-symbols-outlined text-cyan-400 text-base shrink-0 mt-0.5">credit_card</span>
+                <div><span class="font-medium text-white text-xs">Raw</span>
+                    <p class="text-gray-400 text-[10px] mt-0.5">Single card without protective casing. Stored in a penny
+                        sleeve or bare. Not professionally graded.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-2.5 rounded-lg bg-amber-900/10 border border-amber-500/10">
+                <span class="material-symbols-outlined text-amber-400 text-base shrink-0 mt-0.5">shield</span>
+                <div><span class="font-medium text-white text-xs">Toploader</span>
+                    <p class="text-gray-400 text-[10px] mt-0.5">Card protected in a rigid plastic toploader case. Good
+                        for shipping and storage. Not professionally graded.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-2.5 rounded-lg bg-emerald-900/10 border border-emerald-500/10">
+                <span class="material-symbols-outlined text-emerald-400 text-base shrink-0 mt-0.5">verified</span>
+                <div><span class="font-medium text-white text-xs">Slab</span>
+                    <p class="text-gray-400 text-[10px] mt-0.5">Professionally graded and encapsulated in a tamper-proof
+                        case by PSA, BGS, CGC, or similar authority.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Condition Section -->
+        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">🃏 Card Condition</h4>
+        <div class="space-y-3 text-sm">
+            <div class="flex gap-3 p-3 rounded-lg bg-green-900/10 border border-green-500/10">
+                <span class="font-bold text-green-400 w-10 shrink-0">NM</span>
+                <div><span class="font-medium text-white">Near Mint</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Card is in excellent condition with minimal to no visible
+                        wear. Corners are sharp and surfaces are clean.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-3 rounded-lg bg-yellow-900/10 border border-yellow-500/10">
+                <span class="font-bold text-yellow-400 w-10 shrink-0">LP</span>
+                <div><span class="font-medium text-white">Lightly Played</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Minor edge wear or light scratching visible on close
+                        inspection. Still great for collecting.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-3 rounded-lg bg-orange-900/10 border border-orange-500/10">
+                <span class="font-bold text-orange-400 w-10 shrink-0">MP</span>
+                <div><span class="font-medium text-white">Moderately Played</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Noticeable wear including scuffing, edge whitening, or light
+                        creasing. Good for casual play.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-3 rounded-lg bg-red-900/10 border border-red-500/10">
+                <span class="font-bold text-red-400 w-10 shrink-0">HP</span>
+                <div><span class="font-medium text-white">Heavily Played</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Significant wear including creases, heavy whitening, or
+                        surface damage. Suitable for play decks only.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-3 rounded-lg bg-gray-700/20 border border-gray-600/20">
+                <span class="font-bold text-gray-400 w-10 shrink-0">DMG</span>
+                <div><span class="font-medium text-white">Damaged</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Major damage including tears, water damage, or missing
+                        pieces. Card identity still recognizable.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 p-3 rounded-lg bg-blue-900/10 border border-blue-500/10">
+                <span class="font-bold text-blue-400 w-10 shrink-0">Raw</span>
+                <div><span class="font-medium text-white">Raw / Ungraded</span>
+                    <p class="text-gray-400 text-xs mt-0.5">Card has not been professionally graded. Condition assessed
+                        by the seller.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Fullscreen Image Overlay -->
 <div id="fullscreen-overlay"
     class="fixed inset-0 z-[60] bg-black/95 backdrop-blur-lg items-center justify-center hidden"
@@ -419,6 +522,20 @@
 
 <!-- Card Details Scripts -->
 <script>
+    // ===== CONDITION GUIDE MODAL =====
+    function openConditionGuide() {
+        const modal = document.getElementById('condition-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeConditionGuide() {
+        const modal = document.getElementById('condition-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
     // ===== IMAGE CAROUSEL =====
     let currentSlide = 0;
     const totalSlides = {{ product.images| length if product and product.images else 0 }};

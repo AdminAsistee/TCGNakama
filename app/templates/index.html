@@ -86,8 +86,15 @@
             <div class="relative h-full flex-shrink-0" style="width: {{ 100 / banners|length }}%;">
                 <!-- Background: image or gradient -->
                 {% if banner.image %}
-                <img src="{{ banner.image }}" alt="{{ banner.title }}"
-                    class="absolute inset-0 w-full h-full object-cover">
+                <picture>
+                    <source type="image/webp"
+                        srcset="{{ banner.image }}{% if '?' in banner.image %}&{% else %}?{% endif %}width=480&format=webp 480w, {{ banner.image }}{% if '?' in banner.image %}&{% else %}?{% endif %}width=960&format=webp 960w, {{ banner.image }}{% if '?' in banner.image %}&{% else %}?{% endif %}width=1920&format=webp 1920w"
+                        sizes="100vw">
+                    <img src="{{ banner.image }}" alt="{{ banner.title }}"
+                        class="absolute inset-0 w-full h-full object-cover"
+                        loading="{% if loop.index0 == 0 %}eager{% else %}lazy{% endif %}" {% if loop.index0==0
+                        %}fetchpriority="high" {% endif %}>
+                </picture>
                 {% else %}
                 <div class="absolute inset-0 bg-gradient-to-r {{ banner.gradient }}"></div>
                 {% endif %}
@@ -156,7 +163,7 @@
                 <!-- Card Image -->
                 <a href="/card/{{ product.id }}" class="relative block overflow-hidden rounded-t-xl"
                     style="aspect-ratio: 5/7;">
-                    <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400"
+                    <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp"
                         alt="{{ product.title }}"
                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                         loading="lazy">
@@ -237,7 +244,7 @@
                         </span>
                         <a href="/card/{{ product.id }}"
                             class="block w-14 sm:w-16 aspect-[3/4] rounded overflow-hidden ring-1 ring-white/8">
-                            <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=160"
+                            <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=160&format=webp"
                                 alt="{{ product.title }}" class="w-full h-full object-cover" loading="lazy">
                         </a>
                     </div>
