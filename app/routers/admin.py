@@ -2347,7 +2347,7 @@ async def run_now(admin: str = Depends(get_admin_session)):
 @router.get("/audit/pagespeed", response_class=HTMLResponse)
 async def pagespeed_dashboard(request: Request, admin: str = Depends(get_admin_session)):
     """Render the PageSpeed Insights audit dashboard."""
-    from app.services.pagespeed import get_latest_audit, get_audit_history, is_audit_running
+    from app.services.pagespeed import get_latest_audit, get_audit_history, is_audit_running, is_psi_configured
 
     latest = get_latest_audit(strategy="mobile")
     history = get_audit_history(limit=10, strategy="mobile")
@@ -2357,6 +2357,7 @@ async def pagespeed_dashboard(request: Request, admin: str = Depends(get_admin_s
         "latest": latest,
         "history": history,
         "is_running": is_audit_running(),
+        "api_configured": is_psi_configured(),
     })
 
 
@@ -2367,7 +2368,10 @@ async def run_pagespeed_audit(
 ):
     """Trigger a new PageSpeed audit (runs async in background)."""
     import asyncio
-    from app.services.pagespeed import run_audit, is_audit_running
+    from app.services.pagespeed import run_audit, is_audit_running, is_psi_configured
+
+    if not is_psi_configured():
+        return JSONResponse({"status": "error", "message": "API Key not configured"}, status_code=400)
 
     if is_audit_running():
         return JSONResponse({"status": "already_running"})
@@ -2400,6 +2404,7 @@ async def pagespeed_status(
     return JSONResponse({
         "is_running": is_audit_running(),
         "cache_fresh": is_cache_fresh(strategy="mobile"),
+        "api_configured": is_psi_configured(),
         "latest": latest,
         "last_error": last_error
     })

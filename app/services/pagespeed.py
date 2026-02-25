@@ -10,6 +10,10 @@ from datetime import datetime, timedelta
 
 from app.database import SessionLocal
 from app.models import PageSpeedAudit, SystemSetting
+from dotenv import load_dotenv
+
+# Ensure environment variables are loaded
+load_dotenv(override=True)
 
 logger = logging.getLogger("pagespeed")
 
@@ -24,6 +28,11 @@ _audit_running = False
 def is_audit_running() -> bool:
     """Check if an audit is currently in progress."""
     return _audit_running
+
+
+def is_psi_configured() -> bool:
+    """Check if the Google PageSpeed API key is configured."""
+    return bool(os.getenv("GOOGLE_PAGESPEED_API_KEY"))
 
 
 def get_latest_audit(strategy: str = "mobile") -> dict | None:
@@ -149,8 +158,14 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
             "category": ["PERFORMANCE", "ACCESSIBILITY", "BEST_PRACTICES", "SEO"],
         }
         api_key = os.getenv("GOOGLE_PAGESPEED_API_KEY")
-        if api_key:
-            params["key"] = api_key
+        if not api_key:
+            error_msg = "Google PageSpeed API Key is not configured. Please add GOOGLE_PAGESPEED_API_KEY to your .env file."
+            logger.error(f"[PAGESPEED] {error_msg}")
+            _set_last_error(error_msg)
+            return {"status": "error", "message": error_msg}
+
+        params["key"] = api_key
+        logger.debug(f"[PAGESPEED] Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.get(PSI_API_URL, params=params)
@@ -215,7 +230,12 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
 
     except httpx.HTTPStatusError as e:
         error_msg = f"PSI API error: {e.response.status_code}"
-        logger.error(f"[PAGESPEED] {error_msg}")
+        try:
+            error_details = e.response.json().get("error", {}).get("message", "No detailed message")
+            error_msg = f"PSI API {e.response.status_code}: {error_details}"
+        except:
+            pass
+        logger.error(f"[PAGESPEED] {error_msg} | Response: {e.response.text}")
         _set_last_error(error_msg)
         return {"status": "error", "message": error_msg}
 

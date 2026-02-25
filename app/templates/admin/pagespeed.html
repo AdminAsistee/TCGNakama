@@ -115,19 +115,39 @@
         <!-- Run Audit Controls -->
         <section class="glass-panel rounded-xl p-4">
             <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-white/70 mb-1">Google PageSpeed Insights
-                    </h2>
-                    <p class="text-[10px] text-white/40">Run mobile performance audits on your storefront</p>
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-white/70 mb-1">Google PageSpeed
+                            Insights
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            {% if api_configured %}
+                            <span
+                                class="flex items-center gap-1 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-neon-green/10 text-neon-green border border-neon-green/20 rounded-md">
+                                <span class="material-symbols-outlined text-[10px]">check_circle</span>
+                                API Configured
+                            </span>
+                            {% else %}
+                            <span
+                                class="flex items-center gap-1 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-danger-red/10 text-danger-red border border-danger-red/20 rounded-md">
+                                <span class="material-symbols-outlined text-[10px]">warning</span>
+                                API Missing
+                            </span>
+                            {% endif %}
+                            <p class="text-[10px] text-white/40">Run mobile performance audits on your storefront</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <input type="text" id="audit-url" value="https://tcgnakama.com"
                         class="bg-white/5 border border-white/10 rounded-lg text-xs text-white px-3 py-2 w-48 focus:outline-none focus:border-neon-blue hidden sm:block"
                         placeholder="URL to audit">
-                    <button id="run-audit-btn" onclick="runAudit()"
+                    <button id="run-audit-btn" onclick="runAudit()" {% if not api_configured %}disabled{% endif %}
                         class="px-4 py-2 rounded-lg bg-neon-blue/20 text-neon-blue text-xs font-bold uppercase tracking-wider hover:bg-neon-blue/30 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <span class="material-symbols-outlined text-sm" id="run-audit-icon">play_arrow</span>
-                        <span id="run-audit-text">Run Audit</span>
+                        <span class="material-symbols-outlined text-sm" id="run-audit-icon">{% if not api_configured
+                            %}lock{% else %}play_arrow{% endif %}</span>
+                        <span id="run-audit-text">{% if not api_configured %}Need API Key{% else %}Run Audit{% endif
+                            %}</span>
                     </button>
                 </div>
             </div>
@@ -331,8 +351,13 @@
 
     <script>
         let _pollInterval = null;
+        const _apiConfigured = {{ 'true' if api_configured else 'false' }};
 
         async function runAudit() {
+            if (!_apiConfigured) {
+                alert('Google PageSpeed API Key is missing. Please add it to your .env file to run audits.');
+                return;
+            }
             const btn = document.getElementById('run-audit-btn');
             const icon = document.getElementById('run-audit-icon');
             const text = document.getElementById('run-audit-text');
@@ -392,15 +417,14 @@
                 console.error('Status check failed:', e);
             }
         }
-
         function resetButton() {
             const btn = document.getElementById('run-audit-btn');
             const icon = document.getElementById('run-audit-icon');
             const text = document.getElementById('run-audit-text');
-            btn.disabled = false;
-            icon.textContent = 'play_arrow';
+            btn.disabled = !_apiConfigured;
+            icon.textContent = _apiConfigured ? 'play_arrow' : 'lock';
             icon.classList.remove('animate-spin');
-            text.textContent = 'Run Audit';
+            text.textContent = _apiConfigured ? 'Run Audit' : 'Need API Key';
             btn.classList.remove('running-glow');
         }
 
