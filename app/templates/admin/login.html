@@ -37,6 +37,41 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+
+        /* ===== AUTOFILL FIX: Force dark background over browser yellow ===== */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus,
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0px 1000px #1a1a1a inset !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* ===== SUPPRESS ALL NATIVE BROWSER ICONS (Safari key, autofill, contacts) ===== */
+        input::-webkit-credentials-auto-fill-button,
+        input::-webkit-contacts-auto-fill-button,
+        input::-webkit-textfield-decoration-container,
+        input::-webkit-caps-lock-indicator,
+        input::-ms-reveal,
+        input::-ms-clear {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+
+        /* ===== CUSTOM PASSWORD TOGGLE (z-indexed above any overlay) ===== */
+        .password-toggle-btn {
+            z-index: 10;
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
     </style>
 </head>
 
@@ -73,9 +108,16 @@
                 </div>
                 <div>
                     <label class="block text-[10px] uppercase tracking-wider text-white/50 mb-2">Password</label>
-                    <input type="password" name="password" required
-                        class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                        placeholder="••••••••">
+                    <div class="relative">
+                        <input type="password" name="password" id="login-password" required
+                            class="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                            placeholder="••••••••" onblur="hidePassword('login-password')">
+                        <button type="button" onclick="togglePasswordVisibility('login-password')"
+                            class="password-toggle-btn p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/5 transition-all"
+                            tabindex="-1" aria-label="Toggle password visibility">
+                            <span class="material-symbols-outlined text-lg" id="login-password-icon">visibility</span>
+                        </button>
+                    </div>
                 </div>
                 <button type="submit"
                     class="w-full py-3 bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-sm rounded-lg transition-colors">
@@ -92,6 +134,38 @@
             </a>
         </div>
     </div>
+
+    <!-- Reusable Show Password Utility -->
+    <script>
+        /**
+         * Toggle password visibility for any input.
+         * @param {string} inputId — the ID of the password input
+         * Icon element must have ID: `${inputId}-icon`
+         */
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(inputId + '-icon');
+            if (!input || !icon) return;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        /** Security guard: revert to password when user clicks away. */
+        function hidePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(inputId + '-icon');
+            if (!input || !icon) return;
+
+            input.type = 'password';
+            icon.textContent = 'visibility';
+        }
+    </script>
 </body>
 
 </html>

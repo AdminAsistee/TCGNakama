@@ -2341,3 +2341,75 @@ async def run_now(admin: str = Depends(get_admin_session)):
     result = await trigger_manual_run()
     return JSONResponse(result)
 
+
+# ============= AGENT PAGESPEED — PSI AUDIT ENDPOINTS =============
+
+@router.get("/audit/pagespeed", response_class=HTMLResponse)
+async def pagespeed_dashboard(request: Request, admin: str = Depends(get_admin_session)):
+    """Render the PageSpeed Insights audit dashboard."""
+    from app.services.pagespeed import get_latest_audit, get_audit_history, is_audit_running
+
+    latest = get_latest_audit(strategy="mobile")
+    history = get_audit_history(limit=10, strategy="mobile")
+
+    return templates.TemplateResponse("admin/pagespeed.html", {
+        "request": request,
+        "latest": latest,
+        "history": history,
+        "is_running": is_audit_running(),
+    })
+
+
+@router.post("/audit/pagespeed/run")
+async def run_pagespeed_audit(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+):
+    """Trigger a new PageSpeed audit (runs async in background)."""
+    import asyncio
+    from app.services.pagespeed import run_audit, is_audit_running
+
+    if is_audit_running():
+        return JSONResponse({"status": "already_running"})
+
+    body = await request.json()
+    url = body.get("url", "https://tcgnakama.com")
+    strategy = body.get("strategy", "mobile")
+
+    # Run in background so the HTTP response returns immediately
+    asyncio.create_task(run_audit(url, strategy))
+
+    return JSONResponse({"status": "started"})
+
+
+@router.get("/audit/pagespeed/status")
+async def pagespeed_status(
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db)
+):
+    """Return current audit status and latest scores."""
+    from app.services.pagespeed import get_latest_audit, is_audit_running, is_cache_fresh
+    from app.models import SystemSetting
+    
+    latest = get_latest_audit(strategy="mobile")
+    
+    # Check for recent errors
+    error_setting = db.query(SystemSetting).filter_by(key="psi_last_error").first()
+    last_error = error_setting.value if error_setting else None
+    
+    return JSONResponse({
+        "is_running": is_audit_running(),
+        "cache_fresh": is_cache_fresh(strategy="mobile"),
+        "latest": latest,
+        "last_error": last_error
+    })
+
+
+@router.get("/audit/pagespeed/history")
+async def pagespeed_history(admin: str = Depends(get_admin_session)):
+    """Return audit history for trend charting."""
+    from app.services.pagespeed import get_audit_history
+
+    history = get_audit_history(limit=10, strategy="mobile")
+    return JSONResponse({"history": history})
+
