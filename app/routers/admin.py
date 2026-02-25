@@ -2013,7 +2013,10 @@ async def bulk_upload_appraise(
                 # Additional AI-extracted details for description
                 "year": appraisal_result.get("year"),
                 "card_name_japanese": appraisal_result.get("card_name_japanese"),
-                "card_name_english": appraisal_result.get("card_name_english")
+                "card_name_english": appraisal_result.get("card_name_english"),
+                "full_set_name": appraisal_result.get("full_set_name", ""),
+                "card_condition": appraisal_result.get("card_condition", "Near Mint"),
+                "manufacturer": appraisal_result.get("manufacturer", "")
             })
             
         except Exception as e:
@@ -2155,11 +2158,15 @@ async def bulk_confirm(
                 
                 try:
                     # Prepare tags in the same format as add_card
+                    full_set_name = card.get("full_set_name", "")
+                    card_condition = card.get("card_condition", "Near Mint")
                     tags = [
-                        f"Set: {set_name}" if set_name else "Set: Unknown",
+                        f"Set: {set_name}" if set_name else "Set: ",
                         f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
-                        f"Number: {card_number}" if card_number else "Number: Unknown",
-                        "Condition: Raw"  # Default condition for bulk upload
+                        f"Number: {card_number}" if card_number else "Number: ",
+                        "Condition: Raw",
+                        f"Set Name: {full_set_name}" if full_set_name else "Set Name: ",
+                        f"Card: {card_condition}"
                     ]
                     
                     
@@ -2175,7 +2182,9 @@ async def bulk_confirm(
                     if card_name_en:
                         description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
                     if set_name:
-                        description_html += f"<p><strong>Set:</strong> {set_name}</p>"
+                        description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
+                    if full_set_name:
+                        description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
                     if card_number:
                         description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
                     if rarity:
@@ -2184,7 +2193,7 @@ async def bulk_confirm(
                         description_html += f"<p><strong>Year:</strong> {year}</p>"
                     if manufacturer:
                         description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
-                    description_html += "<p><strong>Condition:</strong> Raw</p>"
+                    description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
                     
                     # Collections can be empty
                     collections = []

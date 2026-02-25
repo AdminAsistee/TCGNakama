@@ -404,9 +404,11 @@ Output ONLY this JSON, nothing else:
                 elif card_name_en:
                     name_parts.append(card_name_en)
                 
-                # Add set name if available, otherwise use fallback for vintage cards
-                if set_name:
-                    name_parts.append(f"- {set_name}")
+                # Add set name if available — prefer short code, fall back to full_set_name, then vintage year
+                full_set_name = card_data.get('full_set_name', '')
+                effective_set = set_name or full_set_name
+                if effective_set:
+                    name_parts.append(f"- {effective_set}")
                 elif card_data.get('year') and not re.match(r'^P-\d+$', card_number):
                     # Only label as "Vintage" if it's actually a vintage card
                     # Modern cards have "###/###" format; vintage cards have standalone numbers like "094"
@@ -423,8 +425,8 @@ Output ONLY this JSON, nothing else:
                 # Add card number if available — always with a dash separator
                 if card_number:
                     formatted_number = card_number if card_number.startswith('#') else f"#{card_number}"
-                    # If no set_name or other separator was added, prepend the dash
-                    if not set_name and not any(p.startswith('-') for p in name_parts):
+                    # If no set label was added, prepend the dash before the number
+                    if not effective_set and not any(p.startswith('-') for p in name_parts):
                         name_parts.append(f"- {formatted_number}")
                     else:
                         name_parts.append(formatted_number)
