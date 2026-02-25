@@ -63,17 +63,12 @@
                 </div>
                 <input id="search-input" name="q"
                     class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
-                    placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/search"
-                    hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-indicator="#search-loading"
-                    hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
-                <div class="flex items-center pr-4 gap-2">
-                    <div id="search-loading" class="htmx-indicator">
-                        <span class="material-symbols-outlined text-primary text-sm animate-spin">sync</span>
-                    </div>
-                    <span class="material-symbols-outlined text-gray-500 text-lg">mic</span>
-                </div>
+                    placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/filter"
+                    hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-swap="innerHTML"
+                    hx-indicator="#search-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
             </div>
-        </label>
+    </div>
+    </label>
 
 
     </div>
@@ -316,9 +311,7 @@
                 <!-- Hidden Inputs for Additive Filtering -->
                 <input type="hidden" name="rarity" id="rarity-input" value="" />
                 <input type="hidden" name="collection" id="collection-input" value="" />
-                <input type="hidden" name="condition" id="condition-input" value="" hx-get="/products"
-                    hx-target="#product-grid" hx-swap="outerHTML"
-                    hx-include="[name='rarity'], [name='collection'], [name='condition'], [name='min_price'], [name='max_price']" />
+                <input type="hidden" name="condition" id="condition-input" value="" />
                 <input type="hidden" name="max_price" id="price-slider" value="" />
 
                 <!-- ═══════ MOBILE: Compact Filter Bar ═══════ -->
@@ -548,18 +541,17 @@
             </div>
         </div>
 
-        <div class="py-6">
-
-
-            <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative">
-                <!-- Loading Overlay -->
-                <div id="grid-loading"
-                    class="htmx-indicator absolute inset-0 bg-background-dark/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                    <div class="flex flex-col items-center gap-3">
-                        <span class="material-symbols-outlined text-primary text-4xl animate-spin">sync</span>
-                        <p class="text-sm text-gray-400 font-medium">Loading cards...</p>
-                    </div>
+        <div class="py-6 relative">
+            <!-- Loading Overlay (Persists) -->
+            <div id="grid-loading"
+                class="htmx-indicator absolute inset-0 bg-background-dark/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                <div class="flex flex-col items-center gap-3">
+                    <span class="material-symbols-outlined text-primary text-4xl animate-spin">sync</span>
+                    <p class="text-sm text-gray-400 font-medium">Loading cards...</p>
                 </div>
+            </div>
+
+            <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {% include "partials/product_grid.html" %}
             </div>
         </div>
@@ -718,7 +710,7 @@
         if (typeof htmx !== 'undefined') {
             htmx.ajax('POST', '/refresh', {
                 target: '#product-grid',
-                swap: 'outerHTML'
+                swap: 'innerHTML'
             }).then(() => {
                 // Re-enable button after sync
                 setTimeout(() => {

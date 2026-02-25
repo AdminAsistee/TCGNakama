@@ -100,6 +100,7 @@ async def read_root(
 ):
     from app.dependencies import SHOPIFY_STORE_URL
     products = await client.get_products()
+    print(f"[DEBUG] read_root | Total products fetched: {len(products)}")
     
     # Pagination
     PAGE_SIZE = 20
@@ -273,6 +274,8 @@ async def filter_products(
         # Apply condition filter to general products
         if condition:
             products = [p for p in products if f"Condition: {condition}" in p.get('tags', [])]
+    
+    print(f"[DEBUG] filter_products | Total products after fetch/filter: {len(products)}")
     
     collections = await client.get_collections()
 
@@ -567,10 +570,21 @@ async def refresh_products(
         for p in products:
             p['listed_ago'] = _calc_listed_ago(p)
         
+        # Pagination logic for the refreshed grid
+        PAGE_SIZE = 20
+        total_products = len(products)
+        total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
+        paginated_products = products[:PAGE_SIZE]
+
         # Return updated product grid
         return templates.TemplateResponse("partials/product_grid.html", {
             "request": request,
-            "products": products
+            "products": paginated_products,
+            "total_products": total_products,
+            "current_page": 1,
+            "total_pages": total_pages,
+            "svr_active_collection": None,
+            "svr_active_rarity": None
         })
     except Exception as e:
         print(f"[ERROR] Refresh failed: {e}")
@@ -578,5 +592,8 @@ async def refresh_products(
         return templates.TemplateResponse("partials/product_grid.html", {
             "request": request,
             "products": [],
+            "total_products": 0,
+            "current_page": 1,
+            "total_pages": 0,
             "error": "Failed to refresh products. Please try again."
         })

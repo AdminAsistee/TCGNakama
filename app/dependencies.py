@@ -130,6 +130,7 @@ class ShopifyClient:
             "card_number": card_number,
             "totalInventory": total_inventory,
             "createdAt": node.get("createdAt"),
+            "description": node.get("descriptionHtml", ""),
             "status": "Sync" if any_available else "Sold Out",
             "tags": node.get("tags", []),
             "images": [img["node"]["url"] for img in node.get("images", {}).get("edges", [])] if node.get("images", {}).get("edges") else ([node.get("featuredImage", {}).get("url")] if node.get("featuredImage") else ["https://images.pokemontcg.io/bg.jpg"]),
@@ -138,7 +139,6 @@ class ShopifyClient:
         }
 
     async def get_products(self, query: Optional[str] = None, rarity: Optional[str] = None, min_price: Optional[float] = None, max_price: Optional[float] = None) -> List[dict]:
-        # Broaden search: remove type restriction for initial debugging
         search_query = ""
         if query:
             search_query += f" (title:*{query}*)"
@@ -152,12 +152,17 @@ class ShopifyClient:
             search_query = "" 
         
         gql_query = """
-        query getProducts($query: String!) {
-          products(first: 50, query: $query) {
+        query getProducts($query: String, $first: Int!, $after: String) {
+          products(first: $first, query: $query, after: $after) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             edges {
               node {
                 id
                 title
+                descriptionHtml
                 tags
                 handle
                 createdAt
@@ -191,17 +196,27 @@ class ShopifyClient:
         }
         """
         try:
-            print(f"Querying Shopify with: {search_query}")
-            data = await self._query(gql_query, {"query": search_query})
-            products = [self._map_product(edge["node"]) for edge in data["products"]["edges"]]
+            products = []
+            cursor = None
+            page = 1
             
-            # Fallback/Development: Include mock products if Shopify is empty or for local testing visibility
-            # if not products and not query and not rarity:
-            #     from app.utils.mock_data import MOCK_PRODUCTS
-            #     products = MOCK_PRODUCTS + products
-            #     print(f"Shopify empty, injected {len(MOCK_PRODUCTS)} mock products for visibility")
+            # If search_query is empty string, set to None so Shopify returns all products
+            final_query = search_query if search_query.strip() else None
             
-            print(f"Successfully fetched {len(products)} products")
+            while True:
+                variables = {"query": final_query, "first": 250, "after": cursor}
+                print(f"[SHOPIFY] Fetching page {page} (after={cursor})")
+                data = await self._query(gql_query, variables)
+                page_data = data["products"]
+                edges = page_data["edges"]
+                products.extend([self._map_product(edge["node"]) for edge in edges])
+                page_info = page_data["pageInfo"]
+                if page_info["hasNextPage"]:
+                    cursor = page_info["endCursor"]
+                    page += 1
+                else:
+                    break
+            print(f"[SHOPIFY] Successfully fetched {len(products)} products total")
         except Exception as e:
             print(f"Error fetching products from Shopify: {e}. Falling back to mock data.")
             from app.utils.mock_data import MOCK_PRODUCTS
@@ -222,7 +237,7 @@ class ShopifyClient:
 
     async def get_collections(self, first: int = 50) -> List[dict]:
         gql_query = """
-        query getCollections($first: int!) {
+        query getCollections($first: Int!) {
           collections(first: $first) {
             edges {
               node {
@@ -239,8 +254,6 @@ class ShopifyClient:
         }
         """
         try:
-            # Note: int! in GraphQL schema might need to be Int!
-            gql_query = gql_query.replace("$first: int!", "$first: Int!")
             data = await self._query(gql_query, {"first": first})
             collections = []
             for edge in data["collections"]["edges"]:
@@ -258,17 +271,22 @@ class ShopifyClient:
             print(f"Error fetching collections from Shopify: {e}")
             raise
 
-    async def get_collection_products(self, handle: str, first: int = 50) -> List[dict]:
+    async def get_collection_products(self, handle: str) -> List[dict]:
         gql_query = """
-        query getCollectionProducts($handle: String!, $first: Int!) {
+        query getCollectionProducts($handle: String!, $first: Int!, $after: String) {
           collection(handle: $handle) {
-            products(first: $first) {
+            products(first: $first, after: $after) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
               edges {
                 node {
                   id
                   title
                   tags
                   handle
+                  createdAt
                   featuredImage {
                     url
                   }
@@ -300,13 +318,25 @@ class ShopifyClient:
         }
         """
         try:
-            data = await self._query(gql_query, {"handle": handle, "first": first})
-            if not data or not data.get("collection"):
-                print(f"Collection with handle '{handle}' not found.")
-                return []
-            
-            products = [self._map_product(edge["node"]) for edge in data["collection"]["products"]["edges"]]
-            print(f"Successfully fetched {len(products)} products from collection '{handle}'")
+            products = []
+            cursor = None
+            page = 1
+            while True:
+                variables = {"handle": handle, "first": 250, "after": cursor}
+                data = await self._query(gql_query, variables)
+                if not data or not data.get("collection"):
+                    print(f"[SHOPIFY] Collection '{handle}' not found.")
+                    break
+                page_data = data["collection"]["products"]
+                edges = page_data["edges"]
+                products.extend([self._map_product(edge["node"]) for edge in edges])
+                page_info = page_data["pageInfo"]
+                if page_info["hasNextPage"]:
+                    cursor = page_info["endCursor"]
+                    page += 1
+                else:
+                    break
+            print(f"[SHOPIFY] Successfully fetched {len(products)} products from collection '{handle}'")
             return products
         except Exception as e:
             print(f"Error fetching products from collection '{handle}': {e}")

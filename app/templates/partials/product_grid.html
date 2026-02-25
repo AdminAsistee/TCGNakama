@@ -1,7 +1,13 @@
 <!-- Card Count Header -->
 <div class="flex items-center justify-between mb-4 px-1 col-span-full">
     <h3 class="text-sm font-bold uppercase tracking-[0.25em] text-gray-400">All Cards</h3>
-    <span class="text-[10px] font-black text-gray-600 uppercase tracking-wider">{{ products|length }} in vault</span>
+    <span class="text-[10px] font-black text-gray-600 uppercase tracking-wider">
+        {% if total_products and total_products > products|length %}
+        {{ products|length }} shown &nbsp;·&nbsp; <span class="text-primary">{{ total_products }} total</span>
+        {% else %}
+        {{ total_products or products|length }} in vault
+        {% endif %}
+    </span>
 </div>
 
 {% for product in products %}
@@ -65,7 +71,8 @@
 {% if total_pages > 1 %}
 <div class="col-span-full flex justify-center items-center gap-2 mt-8">
     {% if current_page > 1 %}
-    <button hx-get="/filter?page={{ current_page - 1 }}" hx-target="#product-grid" hx-swap="innerHTML"
+    <button hx-get="/filter" hx-include="#filter-form, #search-input" hx-vals='{"page": "{{ current_page - 1 }}"}'
+        hx-target="#product-grid" hx-swap="innerHTML"
         class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-xs rounded border border-white/10 transition-colors">
         Previous
     </button>
@@ -73,8 +80,8 @@
 
     <span class="text-xs text-gray-400">Page {{ current_page }} of {{ total_pages }}</span>
 
-    {% if current_page < total_pages %} <button hx-get="/filter?page={{ current_page + 1 }}" hx-target="#product-grid"
-        hx-swap="innerHTML"
+    {% if current_page < total_pages %} <button hx-get="/filter" hx-include="#filter-form, #search-input"
+        hx-vals='{"page": "{{ current_page + 1 }}"}' hx-target="#product-grid" hx-swap="innerHTML"
         class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-xs rounded border border-white/10 transition-colors">
         Next
         </button>

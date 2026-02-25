@@ -433,6 +433,12 @@
         <section class="mb-20">
             <div class="flex items-center gap-3 mb-3 px-1">
                 <h2 class="text-xs font-bold tracking-[0.2em] text-white/50 uppercase">Vault Operations Ledger</h2>
+                <!-- Total product count badge -->
+                <span
+                    class="flex items-center gap-1 text-neon-blue text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-neon-blue/10 rounded-full border border-neon-blue/20">
+                    <span class="material-symbols-outlined text-[10px]">inventory_2</span>
+                    {{ total_products }} cards
+                </span>
                 {% if oauth_connected %}
                 <div class="flex items-center gap-1 text-neon-green text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 bg-neon-green/10 rounded-full border border-neon-green/20"
                     title="Shopify Admin API is connected">
@@ -548,8 +554,8 @@
                             <td class="p-3 text-white/30 text-center">{{ loop.index }}</td>
                             <td class="p-3 border-r border-white/10">
                                 <div class="flex items-center gap-3">
-                                    {% if product.featuredImage %}
-                                    <img src="{{ product.featuredImage.url }}"
+                                    {% if product.image %}
+                                    <img src="{{ product.image }}"
                                         class="w-8 h-8 rounded border border-white/10 object-cover" />
                                     {% else %}
                                     <div
