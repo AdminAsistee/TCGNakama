@@ -147,9 +147,11 @@ Then fill in:
 4. set_name:
    - Provide the short alphanumeric SET CODE or identifier.
    - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H).
+   - Some sets display their code in a small COLORED BOX at the bottom left corner, directly before the card number (e.g. a red box with "CLL", or similar). That boxed code IS the set_name (e.g. set_name = "CLL", card_number = "027/032").
    - English Pokémon: identify the set from the set symbol icon on the card (e.g. crown = Chilling Reign, fusion symbol = Fusion Strike) — provide the official 3-letter code if known.
    - PROMO: use "PROMO" ONLY if (a) the word "PROMO" is physically printed on the card, OR (b) the card number ends with "/P". Do NOT infer "PROMO" from context alone.
    - Vintage Japanese sets — look carefully at the card layout:
+     * CRITICAL OVERRIDE — Pokémon TCG Classic set (CLL): Some Japanese cards that look like vintage Base Set/Team Rocket Trainer cards were reprinted in 2023 as "Pokémon Card Game Classic". These have a small RED RECTANGULAR BOX at the BOTTOM LEFT corner (NOT a circle regulation mark) containing the letters "CLL". Next to that box is the card number in ###/### format (e.g. 027/032). LOOK CAREFULLY at the bottom-left area of the card. If you see a colored rectangle with letters before a ###/### number: that rectangle IS the set code (set_name = "CLL"), and only the ###/### part is the card_number. full_set_name = "Pokémon Card Game Classic". These cards also have copyright text starting with "©2023 Pokémon" near the bottom.
      * Topsun (1995): number in top-left box, NO HP or attack damage → set_name = "Topsun"
      * Carddass Vending (Bandai, 1997-2000): NO HP stat, NO attack damage numbers — only height/weight/type stats. Very different from standard TCG cards → set_name = "Carddass Vending Part X"
      * Base Set / Jungle / Fossil / Team Rocket / Neo / Gym: standard Pokémon TCG layout WITH HP and attack damage numbers — these have NO set code → set_name = ""
@@ -158,7 +160,7 @@ Then fill in:
 5. full_set_name:
    - Provide the full descriptive SET NAME (e.g., "Cyber Judge", "Fusion Strike", "Romance Dawn").
    - Correct identification of the set name is critical.
-6. card_number: bottom right corner. Extract ONLY the number — do NOT include rarity suffixes. Valid: "###/###", "###/P", "No.094", "094", "26", "P-044". If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
+6. card_number: Extract ONLY the numeric part of the card number (e.g. "027/032", "###/###", "###/P", "No.094", "094", "26", "P-044"). Do NOT include any set code prefix that appears in a colored box before the number. If you see "088/071 SR", card_number = "088/071" and rarity = "SR". Invalid: "ID:..." → ""
 7. rarity: ◆=Common, ●=Uncommon, ★=Rare, R, C, U, SR, UR — or "" if not visible
 8. special_variants: comma-separated or ""
    - Holo Rare (sparkly art box only, normal borders) → NOT a variant, do NOT write "Prism"
@@ -467,10 +469,11 @@ Output ONLY this JSON, nothing else:
 async def get_market_value_jpy(
     card_name: str,
     rarity: str,
-    set_name: str = "Unknown",
+    set_name: str = "",
     card_number: str = "",
     variants: Optional[list] = None,
-    force_refresh: bool = False
+    force_refresh: bool = False,
+    full_set_name: str = ""
 ) -> Dict:
     """
     Get market value estimate in JPY for a trading card.
@@ -504,7 +507,7 @@ async def get_market_value_jpy(
     
     try:
         # Step 1: Estimate market value in USD
-        market_usd = await estimate_market_value_usd(card_name, rarity, set_name, card_number, variants)
+        market_usd = await estimate_market_value_usd(card_name, rarity, set_name, card_number, variants, full_set_name=full_set_name)
         
         if market_usd == 0:
             return {'error': 'Unable to estimate market value'}
@@ -563,9 +566,10 @@ async def get_market_value_jpy(
 async def estimate_market_value_usd(
     card_name: str,
     rarity: str,
-    set_name: str = "Unknown",
+    set_name: str = "",
     card_number: str = "",
-    variants: Optional[list] = None
+    variants: Optional[list] = None,
+    full_set_name: str = ""
 ) -> float:
     """
     Estimate market value in USD using PriceCharting with Gemini filtering.
@@ -588,13 +592,13 @@ async def estimate_market_value_usd(
     is_japanese = variants and 'Japanese' in variants
     
     # Try PriceCharting API first (official, no blocking)
-    price = await _try_pricecharting_api(card_name, set_name, card_number, is_japanese)
+    price = await _try_pricecharting_api(card_name, set_name, card_number, is_japanese, full_set_name=full_set_name)
     if price:
         return price
     
     # Fallback to scraping if API not available or failed
     safe_print(f"[APPRAISE] API unavailable, trying web scraping...")
-    price = await _try_pricecharting_scrape(card_name, set_name, card_number, is_japanese)
+    price = await _try_pricecharting_scrape(card_name, set_name, card_number, is_japanese, full_set_name=full_set_name)
     if price:
         return price
     
@@ -853,7 +857,7 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
         return results
 
 
-async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
+async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False, full_set_name: str = "") -> Optional[float]:
     """Try to get price from PriceCharting API (official, no scraping)."""
     try:
         import httpx
@@ -878,8 +882,10 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
         
         query_parts = [search_name]
         
-        if set_name and set_name != "Unknown":
-            query_parts.append(set_name)
+        # For initial query: use set_name (code) if available, else full_set_name
+        query_set = set_name if (set_name and set_name != "Unknown") else full_set_name
+        if query_set:
+            query_parts.append(query_set)
         
         if card_number:
             clean_card_number = card_number.replace('#', '')

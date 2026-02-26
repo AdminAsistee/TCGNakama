@@ -516,14 +516,17 @@ async def appraise_market_value(
         else:
             tags = []
         
-        set_name = 'Unknown'
+        set_name = ''
+        set_name_full = ''
         card_number = ''
         
         # Extract from tags using prefix format (same as edit card function)
         # Make case-insensitive to handle both "Set:" and "set:"
         for tag in tags:
             tag_lower = tag.lower()
-            if tag_lower.startswith("set:"):
+            if tag_lower.startswith("set name:"):
+                set_name_full = tag[9:].strip()
+            elif tag_lower.startswith("set:"):
                 set_name = tag[4:].strip()  # Skip "Set:" or "set:"
             elif tag_lower.startswith("number:"):
                 card_number = tag[7:].strip()  # Skip "Number:" or "number:"
@@ -531,7 +534,11 @@ async def appraise_market_value(
                 if card_number and not card_number.startswith('#'):
                     card_number = f'#{card_number}'
         
-        print(f"[APPRAISE] Extracted from tags - Set: '{set_name}', Card Number: '{card_number}'")
+        # Use full set name as fallback if no set code
+        effective_set = set_name or set_name_full or 'Unknown'
+        
+        print(f"[APPRAISE] Extracted from tags - Set: '{set_name}', Set Name: '{set_name_full}', Effective: '{effective_set}', Card Number: '{card_number}'")
+
         
         # Detect if Japanese card (has Japanese characters)
         import re
@@ -584,12 +591,13 @@ async def appraise_market_value(
         # Get market value in JPY
         safe_print(f"[APPRAISE] Calling appraisal service...")
         market_data = await appraisal.get_market_value_jpy(
-            card_name=search_name,  # Use cleaned search name
+            card_name=search_name,
             rarity=rarity,
             set_name=set_name,
+            full_set_name=set_name_full,
             card_number=card_number,
             variants=variants if variants else None,
-            force_refresh=force_refresh  # Pass through force_refresh parameter
+            force_refresh=force_refresh
         )
         
         safe_print(f"[APPRAISE] Market data: {market_data}")
@@ -739,6 +747,7 @@ async def force_sync(request: Request, admin: str = Depends(get_admin_session), 
 async def estimate_market_value(
     card_name: str,
     set_name: str = "",
+    full_set_name: str = "",
     card_number: str = "",
     rarity: str = "",
     is_japanese: bool = False,
@@ -757,6 +766,7 @@ async def estimate_market_value(
         safe_print(f"[ESTIMATE] ===== Market Value Estimation Request =====")
         safe_print(f"[ESTIMATE] card_name: '{card_name}'")
         safe_print(f"[ESTIMATE] set_name: '{set_name}'")
+        safe_print(f"[ESTIMATE] full_set_name: '{full_set_name}'")
         safe_print(f"[ESTIMATE] card_number: '{card_number}'")
         safe_print(f"[ESTIMATE] rarity: '{rarity}'")
         safe_print(f"[ESTIMATE] is_japanese: {is_japanese}")
@@ -771,9 +781,10 @@ async def estimate_market_value(
             card_name=card_name,
             rarity=rarity,
             set_name=set_name,
+            full_set_name=full_set_name,
             card_number=card_number,
             variants=variants,
-            force_refresh=True  # Always get fresh data for new cards
+            force_refresh=True
         )
         
         safe_print(f"[ESTIMATE] Market data: {market_data}")
@@ -1975,6 +1986,8 @@ async def bulk_upload_appraise(
             card_name_english = appraisal_result.get("card_name_english", card_name)  # Use English name for PriceCharting
             card_name_japanese = appraisal_result.get("card_name_japanese", "")  # Japanese name if present
             set_name = appraisal_result.get("set_name", "")
+            full_set_name = appraisal_result.get("full_set_name", "")
+            effective_set = set_name or full_set_name  # use full name if no code
             card_number = appraisal_result.get("card_number", "")
             rarity = appraisal_result.get("rarity", "")
             vendor = appraisal_result.get("manufacturer", "TCG Nakama")
@@ -2038,11 +2051,12 @@ async def bulk_upload_appraise(
             if not exists:
                 try:
                     price_result = await appraisal.get_market_value_jpy(
-                        card_name=card_name_english,  # Use English name for PriceCharting search
+                        card_name=card_name_english,
                         rarity=rarity,
                         set_name=set_name,
+                        full_set_name=full_set_name,
                         card_number=card_number,
-                        variants=['Japanese'] if is_japanese else None  # Pass language for correct filtering
+                        variants=['Japanese'] if is_japanese else None
                     )
                     if not price_result.get("error"):
                         price = price_result.get("market_jpy")
