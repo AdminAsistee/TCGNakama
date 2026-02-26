@@ -162,6 +162,8 @@ async def read_root(
         "checkout_url": checkout_url,
         "svr_active_collection": None,
         "svr_active_rarity": None,
+        "svr_active_package_type": None,
+        "svr_active_card_condition": None,
         "current_page": page,
         "total_pages": total_pages,
         "total_products": total_products
@@ -173,6 +175,8 @@ async def search_products(
     q: str = Query(default=""),
     collection: str = Query(default=""),
     rarity: str = Query(default=""),
+    package_type: str = Query(default=""),
+    card_condition: str = Query(default=""),
     max_price: Optional[float] = None,
     page: int = Query(1, ge=1),
     client: ShopifyClient = Depends(get_shopify_client)
@@ -181,10 +185,14 @@ async def search_products(
     q = q.strip() if q and q.strip() else None
     rarity = rarity.strip() if rarity and rarity.strip() else None
     collection = collection.strip() if collection and collection.strip() else None
+    package_type = package_type.strip() if package_type and package_type.strip() else None
+    card_condition = card_condition.strip() if card_condition and card_condition.strip() else None
     
     # Normalize for templates
     svr_active_collection = collection.lower() if collection else None
     svr_active_rarity = rarity.lower() if rarity else None
+    svr_active_package_type = package_type if package_type else None
+    svr_active_card_condition = card_condition if card_condition else None
 
     # Apply filters during search
     if collection or rarity or max_price:
@@ -200,6 +208,13 @@ async def search_products(
     else:
         products = await client.get_products(query=q)
 
+    # Apply package type filter
+    if package_type:
+        products = [p for p in products if f"Condition: {package_type}" in p.get('tags', [])]
+    # Apply card condition filter
+    if card_condition:
+        products = [p for p in products if f"Card: {card_condition}" in p.get('tags', [])]
+
     collections = await client.get_collections()
     
     # Pagination
@@ -210,13 +225,15 @@ async def search_products(
     end = start + PAGE_SIZE
     paginated_products = products[start:end]
 
-    print(f"[DEBUG] Search | collection: {svr_active_collection}, rarity: {svr_active_rarity}, page: {page}")
+    print(f"[DEBUG] Search | collection: {svr_active_collection}, rarity: {svr_active_rarity}, package_type: {svr_active_package_type}, card_condition: {svr_active_card_condition}, page: {page}")
     return templates.TemplateResponse("partials/product_grid.html", {
         "request": request, 
         "products": paginated_products,
         "collections": collections,
         "svr_active_collection": svr_active_collection,
         "svr_active_rarity": svr_active_rarity,
+        "svr_active_package_type": svr_active_package_type,
+        "svr_active_card_condition": svr_active_card_condition,
         "current_page": page,
         "total_pages": total_pages,
         "total_products": total_products
@@ -228,7 +245,8 @@ async def filter_products(
     q: str = Query(default=""),
     rarity: str = Query(default=""),
     collection: str = Query(default=""),
-    condition: str = Query(default=""),
+    package_type: str = Query(default=""),
+    card_condition: str = Query(default=""),
     min_price: Union[str, float, None] = Query(default=None),
     max_price: Union[str, float, None] = Query(default=None),
     page: int = Query(1, ge=1),
@@ -238,7 +256,8 @@ async def filter_products(
     q = q.strip() if q and q.strip() else None
     rarity = rarity.strip() if rarity and rarity.strip() else None
     collection = collection.strip() if collection and collection.strip() else None
-    condition = condition.strip() if condition and condition.strip() else None
+    package_type = package_type.strip() if package_type and package_type.strip() else None
+    card_condition = card_condition.strip() if card_condition and card_condition.strip() else None
     
     # Convert price parameters
     if isinstance(min_price, str) and not min_price.strip():
@@ -254,7 +273,8 @@ async def filter_products(
     # Normalize for templates
     svr_active_collection = collection.lower() if collection else None
     svr_active_rarity = rarity.lower() if rarity else None
-    svr_active_condition = condition if condition else None
+    svr_active_package_type = package_type if package_type else None
+    svr_active_card_condition = card_condition if card_condition else None
 
     if collection:
         products = await client.get_collection_products(handle=collection)
@@ -263,17 +283,22 @@ async def filter_products(
             products = [p for p in products if q.lower() in p['title'].lower()]
         if rarity:
             products = [p for p in products if p['rarity'].lower() == rarity.lower()]
-        if condition:
-            products = [p for p in products if f"Condition: {condition}" in p.get('tags', [])]
+        if package_type:
+            products = [p for p in products if f"Condition: {package_type}" in p.get('tags', [])]
+        if card_condition:
+            products = [p for p in products if f"Card: {card_condition}" in p.get('tags', [])]
         if min_price:
             products = [p for p in products if p['price'] >= min_price]
         if max_price:
             products = [p for p in products if p['price'] <= max_price]
     else:
         products = await client.get_products(query=q, rarity=rarity, min_price=min_price, max_price=max_price)
-        # Apply condition filter to general products
-        if condition:
-            products = [p for p in products if f"Condition: {condition}" in p.get('tags', [])]
+        # Apply package type filter
+        if package_type:
+            products = [p for p in products if f"Condition: {package_type}" in p.get('tags', [])]
+        # Apply card condition filter
+        if card_condition:
+            products = [p for p in products if f"Card: {card_condition}" in p.get('tags', [])]
     
     print(f"[DEBUG] filter_products | Total products after fetch/filter: {len(products)}")
     
@@ -287,14 +312,15 @@ async def filter_products(
     end = start + PAGE_SIZE
     paginated_products = products[start:end]
 
-    print(f"[DEBUG] Filter | q: {q}, rarity: {svr_active_rarity}, collection: {svr_active_collection}, condition: {svr_active_condition}, max_price: {max_price}")
+    print(f"[DEBUG] Filter | q: {q}, rarity: {svr_active_rarity}, collection: {svr_active_collection}, package_type: {svr_active_package_type}, card_condition: {svr_active_card_condition}, max_price: {max_price}")
     return templates.TemplateResponse("partials/product_grid.html", {
         "request": request, 
         "products": paginated_products,
         "collections": collections,
         "svr_active_collection": svr_active_collection,
         "svr_active_rarity": svr_active_rarity,
-        "svr_active_condition": svr_active_condition,
+        "svr_active_package_type": svr_active_package_type,
+        "svr_active_card_condition": svr_active_card_condition,
         "current_page": page,
         "total_pages": total_pages,
         "total_products": total_products
@@ -584,7 +610,9 @@ async def refresh_products(
             "current_page": 1,
             "total_pages": total_pages,
             "svr_active_collection": None,
-            "svr_active_rarity": None
+            "svr_active_rarity": None,
+            "svr_active_package_type": None,
+            "svr_active_card_condition": None
         })
     except Exception as e:
         print(f"[ERROR] Refresh failed: {e}")

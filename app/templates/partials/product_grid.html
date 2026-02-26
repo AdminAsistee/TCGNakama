@@ -48,7 +48,8 @@
             <p class="text-[9px] md:text-[10px] text-gray-500 mt-0.5 truncate">{{ product.set }}</p>
             {% if product.card_number and product.card_number != '#000' %}
             <p class="text-[8px] text-gray-600 truncate">
-                {{ product.card_number }}{% if product.condition %} · {{ product.condition }}{% endif %}
+                {{ product.card_number }}{% if product.package_type %} · {{ product.package_type }}{% endif %}{% if
+                product.card_condition %} · {{ product.card_condition }}{% endif %}
             </p>
             {% endif %}
         </a>
@@ -113,9 +114,11 @@
 </div>
 {% endif %}
 
-{% if request.headers.get('HX-Request') and (collections or svr_active_rarity or svr_active_condition) %}
+{% if request.headers.get('HX-Request') and (collections or svr_active_rarity or svr_active_package_type or
+svr_active_card_condition) %}
 {% set oob = true %}
 {% include "partials/collection_filters.html" %}
 {% include "partials/rarity_filters.html" %}
 {% include "partials/condition_filters.html" %}
+{% include "partials/card_condition_filters.html" %}
 {% endif %}

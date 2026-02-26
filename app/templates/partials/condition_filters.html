@@ -1,13 +1,17 @@
-<div id="condition-filters" class="flex gap-2" {% if oob %}hx-swap-oob="true" {% endif %}>
-    {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-    {% for c in conditions %}
-    {% set is_active = (svr_active_condition and svr_active_condition|trim|lower == c|trim|lower) %}
-    <div class="condition-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border px-4 cursor-pointer transition-all duration-75 {{ 'bg-primary border-primary shadow-[0_0_20px_rgba(244,37,209,0.5)]' if is_active else 'bg-white/5 border-white/10 hover:bg-white/10' }}"
-        data-condition-btn="{{ c }}" onclick="setConditionFilter('{{ c }}', this)">
+<div id="package-type-filters" class="flex gap-2" {% if oob %}hx-swap-oob="true" {% endif %}>
+    {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+    {% set pkg_soon = ['Booster Pack', 'Toploader'] %}
+    {% for pt in package_types %}
+    {% set is_active = (svr_active_package_type and svr_active_package_type|trim|lower == pt|trim|lower) %}
+    <div class="package-type-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border px-4 cursor-pointer transition-all duration-75 {{ 'bg-primary border-primary shadow-[0_0_20px_rgba(244,37,209,0.5)]' if is_active else 'bg-white/5 border-white/10 hover:bg-white/10' }}"
+        data-package-type-btn="{{ pt }}" onclick="setPackageTypeFilter('{{ pt }}', this)">
         <p
             class="text-[10px] font-bold uppercase whitespace-nowrap {{ 'text-white' if is_active else 'text-gray-300' }}">
-            {{ c }}
+            {{ pt }}
         </p>
+        {% if pt in pkg_soon %}<span
+            class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+        endif %}
     </div>
     {% endfor %}
 </div>

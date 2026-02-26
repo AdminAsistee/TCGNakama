@@ -318,7 +318,8 @@
                 <!-- Hidden Inputs for Additive Filtering -->
                 <input type="hidden" name="rarity" id="rarity-input" value="" />
                 <input type="hidden" name="collection" id="collection-input" value="" />
-                <input type="hidden" name="condition" id="condition-input" value="" />
+                <input type="hidden" name="package_type" id="package-type-input" value="" />
+                <input type="hidden" name="card_condition" id="card-condition-input" value="" />
                 <input type="hidden" name="max_price" id="price-slider" value="" />
 
                 <!-- ═══════ MOBILE: Compact Filter Bar ═══════ -->
@@ -384,26 +385,60 @@
                                     </div>
                                 </div>
 
+                                <!-- Package Type Dropdown -->
+                                <div class="relative filter-dropdown" data-filter-group="package-type">
+                                    <button type="button" onclick="toggleFilterDropdown('package-type')"
+                                        class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
+                                        <span
+                                            class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Package
+                                            Type</span>
+                                        <span
+                                            class="material-symbols-outlined text-gray-400 text-sm transition-transform"
+                                            id="package-type-chevron">expand_more</span>
+                                        <span id="package-type-badge"
+                                            class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
+                                    </button>
+                                    <div id="package-type-dropdown-panel"
+                                        class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+                                        {% set pkg_soon = ['Booster Pack', 'Toploader'] %}
+                                        {% for pt in package_types %}
+                                        <button type="button" data-package-type-btn="{{ pt }}"
+                                            onclick="setPackageTypeFilter('{{ pt }}', this)"
+                                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                            {{ pt }}
+                                            {% if pt in pkg_soon %}<span
+                                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                                            endif %}
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
                                 <!-- Condition Dropdown -->
-                                <div class="relative filter-dropdown" data-filter-group="condition">
-                                    <button type="button" onclick="toggleFilterDropdown('condition')"
+                                <div class="relative filter-dropdown" data-filter-group="card-condition">
+                                    <button type="button" onclick="toggleFilterDropdown('card-condition')"
                                         class="flex items-center gap-1.5 h-9 px-3 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer">
                                         <span
                                             class="text-[10px] font-bold uppercase tracking-wider text-gray-300">Condition</span>
                                         <span
                                             class="material-symbols-outlined text-gray-400 text-sm transition-transform"
-                                            id="condition-chevron">expand_more</span>
-                                        <span id="condition-badge"
+                                            id="card-condition-chevron">expand_more</span>
+                                        <span id="card-condition-badge"
                                             class="hidden text-[8px] font-black bg-primary text-background-dark px-1.5 py-0.5 rounded-full uppercase"></span>
                                     </button>
-                                    <div id="condition-dropdown-panel"
+                                    <div id="card-condition-dropdown-panel"
                                         class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
-                                        {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-                                        {% for c in conditions %}
-                                        <button type="button" data-condition-btn="{{ c }}"
-                                            onclick="setConditionFilter('{{ c }}', this)"
-                                            class="flex items-center px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
-                                            {{ c }}
+                                        {% set card_conditions = ['Near Mint', 'Lightly Played', 'Mostly Played'] %}
+                                        {% set cc_soon = ['Lightly Played', 'Mostly Played'] %}
+                                        {% for cc in card_conditions %}
+                                        <button type="button" data-card-condition-btn="{{ cc }}"
+                                            onclick="setCardConditionFilter('{{ cc }}', this)"
+                                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider text-gray-300 hover:bg-white/10 hover:text-white transition-all text-left whitespace-nowrap">
+                                            {{ cc }}
+                                            {% if cc in cc_soon %}<span
+                                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                                            endif %}
                                         </button>
                                         {% endfor %}
                                     </div>
@@ -423,6 +458,7 @@
                                     </button>
                                     <div id="collection-dropdown-panel"
                                         class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
+                                        {% set col_soon = ['yu-gi-oh', 'magic-tg'] %}
                                         {% for collection in collections %}
                                         <button type="button" data-collection-btn="{{ collection.handle }}"
                                             onclick="setActiveCollection('{{ collection.handle }}', this)"
@@ -431,6 +467,9 @@
                                             <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
                                             {% endif %}
                                             {{ collection.title }}
+                                            {% if collection.handle in col_soon %}<span
+                                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                                            endif %}
                                         </button>
                                         {% endfor %}
                                     </div>
@@ -503,16 +542,39 @@
                     </div>
                 </div>
 
+                <!-- Package Type -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Package Type</h4>
+                    <div class="flex flex-wrap gap-2">
+                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
+                        {% set pkg_soon = ['Booster Pack', 'Toploader'] %}
+                        {% for pt in package_types %}
+                        <button type="button" data-sheet-package-type="{{ pt }}"
+                            onclick="setSheetFilter('package-type', '{{ pt }}', this)"
+                            class="flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
+                            {{ pt }}
+                            {% if pt in pkg_soon %}<span
+                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                            endif %}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
                 <!-- Condition -->
                 <div>
                     <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Condition</h4>
                     <div class="flex flex-wrap gap-2">
-                        {% set conditions = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-                        {% for c in conditions %}
-                        <button type="button" data-sheet-condition="{{ c }}"
-                            onclick="setSheetFilter('condition', '{{ c }}', this)"
-                            class="px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
-                            {{ c }}
+                        {% set card_conditions = ['Near Mint', 'Lightly Played', 'Mostly Played'] %}
+                        {% set cc_soon = ['Lightly Played', 'Mostly Played'] %}
+                        {% for cc in card_conditions %}
+                        <button type="button" data-sheet-card-condition="{{ cc }}"
+                            onclick="setSheetFilter('card-condition', '{{ cc }}', this)"
+                            class="flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-[11px] font-bold uppercase tracking-wider text-gray-300 active:scale-95 transition-all">
+                            {{ cc }}
+                            {% if cc in cc_soon %}<span
+                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                            endif %}
                         </button>
                         {% endfor %}
                     </div>
@@ -522,6 +584,7 @@
                 <div>
                     <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Collection</h4>
                     <div class="flex flex-wrap gap-2">
+                        {% set col_soon = ['yu-gi-oh', 'magic-tg'] %}
                         {% for collection in collections %}
                         <button type="button" data-sheet-collection="{{ collection.handle }}"
                             onclick="setSheetFilter('collection', '{{ collection.handle }}', this)"
@@ -530,6 +593,9 @@
                             <img src="{{ collection.image }}" class="w-4 h-4 rounded-full" alt="">
                             {% endif %}
                             {{ collection.title }}
+                            {% if collection.handle in col_soon %}<span
+                                class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+                            endif %}
                         </button>
                         {% endfor %}
                     </div>
@@ -884,54 +950,90 @@
         const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
         const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
 
-        document.querySelectorAll('[data-rarity-btn], [data-collection-btn], [data-condition-btn]').forEach(b => {
+        document.querySelectorAll('[data-rarity-btn], [data-collection-btn], [data-package-type-btn], [data-card-condition-btn]').forEach(b => {
             b.classList.remove(...activeClasses);
             b.classList.add(...inactiveClasses);
         });
 
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
-        const conditionInput = document.getElementById('condition-input');
+        const packageTypeInput = document.getElementById('package-type-input');
+        const cardConditionInput = document.getElementById('card-condition-input');
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
-        if (conditionInput) conditionInput.value = '';
+        if (packageTypeInput) packageTypeInput.value = '';
+        if (cardConditionInput) cardConditionInput.value = '';
 
         // Clear badges
         updateFilterBadge('rarity', '');
-        updateFilterBadge('condition', '');
+        updateFilterBadge('package-type', '');
+        updateFilterBadge('card-condition', '');
         updateFilterBadge('collection', '');
     }
 
-    function setConditionFilter(condition, element) {
-        const conditionInput = document.getElementById('condition-input');
-        if (!conditionInput) return;
+    function setPackageTypeFilter(packageType, element) {
+        const packageTypeInput = document.getElementById('package-type-input');
+        if (!packageTypeInput) return;
+
+        const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
+        const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
+
+        // Toggle: if clicking the same package type, clear it
+        if (packageTypeInput.value === packageType) {
+            packageTypeInput.value = '';
+            element.classList.remove(...activeClasses);
+            element.classList.add(...inactiveClasses);
+            updateFilterBadge('package-type', '');
+        } else {
+            // Clear other package type buttons
+            document.querySelectorAll('[data-package-type-btn]').forEach(b => {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            });
+            packageTypeInput.value = packageType;
+            element.classList.add(...activeClasses);
+            element.classList.remove(...inactiveClasses);
+            updateFilterBadge('package-type', packageType);
+        }
+
+        // Trigger HTMX update
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger(packageTypeInput, 'change');
+        } else {
+            packageTypeInput.dispatchEvent(new Event('change'));
+        }
+    }
+
+    function setCardConditionFilter(cardCondition, element) {
+        const cardConditionInput = document.getElementById('card-condition-input');
+        if (!cardConditionInput) return;
 
         const activeClasses = ['bg-primary', 'border-primary', 'shadow-[0_0_20px_rgba(244,37,209,0.5)]', 'text-white'];
         const inactiveClasses = ['bg-white/5', 'border-white/10', 'hover:bg-white/10', 'text-gray-300'];
 
         // Toggle: if clicking the same condition, clear it
-        if (conditionInput.value === condition) {
-            conditionInput.value = '';
+        if (cardConditionInput.value === cardCondition) {
+            cardConditionInput.value = '';
             element.classList.remove(...activeClasses);
             element.classList.add(...inactiveClasses);
-            updateFilterBadge('condition', '');
+            updateFilterBadge('card-condition', '');
         } else {
-            // Clear other condition buttons
-            document.querySelectorAll('[data-condition-btn]').forEach(b => {
+            // Clear other card condition buttons
+            document.querySelectorAll('[data-card-condition-btn]').forEach(b => {
                 b.classList.remove(...activeClasses);
                 b.classList.add(...inactiveClasses);
             });
-            conditionInput.value = condition;
+            cardConditionInput.value = cardCondition;
             element.classList.add(...activeClasses);
             element.classList.remove(...inactiveClasses);
-            updateFilterBadge('condition', condition);
+            updateFilterBadge('card-condition', cardCondition);
         }
 
         // Trigger HTMX update
         if (typeof htmx !== 'undefined') {
-            htmx.trigger(conditionInput, 'change');
+            htmx.trigger(cardConditionInput, 'change');
         } else {
-            conditionInput.dispatchEvent(new Event('change'));
+            cardConditionInput.dispatchEvent(new Event('change'));
         }
     }
 
@@ -939,14 +1041,16 @@
         const searchInput = document.getElementById('search-input');
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
-        const conditionInput = document.getElementById('condition-input');
+        const packageTypeInput = document.getElementById('package-type-input');
+        const cardConditionInput = document.getElementById('card-condition-input');
         const priceSlider = document.getElementById('price-slider');
         const mainPriceSlider = document.getElementById('main-price-slider');
 
         if (searchInput) searchInput.value = '';
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
-        if (conditionInput) conditionInput.value = '';
+        if (packageTypeInput) packageTypeInput.value = '';
+        if (cardConditionInput) cardConditionInput.value = '';
         if (priceSlider) priceSlider.value = '';
         if (mainPriceSlider) {
             mainPriceSlider.value = 30000;
@@ -958,7 +1062,8 @@
 
         // Clear all badges
         updateFilterBadge('rarity', '');
-        updateFilterBadge('condition', '');
+        updateFilterBadge('package-type', '');
+        updateFilterBadge('card-condition', '');
         updateFilterBadge('collection', '');
 
         // Sync mobile sheet visuals
@@ -1083,10 +1188,22 @@
             }
         });
 
-        // Sync condition
-        const conditionVal = document.getElementById('condition-input')?.value || '';
-        document.querySelectorAll('[data-sheet-condition]').forEach(b => {
-            if (b.getAttribute('data-sheet-condition') === conditionVal && conditionVal) {
+        // Sync package type
+        const packageTypeVal = document.getElementById('package-type-input')?.value || '';
+        document.querySelectorAll('[data-sheet-package-type]').forEach(b => {
+            if (b.getAttribute('data-sheet-package-type') === packageTypeVal && packageTypeVal) {
+                b.classList.add(...activeClasses);
+                b.classList.remove(...inactiveClasses);
+            } else {
+                b.classList.remove(...activeClasses);
+                b.classList.add(...inactiveClasses);
+            }
+        });
+
+        // Sync card condition
+        const cardConditionVal = document.getElementById('card-condition-input')?.value || '';
+        document.querySelectorAll('[data-sheet-card-condition]').forEach(b => {
+            if (b.getAttribute('data-sheet-card-condition') === cardConditionVal && cardConditionVal) {
                 b.classList.add(...activeClasses);
                 b.classList.remove(...inactiveClasses);
             } else {
@@ -1122,12 +1239,14 @@
         // Clear all hidden inputs
         const rarityInput = document.getElementById('rarity-input');
         const collectionInput = document.getElementById('collection-input');
-        const conditionInput = document.getElementById('condition-input');
+        const packageTypeInput = document.getElementById('package-type-input');
+        const cardConditionInput = document.getElementById('card-condition-input');
         const priceSlider = document.getElementById('price-slider');
 
         if (rarityInput) rarityInput.value = '';
         if (collectionInput) collectionInput.value = '';
-        if (conditionInput) conditionInput.value = '';
+        if (packageTypeInput) packageTypeInput.value = '';
+        if (cardConditionInput) cardConditionInput.value = '';
         if (priceSlider) priceSlider.value = '';
 
         // Reset main price slider
@@ -1139,7 +1258,8 @@
         // Clear desktop visuals
         clearFilterVisuals();
         updateFilterBadge('rarity', '');
-        updateFilterBadge('condition', '');
+        updateFilterBadge('package-type', '');
+        updateFilterBadge('card-condition', '');
         updateFilterBadge('collection', '');
 
         // Sync and update sheet visuals
@@ -1168,7 +1288,8 @@
     function updateMobileFilterCount() {
         const count = [
             document.getElementById('rarity-input')?.value,
-            document.getElementById('condition-input')?.value,
+            document.getElementById('package-type-input')?.value,
+            document.getElementById('card-condition-input')?.value,
             document.getElementById('collection-input')?.value,
             (document.getElementById('price-slider')?.value && parseInt(document.getElementById('price-slider')?.value) < 30000) ? 'price' : ''
         ].filter(Boolean).length;

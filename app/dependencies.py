@@ -70,7 +70,8 @@ class ShopifyClient:
         card_set = "Unknown Set"
         rarity = "Common"
         card_number = "#000"
-        condition = None
+        package_type = None
+        card_condition = None
         
         for tag in tags:
             tag_lower = tag.lower()
@@ -86,7 +87,9 @@ class ShopifyClient:
                 elif key == "number":
                     card_number = val
                 elif key == "condition":
-                    condition = val
+                    package_type = val
+                elif key == "card":
+                    card_condition = val
 
         # DEBUG: Log the first variant to see what Shopify is sending
         if variants:
@@ -122,7 +125,8 @@ class ShopifyClient:
             "title": node["title"],
             "set": card_set,
             "rarity": rarity,
-            "condition": condition,
+            "package_type": package_type,
+            "card_condition": card_condition,
             "price": float(variant.get("price", {}).get("amount", 0)),
             "image": node.get("featuredImage", {}).get("url") if node.get("featuredImage") else "https://images.pokemontcg.io/bg.jpg",
             "badge": rarity.upper(),

@@ -1,0 +1,17 @@
+<div id="card-condition-filters" class="flex gap-2" {% if oob %}hx-swap-oob="true" {% endif %}>
+    {% set card_conditions = ['Near Mint', 'Lightly Played', 'Mostly Played'] %}
+    {% set cc_soon = ['Lightly Played', 'Mostly Played'] %}
+    {% for cc in card_conditions %}
+    {% set is_active = (svr_active_card_condition and svr_active_card_condition|trim|lower == cc|trim|lower) %}
+    <div class="card-condition-filter flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border px-4 cursor-pointer transition-all duration-75 {{ 'bg-primary border-primary shadow-[0_0_20px_rgba(244,37,209,0.5)]' if is_active else 'bg-white/5 border-white/10 hover:bg-white/10' }}"
+        data-card-condition-btn="{{ cc }}" onclick="setCardConditionFilter('{{ cc }}', this)">
+        <p
+            class="text-[10px] font-bold uppercase whitespace-nowrap {{ 'text-white' if is_active else 'text-gray-300' }}">
+            {{ cc }}
+        </p>
+        {% if cc in cc_soon %}<span
+            class="text-[8px] font-bold bg-white/5 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Soon</span>{%
+        endif %}
+    </div>
+    {% endfor %}
+</div>

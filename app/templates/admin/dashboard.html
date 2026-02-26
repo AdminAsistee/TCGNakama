@@ -105,6 +105,13 @@
             -moz-appearance: textfield;
             appearance: none;
         }
+
+        /* Hub split: collapse to single column on mobile */
+        @media (max-width: 768px) {
+            .hub-split {
+                grid-template-columns: 1fr !important;
+            }
+        }
     </style>
 </head>
 
@@ -389,10 +396,10 @@
                         class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-neon-purple text-white shadow-[0_0_8px_rgba(188,19,254,0.5)] z-10 transition-all">¥</button>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-3 auto-rows-min">
-                <!-- Total Inventory Value + Chart -->
+            <div class="grid gap-4 hub-split" style="grid-template-columns: 60fr 40fr;">
+                <!-- LEFT: Total Inventory Value + Chart -->
                 <div
-                    class="col-span-2 obsidian-hub-card rounded-xl p-4 shadow-teal-glow border-l-2 border-l-teal-accent group relative">
+                    class="obsidian-hub-card rounded-xl p-4 shadow-teal-glow border-l-2 border-l-teal-accent group relative">
                     <div class="flex justify-between items-start mb-1 relative z-10">
                         <div>
                             <h3 class="text-[10px] text-teal-accent uppercase tracking-widest font-bold mb-1">Total
@@ -425,7 +432,70 @@
                         <canvas id="valueChart"></canvas>
                     </div>
                 </div>
+
+                <!-- RIGHT: Asset Distribution Table -->
+                <div
+                    class="obsidian-hub-card rounded-xl p-4 border-l-2 border-l-neon-purple shadow-[0_0_20px_rgba(188,19,254,0.08)] relative">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-[10px] text-neon-purple uppercase tracking-widest font-bold">Asset Distribution
+                        </h3>
+                        <span class="text-[9px] text-white/30 font-mono uppercase tracking-wider">Top {{
+                            collection_breakdown|length }}</span>
+                    </div>
+                    <table style="font-size:14px; width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr class="text-[9px] text-white/30 uppercase tracking-wider border-b border-white/5">
+                                <th class="pb-2 text-left font-medium">Collection</th>
+                                <th class="pb-2 text-right font-medium">SKUs</th>
+                                <th class="pb-2 text-right font-medium">Qty</th>
+                                <th class="pb-2 text-right font-medium">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for col in collection_breakdown %}
+                            <tr class="border-b border-white/[0.04] hover:bg-white/5 transition-colors">
+                                <td class="py-2.5">
+                                    <div class="flex items-center gap-2">
+                                        {% if col.image %}
+                                        <img src="{{ col.image }}" class="w-4 h-4 rounded-full shrink-0 object-cover"
+                                            alt="">
+                                        {% else %}
+                                        <span
+                                            class="material-symbols-outlined text-[14px] text-white/30 shrink-0">sell</span>
+                                        {% endif %}
+                                        <span class="text-white font-bold truncate text-[13px]">{{ col.title }}</span>
+                                    </div>
+                                </td>
+                                <td class="py-2.5 text-right text-white/60 font-mono text-[12px] opacity-70">{{ col.skus
+                                    }}</td>
+                                <td class="py-2.5 text-right text-white/40 font-mono text-[12px]">{{ col.qty }}</td>
+                                <td
+                                    class="py-2.5 text-right font-mono font-bold text-[13px] {% if col.value > 0 %}text-teal-accent{% else %}text-white/20{% endif %}">
+                                    ¥ {{ "{:,}".format(col.value) }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="py-6 text-center text-white/20 text-xs">No collection data</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-white/[0.03] font-bold border-t border-white/10">
+                                <td class="py-3 pl-2 text-[10px] text-white/60 tracking-widest">Grand Total</td>
+                                <td class="py-3 text-right text-white/80 font-mono text-sm leading-none pt-4">{{
+                                    total_skus_sum }}</td>
+                                <td class="py-3 text-right text-white/80 font-mono text-sm leading-none pt-4">{{
+                                    total_qty_sum }}</td>
+                                <td class="py-3 text-right text-teal-accent font-mono text-sm leading-none pt-4">¥ {{
+                                    "{:,}".format(total_value_sum) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                </div>
             </div>
+
         </section>
 
         <!-- Vault Operations Ledger (Dynamic Grid) -->
@@ -436,7 +506,7 @@
                 <span
                     class="flex items-center gap-1 text-neon-blue text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-neon-blue/10 rounded-full border border-neon-blue/20">
                     <span class="material-symbols-outlined text-[10px]">inventory_2</span>
-                    {{ total_products }} cards
+                    {{ total_products }} SKUs
                 </span>
                 {% if oauth_connected %}
                 <div class="flex items-center gap-1 text-neon-green text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 bg-neon-green/10 rounded-full border border-neon-green/20"

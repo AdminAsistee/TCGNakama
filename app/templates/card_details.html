@@ -137,12 +137,18 @@
                 </span>
                 {% endif %}
 
-                {% if product.condition %}
+                {% if product.package_type %}
                 <button onclick="openConditionGuide()"
                     class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-900/30 text-green-400 border border-green-500/20 hover:bg-green-900/50 transition-colors cursor-pointer flex items-center gap-1">
-                    {{ product.condition }}
+                    {{ product.package_type }}
                     <span class="material-symbols-outlined text-[12px] text-green-500/70">info</span>
                 </button>
+                {% endif %}
+                {% if product.card_condition %}
+                <span
+                    class="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-cyan-900/30 text-cyan-300 border border-cyan-500/20">
+                    {{ product.card_condition }}
+                </span>
                 {% endif %}
 
                 {% for tag in product.tags %}
@@ -293,15 +299,22 @@
                                 {% endif %}
                             </span>
                         </div>
-                        {% if product.condition %}
+                        {% if product.package_type %}
                         <div
                             class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Package Type</span>
                             <span class="text-gray-200 flex items-center gap-2">
-                                {{ product.condition }}
+                                {{ product.package_type }}
                                 <button onclick="openConditionGuide()"
                                     class="text-[10px] text-primary hover:underline">What's this?</button>
                             </span>
+                        </div>
+                        {% endif %}
+                        {% if product.card_condition %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
+                            <span class="text-gray-200">{{ product.card_condition }}</span>
                         </div>
                         {% endif %}
                     </div>
@@ -427,7 +440,7 @@
             TCG Condition Guide
         </h3>
         <!-- Package Types Section -->
-        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">📦 Package Type</h4>
+        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">Package Type</h4>
         <div class="space-y-2 mb-5 text-sm">
             <div class="flex gap-3 p-2.5 rounded-lg bg-purple-900/10 border border-purple-500/10">
                 <span class="material-symbols-outlined text-purple-400 text-base shrink-0 mt-0.5">inventory_2</span>
@@ -460,7 +473,7 @@
         </div>
 
         <!-- Card Condition Section -->
-        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">🃏 Card Condition</h4>
+        <h4 class="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">Card Condition</h4>
         <div class="space-y-3 text-sm">
             <div class="flex gap-3 p-3 rounded-lg bg-green-900/10 border border-green-500/10">
                 <span class="font-bold text-green-400 w-10 shrink-0">NM</span>

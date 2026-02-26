@@ -347,6 +347,73 @@ async def admin_dashboard(
     cost_db.save_value_snapshot(total_value, product_count=live_count)
     value_history = cost_db.get_value_history(limit=12)
 
+    # --- Asset Distribution: aggregate inventory value per Shopify collection ---
+    shopify_collections = await client.get_collections()
+    collection_breakdown = []
+    
+    total_skus_sum = 0
+    total_qty_sum = 0
+    total_value_sum = 0
+    
+    for col in shopify_collections:
+        handle = col.get('handle', '')
+        col_products = await client.get_collection_products(handle=handle)
+        # Enrich with location so we can filter to active-only
+        active_col = [
+            p for p in col_products
+            if all_locations.get(p.get('id', ''), cost_db.DEFAULT_LOCATION) not in cost_db.INACTIVE_LOCATIONS
+        ]
+        
+        sku_count = len(active_col)
+        total_qty = sum(p.get('totalInventory', 0) or 0 for p in active_col)
+        total_val = sum(float(p.get('price', 0) or 0) for p in active_col)
+        
+        # Add to Grand Totals
+        total_skus_sum += sku_count
+        total_qty_sum += total_qty
+        total_value_sum += int(total_val)
+        
+        collection_breakdown.append({
+            'title':  col.get('title', handle),
+            'handle': handle,
+            'image':  col.get('image'),
+            'skus':   sku_count,
+            'qty':    total_qty,
+            'value':  int(total_val),
+        })
+    # Sort descending by value
+    collection_breakdown.sort(key=lambda x: x['value'], reverse=True)
+
+    # --- Catch-all for "Uncategorized" products (active but not in a collection) ---
+    uncategorized_skus = live_count - total_skus_sum
+    if uncategorized_skus > 0:
+        # We don't easily have qty/value for these without re-looping all active products, 
+        # but for accuracy of the Grand Total display, we should account for them.
+        # Since we want Grand Total to match accurately, we add them to the breakdown.
+        uncategorized_qty = sum(p.get('totalInventory', 0) or 0 for p in active_products) - total_qty_sum
+        uncategorized_val = sum(float(p.get('price', 0) or 0) for p in active_products) - total_value_sum
+        
+        collection_breakdown.append({
+            'title': 'Uncategorized',
+            'handle': None,
+            'image': None,
+            'skus': uncategorized_skus,
+            'qty': max(0, uncategorized_qty),
+            'value': int(max(0, uncategorized_val)),
+        })
+        # Re-sort to include Uncategorized in the correct position or keep it? 
+        # Usually best to keep it sorted by value.
+        collection_breakdown.sort(key=lambda x: x['value'], reverse=True)
+
+    # Add to Grand Totals (we update these to match the ACTUAL live_count/total_value)
+    # This ensures consistency even if some counts were missed in collection loops
+    total_skus_sum = live_count
+    total_qty_sum = sum(p.get('totalInventory', 0) or 0 for p in active_products)
+    total_value_sum = int(total_value)
+
+    # Keep Top 5 + Uncategorized if it's significant, or just Top 5 total
+    collection_breakdown = collection_breakdown[:6] 
+
     # Format currency for display
     def format_yen(val):
         return f"{int(val):,}"
@@ -382,8 +449,14 @@ async def admin_dashboard(
         "current_page": page,
         "total_pages": total_pages,
         "total_products": total_products,
-        "value_history": value_history
+        "value_history": value_history,
+        "collection_breakdown": collection_breakdown,
+        "total_skus_sum": total_skus_sum,
+        "total_qty_sum": total_qty_sum,
+        "total_value_sum": total_value_sum,
     })
+
+
 
 
 @router.post("/cost")
