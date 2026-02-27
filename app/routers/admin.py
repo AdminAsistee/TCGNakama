@@ -2288,33 +2288,53 @@ async def bulk_confirm(
                     if temp_path:
                         # Extract filename from stored path
                         temp_filename = Path(temp_path).name
-                        
+
                         # Use the SAME absolute path construction as when saving
                         current_file_dir = Path(__file__).parent.parent  # app/ directory
                         temp_dir = current_file_dir / "static" / "uploads" / "temp"
                         temp_file_path = temp_dir / temp_filename
-                        
+
+                        # Fallback: if original file not found, try the .webp version
+                        # (handles uploads saved before the WebP migration)
+                        if not temp_file_path.exists():
+                            webp_stem = Path(temp_filename).stem
+                            # Remove old extension stem variants and try .webp
+                            webp_name = webp_stem + ".webp"
+                            webp_fallback = temp_dir / webp_name
+                            if webp_fallback.exists():
+                                safe_print(f"[BULK_UPLOAD] Original not found, using .webp fallback: {webp_fallback}")
+                                temp_file_path = webp_fallback
+                                temp_filename = webp_name
+
                         safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
                         safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
                         safe_print(f"[BULK_UPLOAD] Absolute path: {temp_file_path.absolute()}")
-                        
+
                         if temp_file_path.exists():
                             try:
                                 with open(temp_file_path, "rb") as img_file:
                                     img_content = img_file.read()
-                                    
-                                # Get the original filename and mime type
-                                original_filename = card.get("filename", "card.jpg")
-                                mime_type = "image/jpeg" if original_filename.lower().endswith(('.jpg', '.jpeg')) else "image/png"
-                                
+
+                                # Determine mime type from actual file extension
+                                ext = temp_file_path.suffix.lower()
+                                if ext == ".webp":
+                                    mime_type = "image/webp"
+                                    upload_filename = Path(card.get("filename", "card.jpg")).stem + ".webp"
+                                elif ext in (".jpg", ".jpeg"):
+                                    mime_type = "image/jpeg"
+                                    upload_filename = card.get("filename", "card.jpg")
+                                else:
+                                    mime_type = "image/png"
+                                    upload_filename = card.get("filename", "card.png")
+
                                 # Create staged upload
                                 target = await client.staged_uploads_create(
                                     admin_token=admin_token,
-                                    filename=original_filename,
+                                    filename=upload_filename,
                                     mime_type=mime_type,
                                     file_size=str(len(img_content))
                                 )
-                                
+
                                 # Upload file to staged target
                                 resource_url = await client.upload_file_to_staged_target(
                                     target=target,
@@ -2329,7 +2349,6 @@ async def bulk_confirm(
                                 safe_print(traceback.format_exc())
                         else:
                             safe_print(f"[BULK_UPLOAD] ERROR: Temp file not found at {temp_file_path}")
-                            safe_print(f"[BULK_UPLOAD] Checked production path: app/static/uploads/temp/{temp_filename}")
                     else:
                         safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
                     
