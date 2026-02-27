@@ -2,6 +2,7 @@ from typing import Optional, Any, List
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.utils.image_utils import convert_to_webp
 from app.dependencies import get_shopify_client, ShopifyClient
 from app.routers.oauth import get_admin_token
 from app import cost_db
@@ -1301,19 +1302,23 @@ async def add_card(
             try:
                 content = await file.read()
                 if len(content) > 0:
+                    # Convert to WebP before uploading
+                    webp_content = convert_to_webp(content)
+                    webp_filename = Path(file.filename).stem + ".webp"
+
                     # 1. Create staged upload
                     target = await client.staged_uploads_create(
                         admin_token=admin_token,
-                        filename=file.filename,
-                        mime_type=file.content_type,
-                        file_size=str(len(content))
+                        filename=webp_filename,
+                        mime_type="image/webp",
+                        file_size=str(len(webp_content))
                     )
-                    
+
                     # 2. Upload file
                     resource_url = await client.upload_file_to_staged_target(
                         target=target,
-                        file_content=content,
-                        mime_type=file.content_type
+                        file_content=webp_content,
+                        mime_type="image/webp"
                     )
                     all_images.append(resource_url)
             except Exception as upload_err:
@@ -1415,22 +1420,26 @@ async def update_card(
             try:
                 content = await file.read()
                 if len(content) > 0:
+                    # Convert to WebP before uploading
+                    webp_content = convert_to_webp(content)
+                    webp_filename = Path(file.filename).stem + ".webp"
+
                     # 1. Create staged upload
                     target = await client.staged_uploads_create(
                         admin_token=admin_token,
-                        filename=file.filename,
-                        mime_type=file.content_type,
-                        file_size=str(len(content))
+                        filename=webp_filename,
+                        mime_type="image/webp",
+                        file_size=str(len(webp_content))
                     )
-                    
+
                     # 2. Upload file
                     resource_url = await client.upload_file_to_staged_target(
                         target=target,
-                        file_content=content,
-                        mime_type=file.content_type
+                        file_content=webp_content,
+                        mime_type="image/webp"
                     )
                     new_images_to_add.append(resource_url)
-                    print(f"[DEBUG] Uploaded file {file.filename}, resource URL: {resource_url}")
+                    print(f"[DEBUG] Uploaded file {file.filename} as WebP, resource URL: {resource_url}")
             except Exception as upload_err:
                 print(f"[ERROR] Failed to upload {file.filename}: {upload_err}")
     
@@ -1647,7 +1656,7 @@ async def upload_banner_image(
     file: UploadFile = File(...),
     admin: str = Depends(get_admin_session)
 ):
-    """Upload a banner image."""
+    """Upload a banner image and auto-convert to WebP."""
     # Validate file type
     allowed_types = ["image/jpeg", "image/png", "image/webp"]
     if file.content_type not in allowed_types:
@@ -1661,27 +1670,15 @@ async def upload_banner_image(
         banner_dir = Path("app/static/banners")
         banner_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate unique filename
+        # Always save as .webp regardless of original format
         timestamp = int(datetime.now().timestamp())
-        file_ext = Path(file.filename).suffix
-        filename = f"banner_{timestamp}{file_ext}"
+        filename = f"banner_{timestamp}.webp"
         filepath = banner_dir / filename
         
-        # Save uploaded file
+        # Read, convert to WebP (max 1920px wide), and save
         contents = await file.read()
-        
-        # Open with Pillow to validate and optionally resize
-        img = Image.open(io.BytesIO(contents))
-        
-        # Resize if too large (recommended: 1920x600px)
-        max_width = 1920
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-        
-        # Save optimized image
-        img.save(filepath, quality=85, optimize=True)
+        webp_bytes = convert_to_webp(contents, quality=85, max_width=1920)
+        filepath.write_bytes(webp_bytes)
         
         # Return relative path
         relative_path = f"/static/banners/{filename}"
