@@ -24,6 +24,20 @@ async def startup_event():
     db = SessionLocal()
     try:
         banner_count = db.query(Banner).count()
+        # Migrate any banner paths from .jpg/.png to .webp
+        banners_to_fix = db.query(Banner).filter(
+            Banner.image_path.isnot(None)
+        ).all()
+        fixed = 0
+        for b in banners_to_fix:
+            if b.image_path and (b.image_path.endswith('.jpg') or b.image_path.endswith('.png') or b.image_path.endswith('.jpeg')):
+                import re
+                b.image_path = re.sub(r'\.(jpg|jpeg|png)$', '.webp', b.image_path)
+                fixed += 1
+        if fixed:
+            db.commit()
+            print(f"[STARTUP] Migrated {fixed} banner image_path(s) to .webp")
+
         if banner_count == 0:
             print("[STARTUP] Seeding default banners...")
             default_banners = [
