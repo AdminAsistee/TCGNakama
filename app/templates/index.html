@@ -6,7 +6,7 @@
     <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto">
         <!-- Logo -->
         <div class="flex items-center gap-2">
-            <img src="/static/logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
+            <img src="/static/live_logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
             <h1 class="text-lg font-bold tracking-tight text-primary">TCGNakama</h1>
         </div>
 
@@ -49,7 +49,7 @@
             <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
             <span id="cart-count"
                 class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
-                cart_count }}</span>
+                cart_count or 0 }}</span>
         </button>
     </div>
 
@@ -161,7 +161,7 @@
             <div
                 class="flex flex-col bg-surface rounded-xl border border-white/[0.1] overflow-hidden hover:border-primary/30 transition-all group">
                 <!-- Card Image -->
-                <a href="/card/{{ product.id }}" class="relative block overflow-hidden rounded-t-xl"
+                <a href="/card/{{ product.safe_id }}" class="relative block overflow-hidden rounded-t-xl"
                     style="aspect-ratio: 5/7;">
                     <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp"
                         alt="{{ product.title }}"
@@ -188,7 +188,7 @@
 
                 <!-- Info & Action -->
                 <div class="px-3 py-2.5 flex flex-col gap-1.5">
-                    <a href="/card/{{ product.id }}" class="block min-w-0">
+                    <a href="/card/{{ product.safe_id }}" class="block min-w-0">
                         <h4 class="text-[11px] md:text-xs font-bold text-white/90 leading-snug line-clamp-2">{{
                             product.title }}</h4>
                     </a>
@@ -242,7 +242,7 @@
                             style="{% if loop.index <= 3 %}box-shadow: 0 0 8px {% if loop.index == 1 %}rgba(234,179,8,0.4){% elif loop.index == 2 %}rgba(156,163,175,0.3){% else %}rgba(180,83,9,0.3){% endif %};{% endif %}">
                             #{{ loop.index }}
                         </span>
-                        <a href="/card/{{ product.id }}"
+                        <a href="/card/{{ product.safe_id }}"
                             class="block w-14 sm:w-16 aspect-[3/4] rounded overflow-hidden ring-1 ring-white/8">
                             <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=160&format=webp"
                                 alt="{{ product.title }}" class="w-full h-full object-cover" loading="lazy">
@@ -730,7 +730,7 @@
             <span class="text-[9px] font-bold text-gray-500">Cart</span>
             <span id="cart-count-mobile"
                 class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center">{{
-                cart_count }}</span>
+                cart_count or 0 }}</span>
         </button>
     </div>
 </nav>

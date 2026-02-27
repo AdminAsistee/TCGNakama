@@ -7,7 +7,7 @@
         <!-- Logo -->
         <div class="flex items-center gap-2">
             <a href="/" class="flex items-center gap-2">
-                <img src="/static/logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
+                <img src="/static/live_logo.png" alt="TCG Nakama" class="h-8 w-auto rounded-full">
                 <h1 class="text-lg font-bold tracking-tight text-primary">TCGNakama</h1>
             </a>
         </div>
@@ -30,7 +30,7 @@
             hx-get="/cart/drawer" hx-target="#cart-drawer-container">
             <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
             <span id="cart-count"
-                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center {{ '' if cart_count and cart_count > 0 else 'hidden' }}">{{
+                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
                 cart_count or 0 }}</span>
         </button>
     </div>
@@ -359,7 +359,7 @@
         <h2 class="text-lg font-bold text-white mb-4 pl-3 border-l-4 border-primary">From Same Collection</h2>
         <div class="flex overflow-x-auto gap-3 pb-4 hide-scrollbar -mx-1 px-1">
             {% for card in same_collection %}
-            <a href="/card/{{ card.id }}" class="flex-shrink-0 w-32 group cursor-pointer">
+            <a href="/card/{{ card.safe_id }}" class="flex-shrink-0 w-32 group cursor-pointer">
                 <div class="w-32 h-44 rounded-lg bg-black/40 border border-white/10 overflow-hidden mb-2 relative">
                     <img alt="{{ card.title }}"
                         class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
@@ -409,7 +409,7 @@
             <span class="material-symbols-outlined text-gray-500 text-xl">shopping_cart</span>
             <span class="text-[9px] font-bold text-gray-500">Cart</span>
             <span id="cart-count-mobile"
-                class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center {{ '' if cart_count and cart_count > 0 else 'hidden' }}">{{
+                class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center">{{
                 cart_count or 0 }}</span>
         </button>
     </div>

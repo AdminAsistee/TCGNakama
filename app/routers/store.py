@@ -334,6 +334,9 @@ async def card_details_page(
 ):
     """Full-page card details view with market value and related cards."""
     from app.dependencies import SHOPIFY_STORE_URL
+    # Reconstruct full Shopify GID if only numeric ID provided (from safe_id links)
+    if not product_id.startswith("gid://"):
+        product_id = f"gid://shopify/Product/{product_id}"
     product = await client.get_product(product_id)
 
     if not product:

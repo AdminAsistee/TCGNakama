@@ -142,6 +142,10 @@
     }, 10);
 </script>
 <span id="cart-count" hx-swap-oob="true"
-    class="absolute top-1 right-1 w-4 h-4 bg-primary text-[10px] font-black text-white rounded-full flex items-center justify-center border-2 border-background-dark scale-125 transition-transform">
+    class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center transition-transform duration-300 scale-110">
+    {{ cart_count }}
+</span>
+<span id="cart-count-mobile" hx-swap-oob="true"
+    class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center transition-transform duration-300 scale-110">
     {{ cart_count }}
 </span>

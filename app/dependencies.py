@@ -415,7 +415,7 @@ class ShopifyClient:
             # Add inventory quantity from product totalInventory
             product["inventory_quantity"] = data["product"].get("totalInventory", 0)
             
-            print(f"[DEBUG] Successfully fetched product: {product.get('title')}")
+            safe_print(f"[DEBUG] Successfully fetched product: {product.get('title')}")
             return product
         except Exception as e:
             print(f"Error fetching product: {e}")
