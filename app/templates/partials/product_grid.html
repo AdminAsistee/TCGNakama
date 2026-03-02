@@ -19,7 +19,7 @@
         <img alt="{{ product.title }}"
             class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
             src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp"
-            loading="lazy" />
+            width="300" height="420" loading="lazy" decoding="async" />
         <!-- Rarity/Type Badge -->
         <div
             class="absolute top-2.5 left-2.5 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-black text-white/90 border border-white/10 uppercase tracking-widest">
