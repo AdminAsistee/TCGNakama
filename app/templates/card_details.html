@@ -63,8 +63,11 @@
                     data-index="{{ loop.index0 }}">
                     <img alt="{{ product.title }}"
                         class="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
-                        src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=800&format=webp"
-                        loading="{% if loop.index0 == 0 %}eager{% else %}lazy{% endif %}" />
+                        src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=600&format=webp" srcset="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=400&format=webp 400w,
+                                {{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=600&format=webp 600w,
+                                {{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=800&format=webp 800w"
+                        sizes="(max-width: 480px) 400px, (max-width: 1024px) 600px, 800px"
+                        loading="{% if loop.index0 == 0 %}eager{% else %}lazy{% endif %}" decoding="async" />
                 </div>
                 {% endfor %}
                 {% else %}

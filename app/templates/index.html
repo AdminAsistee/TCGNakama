@@ -163,10 +163,13 @@
                 <!-- Card Image -->
                 <a href="/card/{{ product.safe_id }}" class="relative block overflow-hidden rounded-t-xl"
                     style="aspect-ratio: 5/7;">
-                    <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp"
-                        alt="{{ product.title }}"
+                    <img src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=300&format=webp"
+                        srcset="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=200&format=webp 200w,
+                                {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=300&format=webp 300w,
+                                {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp 400w"
+                        sizes="(max-width: 480px) 200px, (max-width: 768px) 300px, 400px" alt="{{ product.title }}"
                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        loading="lazy">
+                        width="300" height="420" loading="lazy" decoding="async">
                     <!-- Freshness Badge -->
                     <div
                         class="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-md px-2 py-0.5 border border-white/10">

@@ -47,9 +47,9 @@ def _get_hot_picks(products: list, db: Session) -> list:
             # Only one snapshot → no comparison, skip or treat as 0% gain
             pass
 
-    # Sort by % gain descending, take top 4
+    # Sort by % gain descending, take top 3
     gainers.sort(key=lambda x: x[1], reverse=True)
-    top_ids = {g[0]: (g[1], g[2]) for g in gainers[:4]}
+    top_ids = {g[0]: (g[1], g[2]) for g in gainers[:3]}
 
     # If we have real gainers, build hot_picks from them
     if top_ids:
@@ -63,10 +63,10 @@ def _get_hot_picks(products: list, db: Session) -> list:
                 hot_picks.append(p_copy)
         # Re-sort by growth
         hot_picks.sort(key=lambda x: x.get('growth', 0), reverse=True)
-        return hot_picks[:4]
+        return hot_picks[:3]
 
     # Fallback: no snapshot data yet → use highest-priced with mock growth
-    fallback = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:4]
+    fallback = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:3]
     for hp in fallback:
         hp['growth'] = round(random.uniform(1.5, 5.5), 1)
     return fallback
