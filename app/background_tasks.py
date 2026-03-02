@@ -10,11 +10,17 @@ from app.dependencies import ShopifyClient
 _polling_task = None
 _last_sync_time = None
 _sync_in_progress = False
+_cached_products = []  # In-memory product cache — populated every 30 min
+
+
+def get_cached_products() -> list:
+    """Return the in-memory product cache (populated by background sync)."""
+    return _cached_products
 
 
 async def sync_shopify_products():
     """Fetch latest products from Shopify and cache them."""
-    global _last_sync_time, _sync_in_progress
+    global _last_sync_time, _sync_in_progress, _cached_products
     
     if _sync_in_progress:
         print("[SYNC] Sync already in progress, skipping...")
@@ -27,13 +33,15 @@ async def sync_shopify_products():
         client = ShopifyClient()
         products = await client.get_products()
         
+        _cached_products = products  # store in memory for instant access
         _last_sync_time = datetime.now()
-        print(f"[SYNC] Successfully synced {len(products)} products at {_last_sync_time}")
+        print(f"[SYNC] Successfully cached {len(products)} products at {_last_sync_time}")
         
     except Exception as e:
         print(f"[SYNC ERROR] Failed to sync products: {e}")
     finally:
         _sync_in_progress = False
+
 
 
 async def polling_task():

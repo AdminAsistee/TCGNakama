@@ -99,8 +99,12 @@ async def read_root(
     db: Session = Depends(get_db)
 ):
     from app.dependencies import SHOPIFY_STORE_URL
-    products = await client.get_products()
-    print(f"[DEBUG] read_root | Total products fetched: {len(products)}")
+    from app.background_tasks import get_cached_products
+    products = get_cached_products()
+    if not products:
+        # Cache empty (cold start) — fall back to live Shopify call
+        products = await client.get_products()
+    print(f"[DEBUG] read_root | Total products: {len(products)} (cache={'hit' if products else 'miss'})")
     
     # Pagination
     PAGE_SIZE = 20
@@ -365,11 +369,12 @@ async def card_details_page(
         print(f"[CARD_DETAILS] Market value fetch failed: {e}")
         market_data = None
 
-    # Fetch same-collection products
+    # Fetch same-collection products (from cache — avoids extra Shopify API call)
     same_collection = []
     if product.get("collections"):
         try:
-            all_products = await client.get_products()
+            from app.background_tasks import get_cached_products
+            all_products = get_cached_products() or await client.get_products()
             same_collection = [
                 p for p in all_products
                 if p["id"] != product["id"]
