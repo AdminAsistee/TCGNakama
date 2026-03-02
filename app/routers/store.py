@@ -47,9 +47,9 @@ def _get_hot_picks(products: list, db: Session) -> list:
             # Only one snapshot → no comparison, skip or treat as 0% gain
             pass
 
-    # Sort by % gain descending, take top 6
+    # Sort by % gain descending, take top 4
     gainers.sort(key=lambda x: x[1], reverse=True)
-    top_ids = {g[0]: (g[1], g[2]) for g in gainers[:6]}
+    top_ids = {g[0]: (g[1], g[2]) for g in gainers[:4]}
 
     # If we have real gainers, build hot_picks from them
     if top_ids:
@@ -63,10 +63,10 @@ def _get_hot_picks(products: list, db: Session) -> list:
                 hot_picks.append(p_copy)
         # Re-sort by growth
         hot_picks.sort(key=lambda x: x.get('growth', 0), reverse=True)
-        return hot_picks[:6]
+        return hot_picks[:4]
 
     # Fallback: no snapshot data yet → use highest-priced with mock growth
-    fallback = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:6]
+    fallback = sorted(products, key=lambda x: x.get('price', 0), reverse=True)[:4]
     for hp in fallback:
         hp['growth'] = round(random.uniform(1.5, 5.5), 1)
     return fallback
@@ -107,7 +107,7 @@ async def read_root(
     print(f"[DEBUG] read_root | Total products: {len(products)} (cache={'hit' if products else 'miss'})")
     
     # Pagination
-    PAGE_SIZE = 20
+    PAGE_SIZE = 12
     total_products = len(products)
     total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
     start = (page - 1) * PAGE_SIZE
@@ -126,7 +126,7 @@ async def read_root(
         p['listed_ago'] = _calc_listed_ago(p)
     
     # Fresh Pulls: newest 6 products (sorted by createdAt desc)
-    fresh_pulls = sorted(products, key=lambda x: x.get('createdAt', ''), reverse=True)[:8]
+    fresh_pulls = sorted(products, key=lambda x: x.get('createdAt', ''), reverse=True)[:4]
     
     # What's Hot: top 6 gainers based on PriceSnapshot market data
     hot_picks = _get_hot_picks(products, db)
@@ -222,7 +222,7 @@ async def search_products(
     collections = await client.get_collections()
     
     # Pagination
-    PAGE_SIZE = 20
+    PAGE_SIZE = 12
     total_products = len(products)
     total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
     start = (page - 1) * PAGE_SIZE
@@ -309,7 +309,7 @@ async def filter_products(
     collections = await client.get_collections()
 
     # Pagination
-    PAGE_SIZE = 20
+    PAGE_SIZE = 12
     total_products = len(products)
     total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
     start = (page - 1) * PAGE_SIZE
@@ -605,7 +605,7 @@ async def refresh_products(
             p['listed_ago'] = _calc_listed_ago(p)
         
         # Pagination logic for the refreshed grid
-        PAGE_SIZE = 20
+        PAGE_SIZE = 12
         total_products = len(products)
         total_pages = (total_products + PAGE_SIZE - 1) // PAGE_SIZE
         paginated_products = products[:PAGE_SIZE]
