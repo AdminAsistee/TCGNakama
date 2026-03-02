@@ -15,7 +15,7 @@ Production server needs to:
 Add this environment variable to your production server (DigitalOcean App Platform, Heroku, etc.):
 
 ```bash
-DATABASE_URL=postgresql://doadmin:AVNS_WJtLYtseYwMSXA15Q5w@app-916f4ca7-336c-43ee-a2bf-6bd8b35e1f48-do-user-7489418-0.m.db.ondigitalocean.com:25060/defaultdb?sslmode=require
+DATABASE_URL=postgresql://doadmin:<YOUR_PASSWORD>@<YOUR_HOST>:25060/defaultdb?sslmode=require
 ```
 
 ### Step 2: Restart Production Server
@@ -35,7 +35,7 @@ To test if banners work, temporarily update your local `.env`:
 # DATABASE_URL=sqlite:///./app/data/costs.db
 
 # Add PostgreSQL
-DATABASE_URL=postgresql://doadmin:AVNS_WJtLYtseYwMSXA15Q5w@app-916f4ca7-336c-43ee-a2bf-6bd8b35e1f48-do-user-7489418-0.m.db.ondigitalocean.com:25060/defaultdb?sslmode=require
+DATABASE_URL=postgresql://doadmin:<YOUR_PASSWORD>@<YOUR_HOST>:25060/defaultdb?sslmode=require
 ```
 
 Then restart your local server:
