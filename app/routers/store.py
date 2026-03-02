@@ -330,6 +330,41 @@ async def filter_products(
         "total_products": total_products
     })
 
+
+@router.get("/card/{product_id}/market-value", response_class=HTMLResponse)
+async def card_market_value(
+    request: Request,
+    product_id: str,
+    client: ShopifyClient = Depends(get_shopify_client)
+):
+    """Async endpoint — returns just the market value HTML partial.
+    Called by HTMX after the card details page has already rendered."""
+    if not product_id.startswith("gid://"):
+        product_id = f"gid://shopify/Product/{product_id}"
+    product = await client.get_product(product_id)
+
+    market_data = None
+    if product:
+        try:
+            from app.services.appraisal import get_market_value_jpy
+            market_data = await get_market_value_jpy(
+                card_name=product.get("title", ""),
+                rarity=product.get("rarity", "Common"),
+                set_name=product.get("set", "Unknown"),
+                card_number=product.get("card_number", "")
+            )
+            if market_data and "error" in market_data:
+                market_data = None
+        except Exception as e:
+            print(f"[MARKET_VALUE] fetch failed: {e}")
+            market_data = None
+
+    return templates.TemplateResponse("partials/market_value.html", {
+        "request": request,
+        "market_data": market_data
+    })
+
+
 @router.get("/card/{product_id:path}", response_class=HTMLResponse)
 async def card_details_page(
     request: Request,
@@ -353,21 +388,8 @@ async def card_details_page(
             "checkout_url": f"{SHOPIFY_STORE_URL}/cart"
         })
 
-    # Fetch market value via appraisal service (non-blocking, with fallback)
-    market_data = None
-    try:
-        from app.services.appraisal import get_market_value_jpy
-        market_data = await get_market_value_jpy(
-            card_name=product.get("title", ""),
-            rarity=product.get("rarity", "Common"),
-            set_name=product.get("set", "Unknown"),
-            card_number=product.get("card_number", "")
-        )
-        if market_data and "error" in market_data:
-            market_data = None
-    except Exception as e:
-        print(f"[CARD_DETAILS] Market value fetch failed: {e}")
-        market_data = None
+    # NOTE: market_data is now loaded async via HTMX (/card/{id}/market-value)
+    # This makes the page render immediately without waiting 3-8s for PriceCharting
 
     # Fetch same-collection products (from cache — avoids extra Shopify API call)
     same_collection = []
@@ -397,7 +419,7 @@ async def card_details_page(
     return templates.TemplateResponse("card_details.html", {
         "request": request,
         "product": product,
-        "market_data": market_data,
+        "market_data": None,  # loaded async by HTMX
         "same_collection": same_collection,
         "cart_count": cart_count,
         "checkout_url": checkout_url

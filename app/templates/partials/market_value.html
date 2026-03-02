@@ -1,0 +1,16 @@
+{% if market_data %}
+<div class="border-t border-primary/20 bg-primary/5">
+    <div class="flex items-center justify-between py-3 px-4">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-base">monitoring</span>
+            <span class="font-medium text-gray-400 text-sm">Market Value</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="font-bold text-white text-sm">¥{{ "{:,}".format(market_data.market_jpy|int) }}</span>
+            <span class="text-gray-500 text-xs">(~${{ "{:.2f}".format(market_data.market_usd) }})</span>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- no market data available — render nothing -->
+{% endif %}

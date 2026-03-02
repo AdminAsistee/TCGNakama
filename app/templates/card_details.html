@@ -322,23 +322,21 @@
                         {% endif %}
                     </div>
 
-                    <!-- Market Value — separated with distinct styling -->
-                    {% if market_data %}
-                    <div class="border-t border-primary/20 bg-primary/5">
+                    <!-- Market Value — loaded async via HTMX (avoids 3-8s page delay) -->
+                    <div id="market-value-container" hx-get="/card/{{ product.safe_id }}/market-value" hx-trigger="load"
+                        hx-swap="innerHTML" class="border-t border-primary/20 bg-primary/5">
+                        <!-- Loading spinner shown while market value fetches -->
                         <div class="flex items-center justify-between py-3 px-4">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-primary text-base">monitoring</span>
                                 <span class="font-medium text-gray-400 text-sm">Market Value</span>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-white text-sm">¥{{ "{:,}".format(market_data.market_jpy|int)
-                                    }}</span>
-                                <span class="text-gray-500 text-xs">(~${{ "{:.2f}".format(market_data.market_usd)
-                                    }})</span>
+                            <div class="flex items-center gap-2 text-gray-500 text-xs animate-pulse">
+                                <span class="w-2 h-2 rounded-full bg-primary/40 animate-bounce"></span>
+                                Loading...
                             </div>
                         </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
 

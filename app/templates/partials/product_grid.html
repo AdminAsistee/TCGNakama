@@ -20,6 +20,7 @@
             class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
             src="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=300&format=webp" srcset="{{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=200&format=webp 200w,
                     {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=300&format=webp 300w,
+                    {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=320&format=webp 320w,
                     {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp 400w"
             sizes="(max-width: 480px) calc(50vw - 22px), (max-width: 768px) calc(33vw - 16px), 300px" width="300"
             height="420" loading="lazy" decoding="async" />
