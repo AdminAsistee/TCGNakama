@@ -1,0 +1,111 @@
+[
+  {
+    "card_id": "gid://shopify/Product/9899027529975",
+    "safe_id": "9899027529975",
+    "title": "モンキー・D・ルフィ (Monkey D. Luffy) - ST10 #ST10-006",
+    "price_jpy": 265.0,
+    "rarity": "Ultra Rare",
+    "set": "ST10",
+    "card_number": "ST10-006",
+    "image_url": "https://cdn.shopify.com/s/files/1/0922/8868/0183/files/Copyof20250205_042.jpg?v=1770703162",
+    "listed_ago": "IN STOCK",
+    "status": "publish_skipped",
+    "gcs_video_uri": "gs://ready-bucket/queue/9899027529975/final.mp4",
+    "gcs_manifest_uri": "gs://ready-bucket/queue/9899027529975/manifest.json",
+    "qa_passed": true,
+    "qa_notes": "Test mode — QA skipped",
+    "captions": {
+      "youtube": {
+        "caption": "Luffy ST10 UR IN STOCK! Don't miss this Ultra Rare! Grab yours now!",
+        "hashtags": [
+          "#OnePieceTCG",
+          "#Luffy",
+          "#ST10",
+          "#UltraRare"
+        ]
+      },
+      "instagram": {
+        "caption": "🔥 Luffy ST10 #ST10-006 Ultra Rare is HERE and IN STOCK! 🏴‍☠️ Don't miss out on adding this iconic captain to your collection! A true gem for any Straw Hat fan. Get yours before it's gone! 🤩",
+        "hashtags": [
+          "#OnePieceTCG",
+          "#Luffy",
+          "#ST10",
+          "#UltraRare",
+          "#TCGCollector",
+          "#CardCollecting",
+          "#AnimeTCG",
+          "#StrawHatPirates",
+          "#OnePieceCardGame",
+          "#InStock"
+        ]
+      },
+      "facebook": {
+        "caption": "We've got the highly sought-after Monkey D. Luffy (ST10-006) Ultra Rare card from the ST10 set IN STOCK! This powerful card is available for just JPY 265.0. A fantastic addition for any One Piece TCG player or collector. Secure yours today!"
+      }
+    },
+    "platforms_skipped": [
+      "youtube",
+      "instagram",
+      "facebook"
+    ],
+    "platforms_attempted": [],
+    "platform_ids": {},
+    "skip_reason": "No platform credentials configured",
+    "published_at": "2026-02-20T12:07:51.828301+00:00"
+  },
+  {
+    "card_id": "gid://shopify/Product/9899027431671",
+    "safe_id": "9899027431671",
+    "title": "エネル (Enel) - OP05 #OP05-100",
+    "price_jpy": 489.0,
+    "rarity": "Ultra Rare",
+    "set": "OP05",
+    "card_number": "OP05-100",
+    "image_url": "https://cdn.shopify.com/s/files/1/0922/8868/0183/files/Copyof20250205_040.jpg?v=1770703289",
+    "listed_ago": "IN STOCK",
+    "status": "publish_skipped",
+    "gcs_video_uri": "gs://ready-bucket/queue/9899027431671/final.mp4",
+    "gcs_manifest_uri": "gs://ready-bucket/queue/9899027431671/manifest.json",
+    "qa_passed": true,
+    "qa_notes": "Test mode — QA skipped",
+    "captions": {
+      "youtube": {
+        "caption": "Enel OP05-100 UR: A thunderous deal for your collection! Grab yours now!",
+        "hashtags": [
+          "#OnePieceTCG",
+          "#Enel",
+          "#OP05",
+          "#UltraRare",
+          "#CardDeal"
+        ]
+      },
+      "instagram": {
+        "caption": "⚡ Unleash divine power in your One Piece TCG collection! Enel OP05-100 Ultra Rare is here and IN STOCK! 🤩 Don't miss this electrifying card at a fantastic price. Perfect for serious collectors! ✨ Get yours before it's gone! 🔥",
+        "hashtags": [
+          "#OnePieceTCG",
+          "#Enel",
+          "#OP05",
+          "#OP05100",
+          "#UltraRare",
+          "#TCGCollector",
+          "#CardCollection",
+          "#InStock",
+          "#AnimeCards",
+          "#RareCards"
+        ]
+      },
+      "facebook": {
+        "caption": "Attention One Piece TCG fans! We've just restocked the highly sought-after Enel (OP05-100) Ultra Rare card. This powerful card is now available for just JPY 489.0. It's a fantastic opportunity to add a premium piece to your collection at an excellent price. Get yours while supplies last!"
+      }
+    },
+    "platforms_skipped": [
+      "youtube",
+      "instagram",
+      "facebook"
+    ],
+    "platforms_attempted": [],
+    "platform_ids": {},
+    "skip_reason": "No platform credentials configured",
+    "published_at": "2026-02-20T12:07:51.828301+00:00"
+  }
+]

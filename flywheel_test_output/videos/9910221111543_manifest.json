@@ -1,0 +1,12 @@
+{
+  "card_id": "gid://shopify/Product/9910221111543",
+  "safe_id": "9910221111543",
+  "title": "ドレディア (Lilligant) - SV11B #007/086",
+  "price_jpy": 400.0,
+  "rarity": "Rare",
+  "image_url": "https://cdn.shopify.com/s/files/1/0922/8868/0183/files/BATCH-11-2026-02-13-PK-half-holo_35.jpg?v=1771885590",
+  "status": "pending_qa",
+  "created_at": "2026-02-27T04:58:29.091592+00:00",
+  "local_video_path": "flywheel_test_output/videos/9910221111543_final.mp4",
+  "gcs_video_uri": "gs://ready-bucket/queue/9910221111543/final.mp4"
+}
