@@ -38,6 +38,26 @@ async def startup_event():
             db.commit()
             print(f"[STARTUP] Migrated {fixed} banner image_path(s) to .webp")
 
+        # Migrate banner cta_link values to #collection: handles
+        cta_link_map = {
+            'Shop One Piece':   '#collection:one-piece',
+            'Shop Now':         '#collection:one-piece',
+            'Shop Romance Dawn':'#collection:one-piece',
+            'Shop Pokémon':     '#collection:pokemon',
+            'Shop Pokemon':     '#collection:pokemon',
+            'Shop MTG':         '#collection:magic-tg',
+            'Shop MG':          '#collection:magic-tg',
+            'Shop Magic':       '#collection:magic-tg',
+        }
+        cta_fixed = 0
+        for b in db.query(Banner).all():
+            if b.cta_link == '/' and b.cta_label in cta_link_map:
+                b.cta_link = cta_link_map[b.cta_label]
+                cta_fixed += 1
+        if cta_fixed:
+            db.commit()
+            print(f"[STARTUP] Migrated {cta_fixed} banner cta_link(s) to #collection: handles")
+
         if banner_count == 0:
             print("[STARTUP] Seeding default banners...")
             default_banners = [
