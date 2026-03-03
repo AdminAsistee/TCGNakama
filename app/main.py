@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from app.routers import store
 import os
 import asyncio
@@ -161,3 +162,159 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8001))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)
+
+
+# ─────────────────────────────────────────────
+# About Page
+# ─────────────────────────────────────────────
+from fastapi.templating import Jinja2Templates as _Jinja2Templates
+_templates = _Jinja2Templates(directory="app/templates")
+
+@app.get("/about", response_class=HTMLResponse, include_in_schema=False)
+async def about_page(request: Request):
+    """Static About page — company info, catalogue, condition guide."""
+    from app.dependencies import get_shopify_client
+    from urllib.parse import unquote
+    shopify = get_shopify_client()
+    cart_count = 0
+    try:
+        cart_id_raw = request.cookies.get("cart_id")
+        cart_id = unquote(cart_id_raw) if cart_id_raw else None
+        if cart_id:
+            cart = await shopify.get_cart(cart_id)
+            if cart:
+                cart_count = sum(edge["node"].get("quantity", 0) for edge in cart.get("lines", {}).get("edges", []))
+    except Exception:
+        pass
+    return _templates.TemplateResponse("about.html", {"request": request, "cart_count": cart_count})
+
+
+# ─────────────────────────────────────────────
+# SEO: robots.txt
+# ─────────────────────────────────────────────
+from fastapi.responses import PlainTextResponse, Response
+
+@app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+async def robots_txt():
+    content = """\
+# TCGNakama — robots.txt
+
+# Standard crawlers
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /api/
+Disallow: /refresh
+
+# Explicitly allow major AI citation & training crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+Sitemap: https://tcgnakama.com/sitemap.xml
+LLMs: https://tcgnakama.com/llms.txt
+"""
+    return PlainTextResponse(content, media_type="text/plain")
+
+
+# ─────────────────────────────────────────────
+# SEO: sitemap.xml — dynamically built from Shopify products
+# ─────────────────────────────────────────────
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    from app.background_tasks import get_cached_products
+    from app.dependencies import get_shopify_client
+    from datetime import date
+
+    today = date.today().isoformat()
+    base_url = "https://tcgnakama.com"
+
+    # Static pages
+    urls = [
+        f"""  <url>
+    <loc>{base_url}/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <lastmod>{today}</lastmod>
+  </url>"""
+    ]
+
+    # Dynamic card pages from cache
+    products = get_cached_products() or []
+    for product in products:
+        safe_id = product.get("safe_id") or ""
+        if not safe_id:
+            # Derive safe_id from Shopify GID (numeric portion)
+            gid = product.get("id", "")
+            safe_id = gid.split("/")[-1] if "/" in gid else gid
+        if safe_id:
+            urls.append(f"""  <url>
+    <loc>{base_url}/card/{safe_id}</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <lastmod>{today}</lastmod>
+  </url>""")
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += "\n".join(urls)
+    xml += "\n</urlset>"
+
+    return Response(content=xml, media_type="application/xml")
+
+
+# ─────────────────────────────────────────────
+# AI Discoverability: llms.txt
+# ─────────────────────────────────────────────
+@app.get("/llms.txt", response_class=PlainTextResponse, include_in_schema=False)
+async def llms_txt():
+    content = """\
+# TCGNakama
+
+> Japan's premier marketplace for Pokémon, One Piece, and Magic: The Gathering single cards.
+
+## What We Sell
+- **Pokémon TCG** — Japanese and international singles, Scarlet & Violet series, all SV sets
+- **One Piece TCG** — All OP sets (OP01 through latest), singles in all rarities
+- **Magic: The Gathering** — Japanese market singles, all formats
+
+## How It Works
+- Browse the full marketplace at https://tcgnakama.com/
+- All prices are listed in **Japanese Yen (JPY)**
+- Cards are graded by condition: NM (Near Mint), LP (Lightly Played), MP (Moderately Played), HP (Heavily Played), Raw
+- Package types available: Raw · Toploader · Booster Pack · Slab (PSA / BGS / CGC graded)
+- Live market value comparison powered by PriceCharting data
+- Secure checkout via Shopify — ships next day from Japan
+
+## Fresh Pulls
+- Newly listed cards appear in the "Fresh Pulls" section on the homepage
+- "What's Hot" section shows cards with the biggest recent price gains
+
+## Key Pages
+- Marketplace homepage: https://tcgnakama.com/
+- Individual card pages: https://tcgnakama.com/card/{id}
+- Sitemap: https://tcgnakama.com/sitemap.xml
+
+## Trust & Authenticity
+- Authenticity guaranteed on all cards
+- Secure, tracked shipping from Japan
+- Market-priced using real-time PriceCharting data
+- Inventory synced live with Shopify
+
+## About
+TCGNakama is a Japan-based TCG card marketplace specialising in Pokémon, One Piece, and Magic: The Gathering singles.
+Cards are sourced, authenticated, and shipped directly from Japan.
+"""
+    return PlainTextResponse(content, media_type="text/plain")

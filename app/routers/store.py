@@ -590,11 +590,22 @@ async def update_cart(
 ):
     cart_id_raw = request.cookies.get("cart_id")
     cart_id = unquote(cart_id_raw) if cart_id_raw else None
-    
+
+    updated_cart = None
     if cart_id:
-        await client.update_cart_line(cart_id, line_id, quantity)
-            
-    # Refresh drawer
+        updated_cart = await client.update_cart_line(cart_id, line_id, quantity)
+
+    # Use the mutation response directly — no second Shopify fetch needed
+    if updated_cart:
+        context = _get_cart_context(updated_cart)
+        return templates.TemplateResponse("partials/cart_drawer.html", {
+            "request": request,
+            **context,
+            "sold_out_items": [],
+            "checkout_url": updated_cart.get("checkoutUrl", "#")
+        })
+
+    # Fallback: full fetch if mutation failed
     return await get_cart_drawer(request, client)
 
 @router.post("/cart/clear", response_class=HTMLResponse)
@@ -604,11 +615,18 @@ async def clear_cart(
 ):
     cart_id_raw = request.cookies.get("cart_id")
     cart_id = unquote(cart_id_raw) if cart_id_raw else None
-    
+
     if cart_id:
         await client.clear_cart(cart_id)
-        
-    return await get_cart_drawer(request, client)
+
+    # Return empty drawer directly — cart is known empty, no need to fetch again
+    empty_context = {"items": [], "total_price": 0, "cart_count": 0}
+    return templates.TemplateResponse("partials/cart_drawer.html", {
+        "request": request,
+        **empty_context,
+        "sold_out_items": [],
+        "checkout_url": "#"
+    })
 
 
 @router.post("/refresh", response_class=HTMLResponse)

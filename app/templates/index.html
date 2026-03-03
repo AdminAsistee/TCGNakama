@@ -1,9 +1,46 @@
 {% extends "base.html" %}
 
+{% block title %}TCGNakama — Buy Pokémon, One Piece & MTG Cards in Japan | JPY{% endblock %}
+{% block meta_description %}Buy and sell Pokémon, One Piece, and Magic: The Gathering single cards in Japan. Fresh pulls
+daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endblock %}
+{% block canonical %}https://tcgnakama.com/{% endblock %}
+
 {% block preload_hints %}
 {% if banners and banners[0] and banners[0].image %}
 <link rel="preload" as="image" href="{{ banners[0].image }}" fetchpriority="high">
 {% endif %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "name": "TCGNakama",
+      "url": "https://tcgnakama.com/",
+      "logo": "https://tcgnakama.com/static/favicon-512x512.png",
+      "description": "Japan's premier marketplace for Pokémon, One Piece, and Magic: The Gathering single cards. Live JPY prices, fresh pulls daily, secure shipping.",
+      "sameAs": [
+        "https://www.facebook.com/people/TCGNakama/61587475310578/",
+        "https://www.instagram.com/tcgnakama.official/",
+        "https://www.youtube.com/@tcg-nakama"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "name": "TCGNakama",
+      "url": "https://tcgnakama.com/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://tcgnakama.com/search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -663,8 +700,10 @@
             <!-- About -->
             <div>
                 <h4 class="text-sm font-bold text-white mb-4">About</h4>
-                <p class="text-xs text-gray-400 leading-relaxed">TCGNakama.com is the premier marketplace for trading
+                <p class="text-xs text-gray-400 leading-relaxed mb-3">TCGNakama.com is the premier marketplace for
+                    trading
                     card enthusiasts and investors.</p>
+                <a href="/about" class="text-xs text-primary hover:underline font-semibold">Learn more →</a>
             </div>
             <!-- Support (Hidden for now)
             <div>

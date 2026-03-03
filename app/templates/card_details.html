@@ -1,5 +1,77 @@
 {% extends "base.html" %}
 
+{% if product %}
+{# ── Per-page SEO blocks ─────────────────────────────────── #}
+{% block title %}{{ product.title }} | {{ product.set }} | Buy for ¥{{ "{:,}".format(product.price|int) }} — TCGNakama{%
+endblock %}
+{% block meta_description %}{{ product.rarity }} · {{ product.card_condition or 'Raw' }} · {{ product.set }}{% if
+product.card_number %} {{ product.card_number }}{% endif %}. Buy for ¥{{ "{:,}".format(product.price|int) }}. Ships next
+day from Japan — TCGNakama.{% endblock %}
+{% block canonical %}https://tcgnakama.com/card/{{ product.safe_id }}{% endblock %}
+
+{# Open Graph — card image shows when shared on Discord/Twitter/LINE #}
+{% block og_type %}product{% endblock %}
+{% block og_title %}{{ product.title }} | {{ product.set }} — ¥{{ "{:,}".format(product.price|int) }} | TCGNakama{%
+endblock %}
+{% block og_description %}{{ product.rarity }}{% if product.card_condition %} · {{ product.card_condition }}{% endif %}
+· {{ product.set }}{% if product.card_number %} {{ product.card_number }}{% endif %}. Authentic TCG card — ships next
+day from Japan.{% endblock %}
+{% block og_url %}https://tcgnakama.com/card/{{ product.safe_id }}{% endblock %}
+{% block og_image %}{{ product.images[0] if product.images else 'https://tcgnakama.com/static/favicon-512x512.png' }}{%
+endblock %}
+{% block og_image_width %}600{% endblock %}
+{% block og_image_height %}840{% endblock %}
+
+{# Twitter / X — summary_large_image shows a big card banner #}
+{% block twitter_card %}summary_large_image{% endblock %}
+{% block twitter_title %}{{ product.title }} — ¥{{ "{:,}".format(product.price|int) }} | TCGNakama{% endblock %}
+{% block twitter_description %}{{ product.rarity }} from {{ product.set }}. {{ product.card_condition or 'Raw' }}
+condition. Buy now at TCGNakama — ships from Japan.{% endblock %}
+{% block twitter_image %}{{ product.images[0] if product.images else 'https://tcgnakama.com/static/favicon-512x512.png'
+}}{% endblock %}
+
+{# JSON-LD: Product + Offer + BreadcrumbList #}
+{% block preload_hints %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Product",
+      "name": "{{ product.title | replace('"', '\\"') }}",
+      "description": "{{ product.rarity }} · {{ product.card_condition or 'Raw' }} · {{ product.set }}{% if product.card_number %} {{ product.card_number }}{% endif %}. Authentic TCG card sold by TCGNakama, ships from Japan.",
+      {% if product.images %}"image": "{{ product.images[0] }}",{% endif %}
+      "sku": "{{ product.safe_id }}",
+      "brand": {
+        "@type": "Brand",
+        "name": "TCGNakama"
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": "https://tcgnakama.com/card/{{ product.safe_id }}",
+        "priceCurrency": "JPY",
+        "price": "{{ product.price | int }}",
+        "availability": "{% if product.totalInventory and product.totalInventory > 0 %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+        "seller": {
+          "@type": "Organization",
+          "name": "TCGNakama"
+        }
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://tcgnakama.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Shop", "item": "https://tcgnakama.com/#all-cards-section" },
+        { "@type": "ListItem", "position": 3, "name": "{{ product.title | replace('"', '\\"') }}", "item": "https://tcgnakama.com/card/{{ product.safe_id }}" }
+      ]
+    }
+  ]
+}
+</script>
+{% endblock %}
+{% endif %}
+
 {% block content %}
 <!-- ==================== HEADER / NAVBAR (same as homepage) ==================== -->
 <header class="sticky top-0 z-50 bg-background-dark/90 backdrop-blur-md border-b border-white/5">
@@ -8,7 +80,7 @@
         <div class="flex items-center gap-2">
             <a href="/" class="flex items-center gap-2">
                 <img src="/static/live_logo.webp" alt="TCG Nakama" class="h-8 w-8 rounded-full" width="32" height="32">
-                <h1 class="text-lg font-bold tracking-tight text-primary">TCGNakama</h1>
+                <span class="text-lg font-bold tracking-tight text-primary">TCGNakama</span>
             </a>
         </div>
 
@@ -61,7 +133,7 @@
                 {% for img_url in product.images %}
                 <div class="carousel-slide absolute inset-0 transition-opacity duration-500 {% if loop.index0 == 0 %}opacity-100{% else %}opacity-0 pointer-events-none{% endif %}"
                     data-index="{{ loop.index0 }}">
-                    <img alt="{{ product.title }}"
+                    <img alt="{{ product.title }}{% if product.rarity %} — {{ product.rarity }}{% endif %}{% if product.set %} · {{ product.set }}{% endif %}{% if product.card_condition %} · {{ product.card_condition }}{% endif %} — TCGNakama"
                         class="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-105"
                         src="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=600&format=webp" srcset="{{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=400&format=webp 400w,
                                 {{ img_url }}{% if '?' in img_url %}&{% else %}?{% endif %}width=600&format=webp 600w,
@@ -117,10 +189,15 @@
 
             <!-- Breadcrumb + Share -->
             <div class="flex items-center justify-between mb-2">
-                <a href="/" class="flex items-center gap-1 text-xs text-gray-500 hover:text-primary transition-colors">
-                    <span class="material-symbols-outlined text-sm">arrow_back</span>
-                    Back to Shop
-                </a>
+                <nav aria-label="Breadcrumb">
+                    <ol class="flex items-center gap-1 text-xs text-gray-500">
+                        <li><a href="/" class="hover:text-primary transition-colors">Home</a></li>
+                        <li><span class="mx-1">›</span></li>
+                        <li><a href="/#all-cards-section" class="hover:text-primary transition-colors">Shop</a></li>
+                        <li><span class="mx-1">›</span></li>
+                        <li class="text-gray-400 truncate max-w-[120px]">{{ product.title }}</li>
+                    </ol>
+                </nav>
                 <button onclick="shareCard(event)" aria-label="Share"
                     class="flex items-center gap-1 text-xs text-gray-500 hover:text-primary transition-colors">
                     <span class="material-symbols-outlined text-sm">share</span>
@@ -166,7 +243,7 @@
 
             <!-- Title -->
             <div>
-                <h1 class="text-2xl md:text-3xl font-bold leading-tight text-white">
+                <h1 class="text-2xl md:text-3xl font-bold leading-tight text-white" itemprop="name">
                     {{ product.title }}
                 </h1>
                 {% if product.set_name or (product.set and product.set != 'Unknown Set') %}
@@ -712,4 +789,56 @@
         return response;
     };
 </script>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="mt-16 border-t border-white/5 pt-10 pb-32 md:pb-12 px-4 md:px-6 max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- About -->
+        <div>
+            <h2 class="text-sm font-bold text-white mb-3">About TCGNakama</h2>
+            <p class="text-xs text-gray-400 leading-relaxed">Japan's premier marketplace for Pokémon, One Piece, and
+                Magic: The Gathering single cards. Authentic, market-priced, ships next day.</p>
+            <a href="/about" class="inline-block mt-3 text-xs text-primary hover:underline font-semibold">Learn more
+                →</a>
+        </div>
+        <!-- Quick Links -->
+        <div>
+            <h2 class="text-sm font-bold text-white mb-3">Explore</h2>
+            <div class="flex flex-col gap-2">
+                <a href="/" class="text-xs text-gray-400 hover:text-primary transition-colors">← Back to Marketplace</a>
+                <a href="/#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">All
+                    Cards</a>
+                <a href="/about" class="text-xs text-gray-400 hover:text-primary transition-colors">About Us</a>
+            </div>
+        </div>
+        <!-- Social -->
+        <div>
+            <h2 class="text-sm font-bold text-white mb-3">Follow Us</h2>
+            <div class="flex gap-3">
+                <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank" rel="noopener"
+                    class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    aria-label="TCGNakama on Facebook">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">public</span>
+                </a>
+                <a href="https://www.instagram.com/tcgnakama.official/" target="_blank" rel="noopener"
+                    class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    aria-label="TCGNakama on Instagram">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">photo_camera</span>
+                </a>
+                <a href="https://www.youtube.com/@tcg-nakama" target="_blank" rel="noopener"
+                    class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    aria-label="TCGNakama on YouTube">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">smart_display</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-2">
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2026 TCG Nakama</p>
+        <a href="/admin/login"
+            class="text-[10px] text-gray-600 hover:text-primary font-bold uppercase tracking-[0.3em] transition-colors">🔐
+            Merchant Login</a>
+    </div>
+</footer>
+
 {% endblock %}

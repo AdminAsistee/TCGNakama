@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{# ── Per-page SEO blocks ─────────────────────────────────────── #}
+{% block title %}About TCGNakama — Japan's TCG Card Marketplace{% endblock %}
+{% block meta_description %}Learn about TCGNakama — Japan's marketplace for authentic Pokémon, One Piece, and Magic: The
+Gathering single cards. Market-priced, ships next day, authenticity guaranteed.{% endblock %}
+{% block canonical %}https://tcgnakama.com/about{% endblock %}
+
+{% block og_title %}About TCGNakama — Japan's TCG Marketplace{% endblock %}
+{% block og_description %}Authentic Pokémon, One Piece, and MTG singles from Japan. Live market prices in JPY, ships
+next day. Meet the team behind TCGNakama.{% endblock %}
+{% block og_url %}https://tcgnakama.com/about{% endblock %}
+
+{% block preload_hints %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "About TCGNakama",
+  "url": "https://tcgnakama.com/about",
+  "description": "Japan's premier marketplace for Pokémon, One Piece, and Magic: The Gathering single cards.",
+  "publisher": {
+    "@type": "Organization",
+    "name": "TCGNakama",
+    "url": "https://tcgnakama.com/",
+    "logo": "https://tcgnakama.com/static/favicon-512x512.png",
+    "sameAs": [
+      "https://www.facebook.com/people/TCGNakama/61587475310578/",
+      "https://www.instagram.com/tcgnakama.official/",
+      "https://www.youtube.com/@tcg-nakama"
+    ]
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- ==================== HEADER / NAVBAR ==================== -->
+<header class="sticky top-0 z-50 bg-background-dark/90 backdrop-blur-md border-b border-white/5">
+    <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto">
+        <div class="flex items-center gap-2">
+            <a href="/" class="flex items-center gap-2">
+                <img src="/static/live_logo.webp" alt="TCG Nakama" class="h-8 w-8 rounded-full" width="32" height="32">
+                <span class="text-lg font-bold tracking-tight text-primary">TCGNakama</span>
+            </a>
+        </div>
+        <nav class="hidden md:flex items-center gap-6" aria-label="Main navigation">
+            <a href="/" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Home</a>
+            <a href="/#all-cards-section"
+                class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Shop</a>
+            <span class="text-sm font-bold text-primary border-b-2 border-primary pb-1">About</span>
+        </nav>
+        <button id="cart-btn"
+            class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+            hx-get="/cart/drawer" hx-target="#cart-drawer-container" aria-label="Open cart">
+            <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
+            <span id="cart-count"
+                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
+                cart_count or 0 }}</span>
+        </button>
+    </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-5 md:px-8 pt-12 pb-40 md:pb-20">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="Breadcrumb" class="mb-10">
+        <ol class="flex items-center gap-1.5 text-xs text-gray-500">
+            <li><a href="/" class="hover:text-primary transition-colors">Home</a></li>
+            <li><span>›</span></li>
+            <li class="text-gray-400">About</li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-14">
+        <h1 class="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
+            About <span class="text-primary">TCGNakama</span>
+        </h1>
+        <p class="text-gray-400 text-base leading-loose max-w-xl">
+            Japan's marketplace for authentic Pokémon, One Piece, and Magic: The Gathering single cards —
+            priced at market value, shipped next day.
+        </p>
+    </div>
+
+    <div class="h-px bg-white/5 mb-14"></div>
+
+    <!-- Who We Are -->
+    <section class="mb-20" aria-labelledby="who-we-are">
+        <h2 id="who-we-are" class="text-2xl font-bold text-white mb-6">
+            🃏 Who We Are
+        </h2>
+        <div class="space-y-4">
+            <p class="text-gray-400 text-sm leading-[1.9]">
+                TCGNakama is a Japan-based trading card game marketplace specialising in
+                <strong class="text-white font-semibold">Pokémon TCG</strong>,
+                <strong class="text-white font-semibold">One Piece TCG</strong>, and
+                <strong class="text-white font-semibold">Magic: The Gathering</strong> singles.
+                Every card in our inventory is sourced, inspected, and authenticated before being listed for sale.
+            </p>
+            <p class="text-gray-400 text-sm leading-[1.9]">
+                We operate out of Japan, giving collectors and investors worldwide direct access to Japanese market
+                cards at real-time JPY prices — no middlemen, no markups.
+            </p>
+        </div>
+    </section>
+
+    <!-- What We Offer -->
+    <section class="mb-20" aria-labelledby="what-we-offer">
+        <h2 id="what-we-offer" class="text-2xl font-bold text-white mb-8">
+            ✨ What We Offer
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div class="bg-surface rounded-2xl border border-white/[0.07] p-8">
+                <div class="text-3xl mb-4">🎴</div>
+                <h3 class="text-sm font-bold text-white mb-2">Authentic Singles</h3>
+                <p class="text-xs text-gray-400 leading-relaxed">Every card is inspected and authenticated before
+                    listing. We guarantee condition accuracy — NM, LP, MP, or Raw.</p>
+            </div>
+            <div class="bg-surface rounded-2xl border border-white/[0.07] p-8">
+                <div class="text-3xl mb-4">📈</div>
+                <h3 class="text-sm font-bold text-white mb-2">Live Market Prices</h3>
+                <p class="text-xs text-gray-400 leading-relaxed">Prices are benchmarked against PriceCharting
+                    market data in real-time so you always know you're paying fair market value in JPY.</p>
+            </div>
+            <div class="bg-surface rounded-2xl border border-white/[0.07] p-8">
+                <div class="text-3xl mb-4">🚀</div>
+                <h3 class="text-sm font-bold text-white mb-2">Ships Next Day</h3>
+                <p class="text-xs text-gray-400 leading-relaxed">Dispatched the following business day — shipped
+                    directly from Japan to collectors worldwide. Pokémon, One Piece, and MTG cards packed
+                    securely with tracking.</p>
+            </div>
+            <div class="bg-surface rounded-2xl border border-white/[0.07] p-8">
+                <div class="text-3xl mb-4">🔥</div>
+                <h3 class="text-sm font-bold text-white mb-2">Fresh Pulls Daily</h3>
+                <p class="text-xs text-gray-400 leading-relaxed">New cards are listed every day. The "Fresh
+                    Pulls" and "What's Hot" sections surface the newest and hottest market movers.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- TCG Franchises -->
+    <section class="mb-20" aria-labelledby="our-catalogue">
+        <h2 id="our-catalogue" class="text-2xl font-bold text-white mb-8">
+            📦 Our Catalogue
+        </h2>
+        <div class="space-y-6">
+            <div class="flex items-start gap-5 p-6 rounded-2xl bg-surface border border-white/[0.06]">
+                <span class="text-2xl mt-0.5">⚡</span>
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-2">Pokémon TCG</h3>
+                    <p class="text-xs text-gray-400 leading-relaxed">Japanese and international singles across all
+                        Scarlet &
+                        Violet sets and beyond — Ultra Rares, Special Illustration Rares, and more.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-5 p-6 rounded-2xl bg-surface border border-white/[0.06]">
+                <span class="text-2xl mt-0.5">🏴‍☠️</span>
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-2">One Piece TCG</h3>
+                    <p class="text-xs text-gray-400 leading-relaxed">Singles from all OP sets — OP01 through the latest
+                        releases. Leader, Character, Event, and Stage cards in all rarities.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-5 p-6 rounded-2xl bg-surface border border-white/[0.06]">
+                <span class="text-2xl mt-0.5">🧙</span>
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-2">Magic: The Gathering</h3>
+                    <p class="text-xs text-gray-400 leading-relaxed">Japanese market MTG singles across modern and
+                        competitive
+                        sets. Sourced and shipped direct from Japan.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Condition Guide -->
+    <section class="mb-20" aria-labelledby="card-conditions">
+        <h2 id="card-conditions" class="text-2xl font-bold text-white mb-4">
+            🔍 Card Conditions
+        </h2>
+        <p class="text-xs text-gray-500 mb-8 leading-relaxed">Every card is graded by our team before listing. Here's
+            what each grade means:</p>
+        <div class="space-y-3">
+            <div class="flex items-start gap-5 p-5 rounded-xl bg-surface border border-white/[0.06]">
+                <span
+                    class="px-2.5 py-1 bg-neon-green/10 text-neon-green font-black rounded-lg text-xs shrink-0 mt-0.5">NM</span>
+                <div>
+                    <p class="text-xs font-bold text-white mb-1">Near Mint</p>
+                    <p class="text-xs text-gray-400 leading-relaxed">Essentially perfect. No visible wear, scratches, or
+                        whitening on edges. Straight from pack or sleeved immediately.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-5 p-5 rounded-xl bg-surface border border-white/[0.06]">
+                <span
+                    class="px-2.5 py-1 bg-sky-400/10 text-sky-400 font-black rounded-lg text-xs shrink-0 mt-0.5">LP</span>
+                <div>
+                    <p class="text-xs font-bold text-white mb-1">Lightly Played</p>
+                    <p class="text-xs text-gray-400 leading-relaxed">Minor edge wear or very light surface scratching.
+                        Still tournament-legal and sleeve-playable.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-5 p-5 rounded-xl bg-surface border border-white/[0.06]">
+                <span
+                    class="px-2.5 py-1 bg-amber-400/10 text-amber-400 font-black rounded-lg text-xs shrink-0 mt-0.5">MP</span>
+                <div>
+                    <p class="text-xs font-bold text-white mb-1">Moderately Played</p>
+                    <p class="text-xs text-gray-400 leading-relaxed">Noticeable wear, some edge whitening. Functional
+                        but shows signs of play.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-5 p-5 rounded-xl bg-surface border border-white/[0.06]">
+                <span
+                    class="px-2.5 py-1 bg-white/10 text-gray-300 font-black rounded-lg text-xs shrink-0 mt-0.5">Raw</span>
+                <div>
+                    <p class="text-xs font-bold text-white mb-1">Raw / Ungraded</p>
+                    <p class="text-xs text-gray-400 leading-relaxed">Condition not individually assessed. Ideal for bulk
+                        buyers or those interested in PSA/BGS grading submission.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <div class="rounded-2xl bg-primary/5 border border-primary/20 text-center" style="padding: 64px 40px;">
+        <h2 class="text-2xl font-black text-white mb-3">Ready to build your collection?</h2>
+        <p class="text-sm text-gray-400 mb-8 leading-relaxed max-w-md mx-auto">
+            Buy authentic Pokémon, One Piece, and MTG cards from Japan — priced at real market value and ready to ship
+            worldwide.
+        </p>
+        <a href="/"
+            class="inline-flex items-center gap-2 bg-primary text-background-dark font-black text-sm rounded-full hover:bg-primary/80 transition-colors shadow-lg gold-glow"
+            style="padding: 14px 40px;">
+            <span class="material-symbols-outlined text-base">storefront</span>
+            Browse the Marketplace
+        </a>
+    </div>
+
+</main>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="border-t border-white/5 pt-12 pb-16 md:pb-12 px-5 md:px-6 max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+        <div>
+            <h2 class="text-sm font-bold text-white mb-4">TCGNakama</h2>
+            <p class="text-xs text-gray-400 leading-relaxed">Japan's marketplace for Pokémon, One Piece, and Magic: The
+                Gathering singles.</p>
+        </div>
+        <div>
+            <h2 class="text-sm font-bold text-white mb-4">Explore</h2>
+            <div class="flex flex-col gap-2.5">
+                <a href="/" class="text-xs text-gray-400 hover:text-primary transition-colors">Marketplace</a>
+                <a href="/#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">All
+                    Cards</a>
+            </div>
+        </div>
+        <div>
+            <h2 class="text-sm font-bold text-white mb-4">Follow Us</h2>
+            <div class="flex gap-3">
+                <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank" rel="noopener"
+                    aria-label="Facebook"
+                    class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">public</span>
+                </a>
+                <a href="https://www.instagram.com/tcgnakama.official/" target="_blank" rel="noopener"
+                    aria-label="Instagram"
+                    class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">photo_camera</span>
+                </a>
+                <a href="https://www.youtube.com/@tcg-nakama" target="_blank" rel="noopener" aria-label="YouTube"
+                    class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
+                    <span class="material-symbols-outlined text-gray-400 text-sm">smart_display</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="mt-10 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-2">
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2026 TCG Nakama</p>
+        <a href="/admin/login"
+            class="text-[10px] text-gray-600 hover:text-primary font-bold uppercase tracking-[0.3em] transition-colors">🔐
+            Merchant Login</a>
+    </div>
+</footer>
+
+<!-- Mobile Bottom Nav -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-lg border-t border-white/10 safe-area-bottom"
+    aria-label="Mobile navigation">
+    <div class="flex items-center justify-around pt-2 pb-1">
+        <a href="/" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">home</span>
+            <span class="text-[9px] font-bold text-gray-500">Home</span>
+        </a>
+        <a href="/#all-cards-section" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">storefront</span>
+            <span class="text-[9px] font-bold text-gray-500">Shop</span>
+        </a>
+        <a href="/about" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-primary text-xl">info</span>
+            <span class="text-[9px] font-bold text-primary">About</span>
+        </a>
+        <button class="relative flex flex-col items-center gap-0.5 px-3 py-1" hx-get="/cart/drawer"
+            hx-target="#cart-drawer-container" aria-label="Open cart">
+            <span class="material-symbols-outlined text-gray-500 text-xl">shopping_cart</span>
+            <span class="text-[9px] font-bold text-gray-500">Cart</span>
+            <span id="cart-count-mobile"
+                class="absolute top-0 right-1 w-4 h-4 bg-neon-red text-[8px] font-black text-white rounded-full flex items-center justify-center">{{
+                cart_count or 0 }}</span>
+        </button>
+    </div>
+</nav>
+
+<div id="cart-drawer-container"></div>
+
+{% endblock %}
