@@ -114,7 +114,11 @@ async def read_root(
     end = start + PAGE_SIZE
     paginated_products = products[start:end]
 
-    collections = await client.get_collections()
+    from app.background_tasks import get_cached_products, get_cached_collections
+    collections = get_cached_collections()
+    if not collections:
+        # Cache empty (cold start) — fall back to live Shopify call
+        collections = await client.get_collections()
     
     # DEBUG: Check for duplicate variant IDs
     v_ids = [p.get('variant_id') for p in products]

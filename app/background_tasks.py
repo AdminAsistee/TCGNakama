@@ -10,7 +10,8 @@ from app.dependencies import ShopifyClient
 _polling_task = None
 _last_sync_time = None
 _sync_in_progress = False
-_cached_products = []  # In-memory product cache — populated every 30 min
+_cached_products = []     # In-memory product cache — populated every 30 min
+_cached_collections = []  # In-memory collections cache — populated every 30 min
 
 
 def get_cached_products() -> list:
@@ -18,27 +19,37 @@ def get_cached_products() -> list:
     return _cached_products
 
 
+def get_cached_collections() -> list:
+    """Return the in-memory collections cache (populated by background sync)."""
+    return _cached_collections
+
+
 async def sync_shopify_products():
-    """Fetch latest products from Shopify and cache them."""
-    global _last_sync_time, _sync_in_progress, _cached_products
-    
+    """Fetch latest products AND collections from Shopify and cache both."""
+    global _last_sync_time, _sync_in_progress, _cached_products, _cached_collections
+
     if _sync_in_progress:
         print("[SYNC] Sync already in progress, skipping...")
         return
-    
+
     try:
         _sync_in_progress = True
-        print(f"[SYNC] Starting Shopify product sync at {datetime.now()}")
-        
+        print(f"[SYNC] Starting Shopify sync at {datetime.now()}")
+
         client = ShopifyClient()
-        products = await client.get_products()
-        
-        _cached_products = products  # store in memory for instant access
+        # Fetch products and collections in parallel — saves ~1s vs sequential
+        products, collections = await asyncio.gather(
+            client.get_products(),
+            client.get_collections()
+        )
+
+        _cached_products = products
+        _cached_collections = collections
         _last_sync_time = datetime.now()
-        print(f"[SYNC] Successfully cached {len(products)} products at {_last_sync_time}")
-        
+        print(f"[SYNC] Cached {len(products)} products + {len(collections)} collections at {_last_sync_time}")
+
     except Exception as e:
-        print(f"[SYNC ERROR] Failed to sync products: {e}")
+        print(f"[SYNC ERROR] Failed to sync: {e}")
     finally:
         _sync_in_progress = False
 
