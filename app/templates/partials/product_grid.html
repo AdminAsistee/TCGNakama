@@ -50,12 +50,16 @@
         <a href="/card/{{ product.safe_id }}" class="cursor-pointer flex-1 block min-w-0">
             <h4 class="text-[11px] md:text-xs font-bold text-white/90 leading-snug line-clamp-2">{{ product.title }}
             </h4>
-            <p class="text-[9px] md:text-[10px] text-gray-500 mt-0.5 truncate">{{ product.set }}</p>
-            {% if product.card_number and product.card_number != '#000' %}
-            <p class="text-[8px] text-gray-600 truncate">
-                {{ product.card_number }}{% if product.package_type %} · {{ product.package_type }}{% endif %}{% if
-                product.card_condition %} · {{ product.card_condition }}{% endif %}
+            {% if product.set_name %}
+            <p class="text-[9px] md:text-[10px] font-semibold text-sky-400/80 mt-0.5 truncate">{{ product.set_name }}
             </p>
+            {% elif product.set and product.set != 'Unknown Set' %}
+            <p class="text-[9px] md:text-[10px] font-semibold text-sky-400/80 mt-0.5 truncate">{{ product.set }}</p>
+            {% endif %}
+            {% if product.card_condition %}
+            <span
+                class="inline-block mt-0.5 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-amber-300 border border-white/10">{{
+                product.card_condition }}</span>
             {% endif %}
         </a>
 

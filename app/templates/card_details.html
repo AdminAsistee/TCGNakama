@@ -169,9 +169,11 @@
                 <h1 class="text-2xl md:text-3xl font-bold leading-tight text-white">
                     {{ product.title }}
                 </h1>
-                <p class="text-sm text-gray-400 font-medium tracking-wide uppercase mt-1">
-                    {{ product.set }}{% if product.card_number %} · {{ product.card_number }}{% endif %}
+                {% if product.set_name or (product.set and product.set != 'Unknown Set') %}
+                <p class="text-sm font-semibold text-sky-400/80 mt-1">
+                    {{ product.set_name if product.set_name else product.set }}
                 </p>
+                {% endif %}
             </div>
 
             <!-- Price + Quantity -->
@@ -253,39 +255,76 @@
             <div class="pt-4">
                 <h2 class="text-lg font-bold text-white mb-3 pl-3 border-l-4 border-primary">Card Details</h2>
 
-                <!-- 2-Column Grid (desktop) / 1-Column (mobile) -->
+                <!-- 2-Column Grid -->
                 <div class="rounded-lg border border-white/10 bg-black/20 backdrop-blur-sm overflow-hidden">
                     <div class="grid grid-cols-1 md:grid-cols-2 text-sm">
-                        {% if product.card_number %}
+
+                        <!-- Row 1: Full Set Name (spans both columns) -->
+                        {% if product.set_name or (product.set and product.set != 'Unknown Set') %}
                         <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="font-medium text-gray-400 w-28 shrink-0">Set Code</span>
-                            <span class="text-gray-200 font-mono">{{ product.card_number }}</span>
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:col-span-2 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Set</span>
+                            <span class="text-sky-300 font-semibold">{{ product.set_name if product.set_name else
+                                product.set }}</span>
                         </div>
                         {% endif %}
-                        {% if product.set %}
+
+                        <!-- Row 2: Card Number | Collection -->
+                        {% if product.card_number and product.card_number != '#000' %}
                         <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="font-medium text-gray-400 w-28 shrink-0">Set</span>
-                            <span class="text-gray-200">{{ product.set }}</span>
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Card Number</span>
+                            <span class="text-gray-200 font-mono">{{ product.card_number }}</span>
                         </div>
+                        {% else %}
+                        <div class="hidden md:block border-b border-white/5 md:border-r md:border-white/5"></div>
                         {% endif %}
                         {% if product.collections and product.collections|length > 0 %}
                         <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                             <span class="font-medium text-gray-400 w-28 shrink-0">Collection</span>
                             <span class="text-gray-200">{{ product.collections | join(', ') }}</span>
                         </div>
+                        {% else %}
+                        <div class="hidden md:block border-b border-white/5"></div>
                         {% endif %}
+
+                        <!-- Row 3: Seller | Package Type -->
                         {% if product.vendor %}
                         <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
                             <span class="font-medium text-gray-400 w-28 shrink-0">Seller</span>
                             <span class="text-gray-200">{{ product.vendor }}</span>
                         </div>
+                        {% else %}
+                        <div class="hidden md:block border-b border-white/5 md:border-r md:border-white/5"></div>
                         {% endif %}
+                        {% if product.package_type %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Package Type</span>
+                            <span class="text-gray-200 flex items-center gap-2">
+                                {{ product.package_type }}
+                                <button onclick="openConditionGuide()"
+                                    class="text-[10px] text-primary hover:underline">What's this?</button>
+                            </span>
+                        </div>
+                        {% else %}
+                        <div class="hidden md:block border-b border-white/5"></div>
+                        {% endif %}
+
+                        <!-- Row 4: Condition | Stock -->
+                        {% if product.card_condition %}
                         <div
                             class="flex items-center py-3 px-4 border-b border-white/5 md:border-r md:border-white/5 hover:bg-white/5 transition-colors">
+                            <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
+                            <span class="text-gray-200">{{ product.card_condition }}</span>
+                        </div>
+                        {% else %}
+                        <div class="hidden md:block border-b border-white/5 md:border-r md:border-white/5"></div>
+                        {% endif %}
+                        <div
+                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                             <span class="font-medium text-gray-400 w-28 shrink-0">Stock</span>
                             <span class="text-gray-200">
                                 {% if product.totalInventory and product.totalInventory > 0 %}
@@ -302,24 +341,7 @@
                                 {% endif %}
                             </span>
                         </div>
-                        {% if product.package_type %}
-                        <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="font-medium text-gray-400 w-28 shrink-0">Package Type</span>
-                            <span class="text-gray-200 flex items-center gap-2">
-                                {{ product.package_type }}
-                                <button onclick="openConditionGuide()"
-                                    class="text-[10px] text-primary hover:underline">What's this?</button>
-                            </span>
-                        </div>
-                        {% endif %}
-                        {% if product.card_condition %}
-                        <div
-                            class="flex items-center py-3 px-4 border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="font-medium text-gray-400 w-28 shrink-0">Condition</span>
-                            <span class="text-gray-200">{{ product.card_condition }}</span>
-                        </div>
-                        {% endif %}
+
                     </div>
 
                     <!-- Market Value — loaded async via HTMX (avoids 3-8s page delay) -->

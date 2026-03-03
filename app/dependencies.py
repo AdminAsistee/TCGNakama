@@ -68,6 +68,7 @@ class ShopifyClient:
         # Shopify tags often contain TCG metadata in this format: set:Base Set, rarity:Epic
         tags = node.get("tags", [])
         card_set = "Unknown Set"
+        set_name = ""
         rarity = "Common"
         card_number = "#000"
         package_type = None
@@ -82,6 +83,8 @@ class ShopifyClient:
                 
                 if key == "set":
                     card_set = val
+                elif key == "set name":
+                    set_name = val
                 elif key == "rarity":
                     rarity = val
                 elif key == "number":
@@ -124,6 +127,7 @@ class ShopifyClient:
             "variant_id": variant.get("id"),
             "title": node["title"],
             "set": card_set,
+            "set_name": set_name,
             "rarity": rarity,
             "package_type": package_type,
             "card_condition": card_condition,
