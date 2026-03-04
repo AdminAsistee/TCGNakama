@@ -43,39 +43,37 @@ async def resolve_full_set_name(card_name: str, set_code: str, card_number: str 
         return set_code
 
     try:
-        import google.generativeai as genai
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key or api_key == "your_api_key_here":
             return set_code
 
-        # Use the fastest available model for this text-only task
+        prompt = (
+            f'Given this trading card info, expand the "Set Code" into its full, official set name.\n\n'
+            f'Card Name: {card_name}\nSet Code: {set_code}\nCard Number: {card_number}\n\n'
+            f'Rules:\n1. Return ONLY the full set name string (e.g., "Romance Dawn", "Cyber Judge").\n'
+            f'2. If the code is already a full name, return it as is.\n'
+            f'3. If unknown, return the original code "{set_code}".\n'
+            f'4. No explanations — set name only.'
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 64},
+        }
         async with _gemini_lock:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            
-            prompt = f"""Given this trading card info, expand the "Set Code" into its full, official set name.
-            
-            Card Name: {card_name}
-            Set Code: {set_code}
-            Card Number: {card_number}
-            
-            Rules:
-            1. Return ONLY the full set name string (e.g., "Romance Dawn", "Cyber Judge", "VSTAR Universe").
-            2. If the code is already a full name, return it as is.
-            3. If you absolutely cannot identify the set, return the original code "{set_code}".
-            4. Do not provide explanations or any other text.
-            """
-            
-            response = model.generate_content(prompt)
-            result = response.text.strip()
-            
-            # Clean up any quotes or markdown
-            result = result.replace('"', '').replace("'", "").strip()
-            
-            if result:
-                safe_print(f"[RESOLVE_SET] Code '{set_code}' -> Full Name '{result}'")
-                return result
-            return set_code
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    json=payload,
+                )
+                data = resp.json()
+                if resp.status_code == 200 and "candidates" in data:
+                    parts = data["candidates"][0]["content"]["parts"]
+                    result = "".join(p.get("text", "") for p in parts).strip()
+                    result = result.replace('"', '').replace("'", "").strip()
+                    if result:
+                        safe_print(f"[RESOLVE_SET] Code '{set_code}' -> Full Name '{result}'")
+                        return result
+        return set_code
     except Exception as e:
         safe_print(f"[RESOLVE_SET] Error: {e}")
         return set_code
@@ -93,41 +91,37 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
         dict: Extracted card information including title, set, card_number, rarity, year, manufacturer
     """
     try:
-        import google.generativeai as genai
         import base64
-        from PIL import Image
+        from PIL import Image, ImageEnhance
         import io
-        
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key or api_key == "your_api_key_here":
             return {'error': 'Gemini API key not configured'}
-        
+
         # Use lock to prevent concurrent Gemini API calls (rate limiting)
         async with _gemini_lock:
-            genai.configure(api_key=api_key)
-            # Use image-specific model (found in list_gemini_models.py output)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            
-            # Prepare image for Gemini
+            # Prepare image bytes
             if image_data:
-                # Convert bytes to PIL Image
                 img = Image.open(io.BytesIO(image_data))
             elif image_url:
-                # Download image from URL
-                import httpx
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.get(image_url)
-                    if response.status_code != 200:
-                        return {'error': f'Failed to download image from URL: {response.status_code}'}
-                    img = Image.open(io.BytesIO(response.content))
+                    dl = await client.get(image_url)
+                    if dl.status_code != 200:
+                        return {'error': f'Failed to download image from URL: {dl.status_code}'}
+                    img = Image.open(io.BytesIO(dl.content))
             else:
                 return {'error': 'No image data or URL provided'}
 
             # Enhance image brightness and contrast so dark card text is more readable
-            from PIL import ImageEnhance
             img = ImageEnhance.Brightness(img).enhance(1.3)   # 30% brighter
             img = ImageEnhance.Contrast(img).enhance(1.2)     # 20% more contrast
             safe_print("[APPRAISE_IMAGE] Image enhanced: brightness +30%, contrast +20%")
+
+            # Encode image as base64 for Gemini REST API
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG")
+            b64_image = base64.b64encode(buf.getvalue()).decode()
 
 
             # Single prompt — Gemini thinks internally then outputs ONLY JSON.
@@ -190,9 +184,27 @@ Output ONLY this JSON, nothing else:
   "manufacturer": ""
 }"""
 
-            # Generate content with image
-            response = model.generate_content([prompt, img])
-            response_text = response.text.strip()
+            # Generate content with image via Gemini REST API
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": "image/jpeg", "data": b64_image}},
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1024},
+            }
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+                    json=payload,
+                )
+                data = resp.json()
+                if resp.status_code != 200 or "candidates" not in data:
+                    err_msg = data.get("error", {}).get("message", str(data))
+                    return {'error': f'Gemini vision failed: {err_msg}'}
+                parts = data["candidates"][0]["content"]["parts"]
+                response_text = "".join(p.get("text", "") for p in parts).strip()
 
             safe_print(f"[APPRAISE_IMAGE] Gemini response: {response_text}")
 
@@ -686,28 +698,21 @@ async def _gemini_filter_cards(search_query: str, results: list[dict]) -> list[d
         Filtered list of matching cards
     """
     try:
-        import google.generativeai as genai
-        import os
         import json
         import re
-        
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key or api_key == "your_api_key_here":
             safe_print("[APPRAISE] No Gemini API key, using all results")
-            return results  # Fallback to all results if no API key
-        
-        # Use lock to prevent concurrent Gemini API calls (rate limiting)
-        async with _gemini_lock:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            
-            # Build the prompt
-            results_text = "\n".join([
-                f"{i+1}. \"{r['name']}\" - ${r['price']}"
-                for i, r in enumerate(results)
-            ])
-            
-            prompt = f"""You are a trading card expert. I'm searching for: "{search_query}"
+            return results
+
+        # Build the prompt
+        results_text = "\n".join([
+            f"{i+1}. \"{r['name']}\" - ${r['price']}"
+            for i, r in enumerate(results)
+        ])
+
+        prompt = f"""You are a trading card expert. I'm searching for: "{search_query}"
 
 PriceCharting returned these results:
 {results_text}
@@ -751,10 +756,24 @@ Example: [1, 3] or [2]
 
 If no cards match, return an empty array: []
 """
-            
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
-        
+        async with _gemini_lock:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 128},
+                }
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    json=payload,
+                )
+                data = resp.json()
+                if resp.status_code == 200 and "candidates" in data:
+                    parts = data["candidates"][0]["content"]["parts"]
+                    response_text = "".join(p.get("text", "") for p in parts).strip()
+                else:
+                    safe_print(f"[APPRAISE] Gemini filter REST error: {data}")
+                    return results
+
         # Extract JSON from response (might have markdown code blocks)
         if "```" in response_text:
             # Extract from code block

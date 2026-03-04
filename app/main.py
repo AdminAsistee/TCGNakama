@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from app.routers import store
+from app.routers import blog as blog_router
 import os
 import asyncio
 from dotenv import load_dotenv
@@ -130,6 +131,9 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 from app.routers import oauth
 app.include_router(oauth.router, tags=["oauth"])
 
+# Blog routes (/blog, /blog/{slug}, /admin/blog)
+app.include_router(blog_router.router, tags=["blog"])
+
 # Search tracking endpoint
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -235,7 +239,8 @@ LLMs: https://tcgnakama.com/llms.txt
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap_xml():
     from app.background_tasks import get_cached_products
-    from app.dependencies import get_shopify_client
+    from app.database import SessionLocal
+    from app.models import BlogPost
     from datetime import date
 
     today = date.today().isoformat()
@@ -248,15 +253,42 @@ async def sitemap_xml():
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <lastmod>{today}</lastmod>
-  </url>"""
+  </url>""",
+        f"""  <url>
+    <loc>{base_url}/blog</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <lastmod>{today}</lastmod>
+  </url>""",
+        f"""  <url>
+    <loc>{base_url}/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <lastmod>{today}</lastmod>
+  </url>""",
     ]
+
+    # Blog post URLs from DB
+    try:
+        db = SessionLocal()
+        blog_posts = db.query(BlogPost).filter(BlogPost.is_published == True).all()
+        db.close()
+        for post in blog_posts:
+            lastmod = post.published_at.date().isoformat() if post.published_at else today
+            urls.append(f"""  <url>
+    <loc>{base_url}/blog/{post.slug}</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>{lastmod}</lastmod>
+  </url>""")
+    except Exception:
+        pass
 
     # Dynamic card pages from cache
     products = get_cached_products() or []
     for product in products:
         safe_id = product.get("safe_id") or ""
         if not safe_id:
-            # Derive safe_id from Shopify GID (numeric portion)
             gid = product.get("id", "")
             safe_id = gid.split("/")[-1] if "/" in gid else gid
         if safe_id:

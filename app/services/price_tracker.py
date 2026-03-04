@@ -32,23 +32,18 @@ async def _gemini_disambiguate(search_query: str, results: list[dict]) -> list[d
         return results  # Clear enough match — skip Gemini
 
     try:
-        import google.generativeai as genai
         import json
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key or api_key == "your_api_key_here":
             return results
 
-        async with _gemini_lock:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-2.5-flash")
+        results_text = "\n".join([
+            f'{i+1}. "{r["name"]}" - ${r["price"]}'
+            for i, r in enumerate(results[:20])  # Cap at 20 to save tokens
+        ])
 
-            results_text = "\n".join([
-                f'{i+1}. "{r["name"]}" - ${r["price"]}'
-                for i, r in enumerate(results[:20])  # Cap at 20 to save tokens
-            ])
-
-            prompt = f"""You are a TCG card pricing expert. I need the market value for: "{search_query}"
+        prompt = f"""You are a TCG card pricing expert. I need the market value for: "{search_query}"
 
 PriceCharting returned these results:
 {results_text}
@@ -61,21 +56,34 @@ Select the BEST match following these priorities:
 
 Return ONLY the indices as a JSON array, e.g. [1] or [2, 5]. If no match: []"""
 
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+        async with _gemini_lock:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 64},
+                }
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    json=payload,
+                )
+                data = resp.json()
+                if resp.status_code != 200 or "candidates" not in data:
+                    return results
+                parts = data["candidates"][0]["content"]["parts"]
+                response_text = "".join(p.get("text", "") for p in parts).strip()
 
-            # Parse JSON
-            if "```" in response_text:
-                json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', response_text, re.DOTALL)
-                if json_match:
-                    response_text = json_match.group(1)
+        if "```" in response_text:
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
 
-            indices = json.loads(response_text)
-            if indices:
-                filtered = [results[i - 1] for i in indices if 0 < i <= len(results)]
-                if filtered:
-                    logger.info(f"  Gemini: {len(results)} → {len(filtered)} matches")
-                    return filtered
+        indices = json.loads(response_text)
+        if indices:
+            filtered = [results[i - 1] for i in indices if 0 < i <= len(results)]
+            if filtered:
+                logger.info(f"  Gemini: {len(results)} -> {len(filtered)} matches")
+                return filtered
 
     except Exception as e:
         logger.warning(f"  Gemini error: {e}, using direct match")

@@ -1,10 +1,20 @@
 """
 Database models for TCG Nakama.
 """
-from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime, Text
+from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+import enum
 from app.database import Base
+
+
+class BlogCategory(str, enum.Enum):
+    pokemon    = "pokemon"
+    onepiece   = "onepiece"
+    mtg        = "mtg"
+    anime      = "anime"
+    news       = "news"
+    tips       = "tips"
 
 
 class Banner(Base):
@@ -86,3 +96,34 @@ class PageSpeedAudit(Base):
     opportunities_json: Mapped[str] = mapped_column(Text, default="{}")
     full_response_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class BlogPost(Base):
+    """AI-generated blog posts for SEO and community engagement."""
+    __tablename__ = "blog_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    slug: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    meta_description: Mapped[str] = mapped_column(String(500))
+    content_html: Mapped[str] = mapped_column(Text)          # Rendered HTML
+    content_markdown: Mapped[str] = mapped_column(Text)      # Raw Markdown source
+    category: Mapped[str] = mapped_column(String(50), index=True, default="news")
+    tags: Mapped[str] = mapped_column(String(500), default="")  # comma-separated
+    og_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    facebook_post_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def excerpt(self) -> str:
+        """First 200 characters of plain text for blog list cards."""
+        import re
+        plain = re.sub(r'<[^>]+>', '', self.content_html or '')
+        return plain[:200].strip() + ('...' if len(plain) > 200 else '')
+
+    @property
+    def tags_list(self) -> list:
+        return [t.strip() for t in (self.tags or '').split(',') if t.strip()]
