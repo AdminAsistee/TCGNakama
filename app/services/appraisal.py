@@ -62,7 +62,7 @@ async def resolve_full_set_name(card_name: str, set_code: str, card_number: str 
         async with _gemini_lock:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
                     json=payload,
                 )
                 data = resp.json()
@@ -196,7 +196,7 @@ Output ONLY this JSON, nothing else:
             }
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
                     json=payload,
                 )
                 data = resp.json()
@@ -763,7 +763,7 @@ If no cards match, return an empty array: []
                     "generationConfig": {"temperature": 0.1, "maxOutputTokens": 128},
                 }
                 resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
                     json=payload,
                 )
                 data = resp.json()

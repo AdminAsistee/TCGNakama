@@ -63,7 +63,7 @@ Return ONLY the indices as a JSON array, e.g. [1] or [2, 5]. If no match: []"""
                     "generationConfig": {"temperature": 0.1, "maxOutputTokens": 64},
                 }
                 resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
                     json=payload,
                 )
                 data = resp.json()

@@ -23,7 +23,6 @@ _GEMINI_BASE    = "https://generativelanguage.googleapis.com/v1beta/models"
 _MODEL_FALLBACKS = [
     "gemini-2.5-flash",
     "gemini-2.0-flash-001",
-    "gemini-2.0-flash-lite",
 ]
 
 

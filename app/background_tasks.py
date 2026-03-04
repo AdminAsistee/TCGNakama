@@ -76,15 +76,6 @@ async def polling_task():
             await asyncio.sleep(60)  # Wait 1 minute before retrying
 
 
-def start_background_tasks():
-    """Start all background tasks."""
-    global _polling_task
-    
-    if _polling_task is None:
-        _polling_task = asyncio.create_task(polling_task())
-        print("[BACKGROUND] Background tasks started")
-    else:
-        print("[BACKGROUND] Background tasks already running")
 
 
 async def stop_background_tasks():
