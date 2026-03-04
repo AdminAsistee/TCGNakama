@@ -125,25 +125,6 @@ def urlencode_gid(value):
 templates.env.filters['urlencode_gid'] = urlencode_gid
 
 
-@router.get("/debug-db")
-async def debug_db(db: Session = Depends(get_db)):
-    """Temporary: verify DB connection and blog post count."""
-    import os
-    from app.models import BlogPost
-    from app import database as _db_mod
-    db_url = str(_db_mod.DATABASE_URL)
-    # Mask password
-    import re
-    masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', db_url)
-    try:
-        total = db.query(BlogPost).count()
-        published = db.query(BlogPost).filter(BlogPost.is_published == True).count()
-        rows = [{"id": p.id, "slug": p.slug, "pub": p.is_published} for p in db.query(BlogPost).all()]
-    except Exception as e:
-        return {"db_url": masked, "error": str(e)}
-    return {"db_url": masked, "total": total, "published": published, "rows": rows}
-
-
 
 def verify_session(request: Request) -> str:
     """Verify admin session from cookie."""
