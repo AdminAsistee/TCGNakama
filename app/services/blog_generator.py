@@ -31,7 +31,7 @@ async def _call_gemini(user_prompt: str, system_prompt: str) -> str:
     payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
-        "generationConfig": {"temperature": 0.8, "maxOutputTokens": 2048},
+        "generationConfig": {"temperature": 0.8, "maxOutputTokens": 8192},
     }
     last_error = "unknown error"
     async with httpx.AsyncClient(timeout=60.0) as client:
