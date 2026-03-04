@@ -164,10 +164,7 @@ async def _blog_loop():
             try:
                 post = await generate_article(db)
                 if post:
-                    fb_id = await post_to_facebook_group(post)
-                    if fb_id:
-                        post.facebook_post_id = fb_id
-                        db.commit()
+                    logger.info(f"[BLOG] Published: '{post.title}'")
             finally:
                 db.close()
 

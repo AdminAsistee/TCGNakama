@@ -208,21 +208,15 @@ Output ONLY this JSON, nothing else:
 
             safe_print(f"[APPRAISE_IMAGE] Gemini response: {response_text}")
 
-            # Parse JSON — extract the last { } block to handle any leading reasoning text
+            # Strip markdown code fences (gemini-2.5-flash wraps responses)
             import re
+            response_text = re.sub(r'```(?:json)?\s*', '', response_text)
+            response_text = re.sub(r'```', '', response_text).strip()
 
-            
-            # Convert null values to empty strings
-            # Robust JSON extraction: handle markdown blocks or leading reasoning text
-            if "```" in response_text:
-                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-                if json_match:
-                    response_text = json_match.group(1)
-            else:
-                # Extract the last { } block in case model output reasoning text before JSON
-                json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
-                if json_match:
-                    response_text = json_match.group(0)
+            # Extract the outermost { } block (greedy — handles nested objects)
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(0)
 
             card_data = json.loads(response_text)
 
@@ -774,13 +768,13 @@ If no cards match, return an empty array: []
                     safe_print(f"[APPRAISE] Gemini filter REST error: {data}")
                     return results
 
-        # Extract JSON from response (might have markdown code blocks)
-        if "```" in response_text:
-            # Extract from code block
-            json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(1)
-        
+        # Strip markdown fences and extract JSON array
+        response_text = re.sub(r'```(?:json)?\s*', '', response_text)
+        response_text = re.sub(r'```', '', response_text).strip()
+        arr_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+        if arr_match:
+            response_text = arr_match.group(0)
+
         matching_indices = json.loads(response_text)
         
         if not matching_indices:

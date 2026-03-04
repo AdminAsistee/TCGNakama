@@ -72,11 +72,12 @@ Return ONLY the indices as a JSON array, e.g. [1] or [2, 5]. If no match: []"""
                 parts = data["candidates"][0]["content"]["parts"]
                 response_text = "".join(p.get("text", "") for p in parts).strip()
 
-        if "```" in response_text:
-            import re
-            json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(1)
+        import re
+        response_text = re.sub(r'```(?:json)?\s*', '', response_text)
+        response_text = re.sub(r'```', '', response_text).strip()
+        arr_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+        if arr_match:
+            response_text = arr_match.group(0)
 
         indices = json.loads(response_text)
         if indices:
