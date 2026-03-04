@@ -2488,7 +2488,7 @@ async def run_pagespeed_audit(
 ):
     """Trigger a new PageSpeed audit (runs async in background)."""
     import asyncio
-    from app.services.pagespeed import run_audit, is_audit_running, is_psi_configured
+    from app.services.pagespeed import run_audit, is_audit_running, is_psi_configured, set_audit_status
 
     if not is_psi_configured():
         return JSONResponse({"status": "error", "message": "API Key not configured"}, status_code=400)
@@ -2500,9 +2500,10 @@ async def run_pagespeed_audit(
     url = body.get("url", "https://tcgnakama.com")
     strategy = body.get("strategy", "mobile")
 
-    # Run in background so the HTTP response returns immediately
-    asyncio.create_task(run_audit(url, strategy))
+    # Set status synchronously to avoid race condition with polling
+    set_audit_status("QUEUED", 5, "Initializing audit...")
 
+    asyncio.create_task(run_audit(url, strategy))
     return JSONResponse({"status": "started"})
 
 
@@ -2512,21 +2513,20 @@ async def pagespeed_status(
     db: Session = Depends(get_db)
 ):
     """Return current audit status and latest scores."""
-    from app.services.pagespeed import get_latest_audit, is_audit_running, is_cache_fresh
-    from app.models import SystemSetting
+    from app.services.pagespeed import get_latest_audit, get_audit_status, is_cache_fresh, is_psi_configured
     
     latest = get_latest_audit(strategy="mobile")
-    
-    # Check for recent errors
-    error_setting = db.query(SystemSetting).filter_by(key="psi_last_error").first()
-    last_error = error_setting.value if error_setting else None
+    status_data = get_audit_status()
     
     return JSONResponse({
-        "is_running": is_audit_running(),
+        "is_running": status_data["status"] not in ["IDLE", "COMPLETED", "FAILED", "TIMEOUT"],
+        "status": status_data["status"],
+        "progress": status_data["progress"],
+        "message": status_data["message"],
         "cache_fresh": is_cache_fresh(strategy="mobile"),
         "api_configured": is_psi_configured(),
         "latest": latest,
-        "last_error": last_error
+        "last_error": status_data["last_error"]
     })
 
 

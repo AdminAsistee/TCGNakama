@@ -2,6 +2,7 @@
 Agent PageSpeed — Google PageSpeed Insights service.
 Runs audits against the PSI API, stores results in DB, and respects rate limits.
 """
+import asyncio
 import json
 import logging
 import os
@@ -21,13 +22,59 @@ PSI_API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 RATE_LIMIT_SECONDS = 60
 CACHE_HOURS = 24
 
-# Module-level state
-_audit_running = False
-
-
 def is_audit_running() -> bool:
-    """Check if an audit is currently in progress."""
-    return _audit_running
+    """Check if an audit is currently in progress using DB state."""
+    status = get_audit_status()
+    return status.get("status") not in ["IDLE", "COMPLETED", "FAILED", "TIMEOUT"]
+
+
+def get_audit_status() -> dict:
+    """Return the current audit status, progress, and message."""
+    db = SessionLocal()
+    try:
+        status = db.query(SystemSetting).filter_by(key="psi_status").first()
+        progress = db.query(SystemSetting).filter_by(key="psi_progress").first()
+        message = db.query(SystemSetting).filter_by(key="psi_message").first()
+        
+        return {
+            "status": status.value if status else "IDLE",
+            "progress": int(progress.value) if progress else 0,
+            "message": message.value if message else "",
+            "last_error": _get_last_error()
+        }
+    finally:
+        db.close()
+
+
+def set_audit_status(status: str, progress: int, message: str = ""):
+    """Update the audit status in the database."""
+    db = SessionLocal()
+    try:
+        settings = {
+            "psi_status": status,
+            "psi_progress": str(progress),
+            "psi_message": message
+        }
+        for key, value in settings.items():
+            row = db.query(SystemSetting).filter_by(key=key).first()
+            if row:
+                row.value = value
+            else:
+                db.add(SystemSetting(key=key, value=value))
+        db.commit()
+        logger.debug(f"[PAGESPEED] Status: {status} ({progress}%) - {message}")
+    finally:
+        db.close()
+
+
+def _get_last_error() -> str | None:
+    """Get the last error message."""
+    db = SessionLocal()
+    try:
+        row = db.query(SystemSetting).filter_by(key="psi_last_error").first()
+        return row.value if row and row.value else None
+    finally:
+        db.close()
 
 
 def is_psi_configured() -> bool:
@@ -136,15 +183,11 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
     Calls the PSI API, parses the response, and stores in the database.
     Returns a dict with status and scores.
     """
-    global _audit_running
+    if is_audit_running() and not _check_rate_limit(): # Allow retry if not rate limited
+        # Check if it's been stuck in same status for too long (e.g. 5 mins)
+        pass
 
-    if _audit_running:
-        return {"status": "already_running"}
-
-    if _check_rate_limit():
-        return {"status": "rate_limited", "message": f"Please wait {RATE_LIMIT_SECONDS}s between audits"}
-
-    _audit_running = True
+    set_audit_status("QUEUED", 5, "Starting audit process...")
     logger.info(f"[PAGESPEED] Starting audit for {url} ({strategy})")
 
     try:
@@ -167,10 +210,14 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
         params["key"] = api_key
         logger.debug(f"[PAGESPEED] Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        set_audit_status("ANALYZING", 15, "Waiting for Google PageSpeed Insights (this can take 60s+)...")
+        async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.get(PSI_API_URL, params=params)
+            logger.debug(f"[PAGESPEED] Response status: {response.status_code}")
             response.raise_for_status()
             data = response.json()
+            logger.debug("[PAGESPEED] Successfully parsed PSI JSON")
+            set_audit_status("PARSING", 80, "Extracting scores and opportunities...")
 
         # Parse scores from lighthouse result
         lighthouse = data.get("lighthouseResult", {})
@@ -216,9 +263,11 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
                 opportunities_json=json.dumps(opportunities),
                 full_response_json=json.dumps(data),
             )
+            set_audit_status("SAVING", 90, "Finalizing report...")
             db.add(audit_record)
             db.commit()
             logger.info(f"[PAGESPEED] Audit complete — Performance: {scores['performance']}")
+            set_audit_status("COMPLETED", 100, "Audit finished successfully!")
         finally:
             db.close()
 
@@ -237,16 +286,29 @@ async def run_audit(url: str, strategy: str = "mobile") -> dict:
             pass
         logger.error(f"[PAGESPEED] {error_msg} | Response: {e.response.text}")
         _set_last_error(error_msg)
+        set_audit_status("FAILED", 0, f"Error: {error_msg}")
         return {"status": "error", "message": error_msg}
 
     except Exception as e:
         error_msg = str(e)[:500]
         logger.error(f"[PAGESPEED] Audit failed: {e}", exc_info=True)
         _set_last_error(error_msg)
+        set_audit_status("FAILED", 0, f"Error: {error_msg}")
         return {"status": "error", "message": error_msg}
 
     finally:
-        _audit_running = False
+        # Reset to IDLE after a short delay so the UI can catch the 100% or Error state
+        import asyncio
+        asyncio.create_task(_reset_to_idle_later())
+
+
+async def _reset_to_idle_later(delay: int = 30):
+    """Wait then reset status to IDLE."""
+    await asyncio.sleep(delay)
+    # Check if a new audit hasn't started in the meantime
+    current = get_audit_status()
+    if current.get("status") in ["COMPLETED", "FAILED", "TIMEOUT"]:
+        set_audit_status("IDLE", 0, "")
 
 
 def _extract_score(category: dict) -> int:
