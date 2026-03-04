@@ -42,9 +42,12 @@ Updated every few days by the TCGNakama team.{% endblock %}
             <span class="text-sm font-bold text-primary border-b-2 border-primary pb-1">Blog</span>
             <a href="/about" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">About</a>
         </nav>
-        <button hx-get="/cart/drawer" hx-target="#cart-drawer-container" aria-label="Open cart"
+        <button id="cart-btn" hx-get="/cart/drawer" hx-target="#cart-drawer-container" aria-label="Open cart"
             class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
             <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
+            <span id="cart-count"
+                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
+                cart_count or 0 }}</span>
         </button>
     </div>
 </header>

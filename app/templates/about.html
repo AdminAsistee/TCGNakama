@@ -48,6 +48,7 @@ next day. Meet the team behind TCGNakama.{% endblock %}
             <a href="/" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Home</a>
             <a href="/#all-cards-section"
                 class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Shop</a>
+            <a href="/blog" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Blog</a>
             <span class="text-sm font-bold text-primary border-b-2 border-primary pb-1">About</span>
         </nav>
         <button id="cart-btn"
@@ -297,6 +298,10 @@ next day. Meet the team behind TCGNakama.{% endblock %}
         <a href="/about" class="flex flex-col items-center gap-0.5 px-3 py-1">
             <span class="material-symbols-outlined text-primary text-xl">info</span>
             <span class="text-[9px] font-bold text-primary">About</span>
+        </a>
+        <a href="/blog" class="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span class="material-symbols-outlined text-gray-500 text-xl">article</span>
+            <span class="text-[9px] font-bold text-gray-500">Blog</span>
         </a>
         <button class="relative flex flex-col items-center gap-0.5 px-3 py-1" hx-get="/cart/drawer"
             hx-target="#cart-drawer-container" aria-label="Open cart">
