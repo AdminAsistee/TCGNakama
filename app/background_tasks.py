@@ -159,21 +159,24 @@ async def _blog_loop():
             await asyncio.sleep(max(wait_seconds, 5))
 
             # Generate & publish
-            logger.info("[BLOG] Generating new article...")
+            print("[BLOG] Generating new article...", flush=True)
             db = SessionLocal()
             try:
                 post = await generate_article(db)
                 if post:
-                    logger.info(f"[BLOG] Published: '{post.title}'")
+                    print(f"[BLOG] Published: '{post.title}'", flush=True)
+                else:
+                    print("[BLOG] generate_article returned None (duplicate or API error)", flush=True)
             finally:
                 db.close()
 
         except asyncio.CancelledError:
-            logger.info("[BLOG] Blog scheduler cancelled")
+            print("[BLOG] Blog scheduler cancelled", flush=True)
             break
         except Exception as e:
-            import logging as _log
-            _log.getLogger(__name__).error(f"[BLOG ERROR] {e}")
+            import traceback
+            print(f"[BLOG ERROR] {e}", flush=True)
+            print(traceback.format_exc(), flush=True)
             await asyncio.sleep(60 * 10)  # back-off 10 min on error
 
 

@@ -754,7 +754,7 @@ If no cards match, return an empty array: []
             async with httpx.AsyncClient(timeout=30.0) as client:
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 128},
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512},
                 }
                 resp = await client.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
@@ -764,6 +764,7 @@ If no cards match, return an empty array: []
                 if resp.status_code == 200 and "candidates" in data:
                     parts = data["candidates"][0]["content"]["parts"]
                     response_text = "".join(p.get("text", "") for p in parts).strip()
+                    safe_print(f"[APPRAISE] Filter raw: {response_text!r}")
                 else:
                     safe_print(f"[APPRAISE] Gemini filter REST error: {data}")
                     return results
