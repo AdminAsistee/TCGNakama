@@ -252,13 +252,37 @@ async def generate_article(db_session) -> Optional[object]:
         published_at=now,
     )
 
+
     try:
         db_session.add(post)
         db_session.commit()
         db_session.refresh(post)
         logger.info(f"[BLOG] ✅ Published: '{post.title}' → /blog/{post.slug}")
-        return post
     except Exception as e:
         db_session.rollback()
         logger.error(f"[BLOG] DB save failed: {e}")
         return None
+
+    # ── Fire Zapier webhook (non-blocking) ────────────────────────────────────────
+    zapier_url = os.getenv("ZAPIER_WEBHOOK_URL", "")
+    if zapier_url:
+        try:
+            base_url = os.getenv("SITE_URL", "https://tcgnakama.com")
+            # Build a plain-text excerpt from the markdown body
+            excerpt = re.sub(r"[#*\[\]()>\-_`]", "", body_markdown)[:300].strip()
+            payload = {
+                "blog_url": f"{base_url}/blog/{post.slug}",
+                "title": post.title,
+                "category": post.category,
+                "tags": post.tags,
+                "excerpt": excerpt,
+                "published_at": post.published_at.isoformat() if post.published_at else "",
+                "slug": post.slug,
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(zapier_url, json=payload)
+            logger.info(f"[BLOG] Zapier webhook fired for '{post.slug}'")
+        except Exception as e:
+            logger.warning(f"[BLOG] Zapier webhook failed (non-critical): {e}")
+
+    return post
