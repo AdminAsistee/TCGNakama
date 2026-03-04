@@ -7,9 +7,13 @@
 {% block og_title %}{{ post.title }}{% endblock %}
 {% block og_description %}{{ post.meta_description }}{% endblock %}
 {% block og_url %}https://tcgnakama.com/blog/{{ post.slug }}{% endblock %}
-{% if post.og_image_url %}
-{% block og_image %}{{ post.og_image_url }}{% endblock %}
-{% endif %}
+{% block og_image %}{{ post.og_image_url if post.og_image_url else 'https://tcgnakama.com/static/favicon-512x512.png'
+}}{% endblock %}
+{% block og_image_width %}512{% endblock %}
+{% block og_image_height %}512{% endblock %}
+{% block og_image_type %}image/png{% endblock %}
+{% block twitter_image %}{{ post.og_image_url if post.og_image_url else
+'https://tcgnakama.com/static/favicon-512x512.png' }}{% endblock %}
 {% block twitter_title %}{{ post.title }}{% endblock %}
 {% block twitter_description %}{{ post.meta_description }}{% endblock %}
 
