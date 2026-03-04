@@ -9,7 +9,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import BlogPost
+from app.dependencies import get_shopify_client, ShopifyClient
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -19,7 +21,12 @@ POSTS_PER_PAGE = 9
 
 # ── Public: Blog list ──────────────────────────────────────────────────────────
 @router.get("/blog", response_class=HTMLResponse)
-async def blog_list(request: Request, page: int = 1, db: Session = Depends(get_db)):
+async def blog_list(
+    request: Request,
+    page: int = 1,
+    db: Session = Depends(get_db),
+    client: ShopifyClient = Depends(get_shopify_client),
+):
     offset = (page - 1) * POSTS_PER_PAGE
     total = db.query(BlogPost).filter(BlogPost.is_published == True).count()
     posts = (
@@ -32,18 +39,32 @@ async def blog_list(request: Request, page: int = 1, db: Session = Depends(get_d
     )
     total_pages = (total + POSTS_PER_PAGE - 1) // POSTS_PER_PAGE
 
+    cart_id_raw = request.cookies.get("cart_id")
+    cart_id = unquote(cart_id_raw) if cart_id_raw else None
+    cart_count = 0
+    if cart_id:
+        cart_data = await client.get_cart(cart_id)
+        if cart_data:
+            cart_count = cart_data.get("totalQuantity", 0)
+
     return templates.TemplateResponse("blog_list.html", {
         "request": request,
         "posts": posts,
         "page": page,
         "total_pages": total_pages,
         "total": total,
+        "cart_count": cart_count,
     })
 
 
 # ── Public: Individual post ────────────────────────────────────────────────────
 @router.get("/blog/{slug}", response_class=HTMLResponse)
-async def blog_post(slug: str, request: Request, db: Session = Depends(get_db)):
+async def blog_post(
+    slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    client: ShopifyClient = Depends(get_shopify_client),
+):
     post = db.query(BlogPost).filter(
         BlogPost.slug == slug,
         BlogPost.is_published == True,
@@ -51,7 +72,6 @@ async def blog_post(slug: str, request: Request, db: Session = Depends(get_db)):
     if not post:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    # Related posts (random 3, excluding current)
     related = (
         db.query(BlogPost)
         .filter(BlogPost.is_published == True, BlogPost.id != post.id)
@@ -60,10 +80,19 @@ async def blog_post(slug: str, request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    cart_id_raw = request.cookies.get("cart_id")
+    cart_id = unquote(cart_id_raw) if cart_id_raw else None
+    cart_count = 0
+    if cart_id:
+        cart_data = await client.get_cart(cart_id)
+        if cart_data:
+            cart_count = cart_data.get("totalQuantity", 0)
+
     return templates.TemplateResponse("blog_post.html", {
         "request": request,
         "post": post,
         "related": related,
+        "cart_count": cart_count,
     })
 
 

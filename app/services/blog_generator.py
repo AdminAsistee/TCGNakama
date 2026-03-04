@@ -157,6 +157,10 @@ def _slugify(title: str) -> str:
 _SYSTEM_PROMPT = """You are an expert TCG content writer for TCGNakama, a Japan-based marketplace
 for Pokémon, One Piece, and Magic: The Gathering single cards.
 
+TODAY'S DATE: {today}. Always write about events, releases, and news from {month_year} or the
+very near future. Never reference past years as 'current'. If you mention a year, it must be
+{year} or later.
+
 Your articles must:
 1. Be written in clear, engaging English for a global TCG audience.
 2. Include the primary keyword naturally in the FIRST paragraph and 2-3 more times throughout.
@@ -184,17 +188,32 @@ async def generate_article(db_session) -> Optional[object]:
         logger.error("[BLOG] GEMINI_API_KEY not set — skipping blog generation.")
         return None
 
+    # Build a date-aware system prompt
+    now_dt = datetime.now(timezone.utc)
+    today_str = now_dt.strftime("%B %d, %Y")        # e.g. "March 05, 2026"
+    month_year_str = now_dt.strftime("%B %Y")       # e.g. "March 2026"
+    year_str = str(now_dt.year)                     # e.g. "2026"
+    system_prompt = _SYSTEM_PROMPT.format(
+        today=today_str,
+        month_year=month_year_str,
+        year=year_str,
+    )
+
     topic = _pick_topic()
     logger.info(f"[BLOG] Generating article — category: {topic['category']}")
 
+    # Replace any static year in topic prompt with current year
+    topic_prompt = topic['prompt_focus'].replace("2025", year_str)
+
     user_prompt = (
-        f"{topic['prompt_focus']}\n\n"
+        f"{topic_prompt}\n\n"
+        f"Today's date is {today_str}. Write about topics relevant to {month_year_str}. "
         "Remember: output ONLY Markdown. First line = # Title. "
         "Second line = > meta: [description]. Then article body with ## subheadings."
     )
 
     try:
-        raw = await _call_gemini(user_prompt, _SYSTEM_PROMPT)
+        raw = await _call_gemini(user_prompt, system_prompt)
         raw = raw.strip()
     except Exception as e:
         logger.error(f"[BLOG] Gemini generation failed: {e}")
