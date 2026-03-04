@@ -192,7 +192,7 @@ Output ONLY this JSON, nothing else:
                         {"inlineData": {"mimeType": "image/jpeg", "data": b64_image}},
                     ]
                 }],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1024},
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
             }
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(
