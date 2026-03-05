@@ -34,8 +34,47 @@ BG_W, BG_H        = 720, 1280
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 POLLO_HEADERS = {"Content-Type": "application/json", "x-api-key": POLLO_KEY}
-FFMPEG_PATH   = (os.getenv("LOCALAPPDATA","") +
-                 r"\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin")
+
+# Windows: add WinGet ffmpeg install to PATH
+if os.name == 'nt':
+    _win_ffmpeg = (os.getenv("LOCALAPPDATA","") +
+                   r"\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin")
+    if _win_ffmpeg and _win_ffmpeg not in os.environ.get("PATH",""):
+        os.environ["PATH"] = os.environ.get("PATH","") + ";" + _win_ffmpeg
+
+
+def ensure_ffmpeg():
+    """Download a static ffmpeg binary on Linux servers that don't have it installed."""
+    import shutil as _sh
+    if _sh.which("ffmpeg"):
+        return  # already on PATH
+    if os.name == 'nt':
+        return  # Windows handled above
+
+    _bin = "/tmp/ffmpeg_static/ffmpeg"
+    if os.path.exists(_bin):
+        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH","")
+        print("[ffmpeg] Using cached static binary")
+        return
+
+    print("[ffmpeg] Downloading static binary (first-time setup)...")
+    import tarfile, urllib.request as _u
+    _url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    _tar = "/tmp/ffmpeg.tar.xz"
+    try:
+        _u.urlretrieve(_url, _tar)
+        os.makedirs("/tmp/ffmpeg_static", exist_ok=True)
+        with tarfile.open(_tar, "r:xz") as t:
+            for m in t.getmembers():
+                if m.name.endswith("/ffmpeg") or m.name == "ffmpeg":
+                    m.name = "ffmpeg"
+                    t.extract(m, "/tmp/ffmpeg_static")
+                    break
+        os.chmod(_bin, 0o755)
+        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH","")
+        print("[ffmpeg] Static binary ready ✓")
+    except Exception as _e:
+        print(f"[ffmpeg] Download failed: {_e}")
 
 
 # ── Helpers ───────────────────────────────────────────────
@@ -479,8 +518,7 @@ def concat_xfade(seg_paths: list, seg_durations: list, out_path: str):
 
 # ── Main ─────────────────────────────────────────────────
 async def main():
-    if FFMPEG_PATH not in os.environ.get("PATH",""):
-        os.environ["PATH"] = os.environ.get("PATH","") + ";" + FFMPEG_PATH
+    ensure_ffmpeg()  # install static binary on Linux if needed
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     print("=" * 62)
