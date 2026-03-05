@@ -371,145 +371,134 @@ def make_intro(first_card_img: str) -> str:
 
 
 
+# ── Text overlay via PIL (no drawtext needed) ─────────────
+def render_text_png(name, price, rar, accent_hex, width, height, out_path):
+    """Render card text labels onto a transparent RGBA PNG using PIL/Pillow."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    def _hex(h):
+        h = h.lstrip('#')
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+    acc = _hex(accent_hex)
+
+    def _font(size, bold=False):
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
+                else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf" if bold
+                else "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        ]
+        for fp in candidates:
+            if os.path.exists(fp):
+                try: return ImageFont.truetype(fp, size)
+                except: pass
+        return ImageFont.load_default()
+
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(img)
+
+    def draw_c(text, font, y_frac, color, shadow_color=(0, 0, 0, 180)):
+        y = int(height * y_frac)
+        bb = d.textbbox((0, 0), text, font=font)
+        tw = bb[2] - bb[0]
+        x  = (width - tw) // 2
+        d.text((x + 2, y + 2), text, font=font, fill=shadow_color)
+        d.text((x, y),         text, font=font, fill=color)
+
+    draw_c(rar,         _font(22, bold=True),  0.820, (*acc, 255))
+    draw_c(name,        _font(36, bold=True),  0.873, (255, 255, 255, 255))
+    draw_c(price,       _font(52, bold=True),  0.922, (*acc, 255))
+    draw_c("TCG Nakama",_font(20),             0.962, (255, 255, 255, 140))
+
+    img.save(out_path, "PNG")
+
+
 # ── Per-card segment ──────────────────────────────────────
 def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, idx: int) -> str:
     """
     Layout (consistent for every card):
-      [0:v] bg_path  — Pollo 1.6 animated card video, streamed as backdrop (720x1280)
-      [1:v] img_path — static card PNG, scaled to CARD_W=450px, slides up from bottom
-    Text overlays fade in below the card.
+      [0:v] bg_path  — Pollo 1.6 animated backdrop (720x1280)
+      [1:v] img_path — static card PNG, slides up from bottom
+      [2:v] text.png — PIL-rendered text overlay (no drawtext needed)
     """
     seg    = f"{OUTPUT_DIR}/seg_{idx:02d}.mp4"
+    txt_png= f"{OUTPUT_DIR}/txt_{idx:02d}.png"
     name   = safe(analysis.get("name") or eng(card['title']))
     price  = f"JPY {card['price']:,.0f}"
     rar    = safe(card.get('rarity') or 'IN STOCK').upper()
     a      = accent(card.get('rarity'))
-    word   = safe(analysis.get("intro_word","REVEALED")).upper()
-    CARD_W = 450   # fixed card overlay width — ensures uniform sizing across all segments
+    CARD_W = 450
 
     has_bg  = bg_path  and os.path.exists(bg_path)  and os.path.getsize(bg_path)  > 1000
     has_img = img_path and os.path.exists(img_path)
 
-    # Sanity check: verify ffmpeg has drawtext available
-    _fc_check = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
-    if "drawtext" not in _fc_check.stdout:
-        raise RuntimeError(f"drawtext filter not available! ffmpeg filters:\n{_fc_check.stdout[:500]}")
+    # Render text overlay PNG using PIL (no ffmpeg drawtext needed)
+    render_text_png(name, price, rar, a, BG_W, BG_H, txt_png)
 
-    # Explicit fontfile= required on Linux — fontconfig fails on minimal containers
-    _ff = f"fontfile={FONT_PATH}:" if FONT_PATH else ""
+    # Card slide animation y expression (safe: no commas)
+    slide_y = f"(H-h)/2-80"   # settled position; full slide done via fade
 
     if has_bg and has_img:
-        # ── PRIMARY: animated Pollo bg + static card overlay at fixed width ──
-        # Card slides up from bottom, settles at vertical center minus small offset.
-        # Use if() instead of max() for the y expression to avoid comma-parsing issues.
-        slide_y = "if(lt(t\\,0.55)\\,(H-h)/2-80+(H+200)*(1-t/0.45)\\,(H-h)/2-80)"
         fc = (
-            # bg: stream-loop Pollo video as full-frame backdrop
             f"[0:v]scale={BG_W}:{BG_H}:force_original_aspect_ratio=decrease,"
             f"pad={BG_W}:{BG_H}:(ow-iw)/2:(oh-ih)/2:black,"
             f"fade=in:st=0:d=0.35[bg];"
 
-            # card: scale to fixed CARD_W, slide up + fade in
             f"[1:v]scale={CARD_W}:-1,format=rgba[cr];"
             f"[cr]fade=in:st=0.1:d=0.45:alpha=1[cf];"
-            f"[bg][cf]overlay=x=(W-w)/2:y='{slide_y}'[ov];"
+            f"[bg][cf]overlay=x=(W-w)/2:y={slide_y}[ov];"
 
-            # flash intro word (first 0.55s)
-            f"[ov]drawtext={_ff}text='{word}':"
-            f"fontsize=48:fontcolor=white:"
-            f"alpha='max(0,min(1,t*6)*min(1,(0.55-t)*8))':"
-            f"x=(w-text_w)/2:y=H*0.04:"
-            f"shadowcolor={a}@0.9:shadowx=3:shadowy=3[fw];"
-
-            # rarity
-            f"[fw]drawtext={_ff}text='{rar}':"
-            f"fontsize=22:fontcolor={a}:"
-            f"alpha='min(1,max(0,(t-0.6)*4))':"
-            f"x=(w-text_w)/2:y=H*0.820:"
-            f"shadowcolor=black:shadowx=1:shadowy=1[r1];"
-
-            # card name
-            f"[r1]drawtext={_ff}text='{name}':"
-            f"fontsize=36:fontcolor=white:"
-            f"alpha='min(1,max(0,(t-0.75)*4))':"
-            f"x=(w-text_w)/2:y=H*0.873:"
-            f"shadowcolor=black:shadowx=2:shadowy=2[en];"
-
-            # price
-            f"[en]drawtext={_ff}text='{price}':"
-            f"fontsize=52:fontcolor={a}:"
-            f"alpha='min(1,max(0,(t-0.9)*4))':"
-            f"x=(w-text_w)/2:y=H*0.922:"
-            f"shadowcolor=black@0.95:shadowx=3:shadowy=3[pr];"
-
-            # branding
-            f"[pr]drawtext={_ff}text='TCG Nakama':"
-            f"fontsize=20:fontcolor=white@0.55:"
-            f"alpha='min(1,max(0,(t-1.05)*4))':"
-            f"x=(w-text_w)/2:y=H*0.962:"
-            f"shadowcolor=black:shadowx=1:shadowy=1"
+            # text overlay fades in at t=0.8s
+            f"[2:v]format=rgba,fade=in:st=0.8:d=0.3:alpha=1[txt];"
+            f"[ov][txt]overlay=0:0"
         )
         cmd = [
-            "ffmpeg","-y",
-            "-stream_loop","-1","-i", bg_path,
+            "ffmpeg", "-y",
+            "-stream_loop", "-1", "-i", bg_path,
             "-i", img_path,
+            "-loop", "1", "-i", txt_png,
             "-filter_complex", fc,
             "-t", str(CARD_SEC),
-            "-c:v","libx264","-crf","18","-preset","fast","-pix_fmt","yuv420p","-an", seg
+            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-pix_fmt", "yuv420p", "-an", seg
         ]
 
     elif has_img:
-        # ── FALLBACK: gradient bg + static card (no Pollo video) ──
-        slide_y = "if(lt(t\\,0.55)\\,(H-h)/2-80+(H+200)*(1-t/0.45)\\,(H-h)/2-80)"
         fc = (
             f"[0:v]fade=in:st=0:d=0.4[bg];"
             f"[1:v]scale={CARD_W}:-1,format=rgba[cr];"
             f"[cr]fade=in:st=0.1:d=0.45:alpha=1[cf];"
-            f"[bg][cf]overlay=x=(W-w)/2:y='{slide_y}'[ov];"
-            f"[ov]drawtext={_ff}text='{rar}':"
-            f"fontsize=22:fontcolor={a}:"
-            f"alpha='min(1,max(0,(t-0.65)*4))':"
-            f"x=(w-text_w)/2:y=H*0.820:"
-            f"shadowcolor=black:shadowx=1:shadowy=1[r1];"
-            f"[r1]drawtext={_ff}text='{name}':"
-            f"fontsize=36:fontcolor=white:"
-            f"alpha='min(1,max(0,(t-0.8)*4))':"
-            f"x=(w-text_w)/2:y=H*0.873:"
-            f"shadowcolor=black:shadowx=2:shadowy=2[en];"
-            f"[en]drawtext={_ff}text='{price}':"
-            f"fontsize=52:fontcolor={a}:"
-            f"alpha='min(1,max(0,(t-0.95)*4))':"
-            f"x=(w-text_w)/2:y=H*0.922:"
-            f"shadowcolor=black@0.95:shadowx=3:shadowy=3[pr];"
-            f"[pr]drawtext={_ff}text='TCG Nakama':"
-            f"fontsize=20:fontcolor=white@0.55:"
-            f"alpha='min(1,max(0,(t-1.1)*4))':"
-            f"x=(w-text_w)/2:y=H*0.962:"
-            f"shadowcolor=black:shadowx=1:shadowy=1"
+            f"[bg][cf]overlay=x=(W-w)/2:y={slide_y}[ov];"
+            f"[2:v]format=rgba,fade=in:st=0.8:d=0.3:alpha=1[txt];"
+            f"[ov][txt]overlay=0:0"
         )
         cmd = [
-            "ffmpeg","-y",
-            "-stream_loop","-1","-i", bg_path,
+            "ffmpeg", "-y",
+            "-stream_loop", "-1", "-i", bg_path,
             "-i", img_path,
+            "-loop", "1", "-i", txt_png,
             "-filter_complex", fc,
             "-t", str(CARD_SEC),
-            "-c:v","libx264","-crf","18","-preset","fast","-pix_fmt","yuv420p","-an", seg
+            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-pix_fmt", "yuv420p", "-an", seg
         ]
 
     else:
-        # ── MINIMAL: bg only + text ──
-        vf = (
-            f"drawtext={_ff}text='{name}':fontsize=36:fontcolor=white:"
-            f"alpha='min(1,max(0,(t-0.5)*4))':"
-            f"x=(w-text_w)/2:y=H*0.45:shadowcolor=black:shadowx=2:shadowy=2,"
-            f"drawtext={_ff}text='{price}':fontsize=52:fontcolor={a}:"
-            f"alpha='min(1,max(0,(t-0.7)*4))':"
-            f"x=(w-text_w)/2:y=H*0.53:shadowcolor=black:shadowx=3:shadowy=3"
+        # Minimal: bg only + text overlay
+        fc = (
+            f"[0:v]fade=in:st=0:d=0.4[bg];"
+            f"[1:v]format=rgba,fade=in:st=0.5:d=0.4:alpha=1[txt];"
+            f"[bg][txt]overlay=0:0"
         )
         cmd = [
-            "ffmpeg","-y","-stream_loop","-1","-i", bg_path,
-            "-vf", vf, "-t", str(CARD_SEC),
-            "-c:v","libx264","-crf","18","-preset","fast","-pix_fmt","yuv420p","-an", seg
+            "ffmpeg", "-y",
+            "-stream_loop", "-1", "-i", bg_path,
+            "-loop", "1", "-i", txt_png,
+            "-filter_complex", fc,
+            "-t", str(CARD_SEC),
+            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-pix_fmt", "yuv420p", "-an", seg
         ]
 
     r = subprocess.run(cmd, capture_output=True, text=True)
