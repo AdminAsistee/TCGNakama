@@ -11,6 +11,33 @@ from app.background_tasks import start_background_tasks, stop_background_tasks, 
 
 load_dotenv(override=True)
 
+# ── GCP Credentials Bootstrap ─────────────────────────────────────────────────
+# On DigitalOcean App Platform the JSON key file can't be committed.
+# Set ONE of these env vars in your DigitalOcean App → Settings → Environment Variables:
+#   GOOGLE_CREDENTIALS_JSON   — the raw JSON string of the service account key
+#   GOOGLE_CREDENTIALS_BASE64 — the same JSON but base64-encoded
+# The app will write it to /tmp/gcp_credentials.json and point ADC there.
+_gcp_json = os.getenv("GOOGLE_CREDENTIALS_JSON", "")
+_gcp_b64  = os.getenv("GOOGLE_CREDENTIALS_BASE64", "")
+if _gcp_json or _gcp_b64:
+    import base64, json as _json, tempfile
+    _creds_path = "/tmp/gcp_credentials.json"
+    try:
+        if _gcp_b64 and not _gcp_json:
+            _gcp_json = base64.b64decode(_gcp_b64.strip()).decode("utf-8")
+        # Validate it's real JSON before writing
+        _json.loads(_gcp_json)
+        with open(_creds_path, "w") as _f:
+            _f.write(_gcp_json)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _creds_path
+        print(f"[GCP] Credentials written to {_creds_path}")
+    except Exception as _e:
+        print(f"[GCP] Failed to bootstrap credentials: {_e}")
+elif not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+    print("[GCP] WARN: No GCP credentials configured — GCS features will fail")
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 app = FastAPI(title="TCG Nakama")
 
 @app.on_event("startup")
