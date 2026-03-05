@@ -390,14 +390,19 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
     has_bg  = bg_path  and os.path.exists(bg_path)  and os.path.getsize(bg_path)  > 1000
     has_img = img_path and os.path.exists(img_path)
 
+    # Sanity check: verify ffmpeg has drawtext available
+    _fc_check = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
+    if "drawtext" not in _fc_check.stdout:
+        raise RuntimeError(f"drawtext filter not available! ffmpeg filters:\n{_fc_check.stdout[:500]}")
+
     # Explicit fontfile= required on Linux — fontconfig fails on minimal containers
     _ff = f"fontfile={FONT_PATH}:" if FONT_PATH else ""
 
     if has_bg and has_img:
         # ── PRIMARY: animated Pollo bg + static card overlay at fixed width ──
         # Card slides up from bottom, settles at vertical center minus small offset.
-        # This matches the screenshot layout — card centered on screen, text below.
-        slide_y = f"(H-h)/2-80 + max(0,(H+200)*max(0,1-(t-0.1)/0.45))"
+        # Use if() instead of max() for the y expression to avoid comma-parsing issues.
+        slide_y = "if(lt(t\\,0.55)\\,(H-h)/2-80+(H+200)*(1-t/0.45)\\,(H-h)/2-80)"
         fc = (
             # bg: stream-loop Pollo video as full-frame backdrop
             f"[0:v]scale={BG_W}:{BG_H}:force_original_aspect_ratio=decrease,"
@@ -455,7 +460,7 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
 
     elif has_img:
         # ── FALLBACK: gradient bg + static card (no Pollo video) ──
-        slide_y = f"(H-h)/2-80 + max(0,(H+200)*max(0,1-(t-0.1)/0.45))"
+        slide_y = "if(lt(t\\,0.55)\\,(H-h)/2-80+(H+200)*(1-t/0.45)\\,(H-h)/2-80)"
         fc = (
             f"[0:v]fade=in:st=0:d=0.4[bg];"
             f"[1:v]scale={CARD_W}:-1,format=rgba[cr];"
@@ -509,7 +514,7 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
 
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"Segment {idx} failed:\n{r.stderr[-400:]}")
+        raise RuntimeError(f"Segment {idx} failed:\n{r.stderr}")
     return seg
 
 
