@@ -104,6 +104,19 @@ def ensure_ffmpeg():
 
 
 
+# Font for ffmpeg drawtext — explicit fontfile avoids fontconfig failures on minimal containers
+if os.name == 'nt':
+    FONT_PATH = ""  # Windows: ffmpeg finds fonts via fontconfig automatically
+else:
+    # Linux: prefer DejaVu (installed via Aptfile), fall back to any available font
+    _font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ]
+    FONT_PATH = next((f for f in _font_candidates if os.path.exists(f)), "")
+
+
 # ── Helpers ───────────────────────────────────────────────
 def safe(s):    return re.sub(r"['\:\\#@\[\]{}()]", "", str(s or ""))
 def eng(title):
@@ -377,6 +390,9 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
     has_bg  = bg_path  and os.path.exists(bg_path)  and os.path.getsize(bg_path)  > 1000
     has_img = img_path and os.path.exists(img_path)
 
+    # Explicit fontfile= required on Linux — fontconfig fails on minimal containers
+    _ff = f"fontfile={FONT_PATH}:" if FONT_PATH else ""
+
     if has_bg and has_img:
         # ── PRIMARY: animated Pollo bg + static card overlay at fixed width ──
         # Card slides up from bottom, settles at vertical center minus small offset.
@@ -394,35 +410,35 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
             f"[bg][cf]overlay=x=(W-w)/2:y='{slide_y}'[ov];"
 
             # flash intro word (first 0.55s)
-            f"[ov]drawtext=text='{word}':"
+            f"[ov]drawtext={_ff}text='{word}':"
             f"fontsize=48:fontcolor=white:"
             f"alpha='max(0,min(1,t*6)*min(1,(0.55-t)*8))':"
             f"x=(w-text_w)/2:y=H*0.04:"
             f"shadowcolor={a}@0.9:shadowx=3:shadowy=3[fw];"
 
             # rarity
-            f"[fw]drawtext=text='{rar}':"
+            f"[fw]drawtext={_ff}text='{rar}':"
             f"fontsize=22:fontcolor={a}:"
             f"alpha='min(1,max(0,(t-0.6)*4))':"
             f"x=(w-text_w)/2:y=H*0.820:"
             f"shadowcolor=black:shadowx=1:shadowy=1[r1];"
 
             # card name
-            f"[r1]drawtext=text='{name}':"
+            f"[r1]drawtext={_ff}text='{name}':"
             f"fontsize=36:fontcolor=white:"
             f"alpha='min(1,max(0,(t-0.75)*4))':"
             f"x=(w-text_w)/2:y=H*0.873:"
             f"shadowcolor=black:shadowx=2:shadowy=2[en];"
 
             # price
-            f"[en]drawtext=text='{price}':"
+            f"[en]drawtext={_ff}text='{price}':"
             f"fontsize=52:fontcolor={a}:"
             f"alpha='min(1,max(0,(t-0.9)*4))':"
             f"x=(w-text_w)/2:y=H*0.922:"
             f"shadowcolor=black@0.95:shadowx=3:shadowy=3[pr];"
 
             # branding
-            f"[pr]drawtext=text='TCG Nakama':"
+            f"[pr]drawtext={_ff}text='TCG Nakama':"
             f"fontsize=20:fontcolor=white@0.55:"
             f"alpha='min(1,max(0,(t-1.05)*4))':"
             f"x=(w-text_w)/2:y=H*0.962:"
@@ -445,22 +461,22 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
             f"[1:v]scale={CARD_W}:-1,format=rgba[cr];"
             f"[cr]fade=in:st=0.1:d=0.45:alpha=1[cf];"
             f"[bg][cf]overlay=x=(W-w)/2:y='{slide_y}'[ov];"
-            f"[ov]drawtext=text='{rar}':"
+            f"[ov]drawtext={_ff}text='{rar}':"
             f"fontsize=22:fontcolor={a}:"
             f"alpha='min(1,max(0,(t-0.65)*4))':"
             f"x=(w-text_w)/2:y=H*0.820:"
             f"shadowcolor=black:shadowx=1:shadowy=1[r1];"
-            f"[r1]drawtext=text='{name}':"
+            f"[r1]drawtext={_ff}text='{name}':"
             f"fontsize=36:fontcolor=white:"
             f"alpha='min(1,max(0,(t-0.8)*4))':"
             f"x=(w-text_w)/2:y=H*0.873:"
             f"shadowcolor=black:shadowx=2:shadowy=2[en];"
-            f"[en]drawtext=text='{price}':"
+            f"[en]drawtext={_ff}text='{price}':"
             f"fontsize=52:fontcolor={a}:"
             f"alpha='min(1,max(0,(t-0.95)*4))':"
             f"x=(w-text_w)/2:y=H*0.922:"
             f"shadowcolor=black@0.95:shadowx=3:shadowy=3[pr];"
-            f"[pr]drawtext=text='TCG Nakama':"
+            f"[pr]drawtext={_ff}text='TCG Nakama':"
             f"fontsize=20:fontcolor=white@0.55:"
             f"alpha='min(1,max(0,(t-1.1)*4))':"
             f"x=(w-text_w)/2:y=H*0.962:"
@@ -478,10 +494,10 @@ def make_card_segment(bg_path: str, img_path: str, card: dict, analysis: dict, i
     else:
         # ── MINIMAL: bg only + text ──
         vf = (
-            f"drawtext=text='{name}':fontsize=36:fontcolor=white:"
+            f"drawtext={_ff}text='{name}':fontsize=36:fontcolor=white:"
             f"alpha='min(1,max(0,(t-0.5)*4))':"
             f"x=(w-text_w)/2:y=H*0.45:shadowcolor=black:shadowx=2:shadowy=2,"
-            f"drawtext=text='{price}':fontsize=52:fontcolor={a}:"
+            f"drawtext={_ff}text='{price}':fontsize=52:fontcolor={a}:"
             f"alpha='min(1,max(0,(t-0.7)*4))':"
             f"x=(w-text_w)/2:y=H*0.53:shadowcolor=black:shadowx=3:shadowy=3"
         )
@@ -672,7 +688,8 @@ async def main():
     notify_zapier(manifest)
 
 
-    subprocess.Popen(["explorer", "/select,", os.path.abspath(final)])
+    if os.name == 'nt':  # Windows only
+        subprocess.Popen(["explorer", "/select,", os.path.abspath(final)])
 
 if __name__ == "__main__":
     asyncio.run(main())
