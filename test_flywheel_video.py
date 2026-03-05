@@ -124,10 +124,10 @@ def eng(title):
     return (m.group(1) if m else title.split(' - ')[0])[:24]
 def accent(rarity):
     r = (rarity or '').lower()
-    if 'secret' in r: return "0xFFD700"
-    if 'ultra'  in r: return "0xE040FB"
-    if 'rare'   in r: return "0x40C4FF"
-    return "0xFFFFFF"
+    if 'secret' in r: return "#FFD700"
+    if 'ultra'  in r: return "#E040FB"
+    if 'rare'   in r: return "#40C4FF"
+    return "#FFFFFF"
 
 
 # ── GCS ──────────────────────────────────────────────────
