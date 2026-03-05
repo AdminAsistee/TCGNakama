@@ -258,7 +258,7 @@ async def _showcase_loop():
                 continue
 
             # ── Cards changed — kick off the full pipeline ──────────────────
-            logger.info(f"[SHOWCASE] New cards detected — starting video pipeline...")
+            print("[SHOWCASE] New cards detected — starting video pipeline...", flush=True)
             try:
                 # Import and run the main showcase pipeline
                 sys.path.insert(0, '.')
@@ -268,11 +268,11 @@ async def _showcase_loop():
                 # (ffmpeg + Pollo polls are blocking/synchronous)
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(None, lambda: asyncio.run(showcase.main()))
-                logger.info("[SHOWCASE] Pipeline complete.")
+                print("[SHOWCASE] Pipeline complete.", flush=True)
             except Exception as e:
                 import traceback
-                logger.error(f"[SHOWCASE] Pipeline failed: {e}")
-                logger.error(traceback.format_exc())
+                print(f"[SHOWCASE] Pipeline failed: {e}", flush=True)
+                print(traceback.format_exc(), flush=True)
                 await asyncio.sleep(60 * 10)  # back-off 10 min
 
         except asyncio.CancelledError:
