@@ -45,40 +45,63 @@ if os.name == 'nt':
 
 def ensure_ffmpeg():
     """
-    On Linux servers, always use the full static ffmpeg build from johnvansickle.com
-    (includes drawtext, libfreetype, all filters). Prepends to PATH so it takes priority
-    over any minimal system apt ffmpeg that may lack certain filters.
+    On Linux servers, ensure the full static ffmpeg build is available.
+    Validates the cached binary before using it; re-downloads if corrupt.
+    Raises RuntimeError if ffmpeg cannot be made available.
     """
     if os.name == 'nt':
         return  # Windows handled above via PATH
 
-    _bin = "/tmp/ffmpeg_static/ffmpeg"
-    if os.path.exists(_bin):
-        # Already downloaded — make sure it's first in PATH
-        _p = os.environ.get("PATH", "")
-        if "/tmp/ffmpeg_static" not in _p:
-            os.environ["PATH"] = "/tmp/ffmpeg_static:" + _p
-        print("[ffmpeg] Using full static binary ✓")
-        return
+    _bin  = "/tmp/ffmpeg_static/ffmpeg"
+    _dir  = "/tmp/ffmpeg_static"
+    _url  = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    _tar  = "/tmp/ffmpeg.tar.xz"
 
-    print("[ffmpeg] Downloading full static binary (first-time setup)...")
+    def _prepend_path():
+        _p = os.environ.get("PATH", "")
+        if _dir not in _p:
+            os.environ["PATH"] = _dir + ":" + _p
+
+    def _valid():
+        """Return True if the cached binary runs successfully."""
+        import subprocess as _sp
+        try:
+            r = _sp.run([_bin, "-version"], capture_output=True, timeout=10)
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    # Check cached binary
+    if os.path.exists(_bin):
+        if _valid():
+            _prepend_path()
+            print("[ffmpeg] Using cached static binary ✓")
+            return
+        else:
+            print("[ffmpeg] Cached binary invalid — re-downloading...")
+            import shutil as _sh
+            _sh.rmtree(_dir, ignore_errors=True)
+
+    # Download
+    print("[ffmpeg] Downloading static binary (~40 MB)...")
     import tarfile, urllib.request as _u
-    _url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-    _tar = "/tmp/ffmpeg.tar.xz"
     try:
         _u.urlretrieve(_url, _tar)
-        os.makedirs("/tmp/ffmpeg_static", exist_ok=True)
+        os.makedirs(_dir, exist_ok=True)
         with tarfile.open(_tar, "r:xz") as t:
             for m in t.getmembers():
                 if m.name.endswith("/ffmpeg") or m.name == "ffmpeg":
                     m.name = "ffmpeg"
-                    t.extract(m, "/tmp/ffmpeg_static")
+                    t.extract(m, _dir)
                     break
         os.chmod(_bin, 0o755)
-        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH", "")
-        print("[ffmpeg] Full static binary ready ✓")
+        if not _valid():
+            raise RuntimeError("Downloaded binary failed validation")
+        _prepend_path()
+        print("[ffmpeg] Static binary ready ✓")
     except Exception as _e:
-        print(f"[ffmpeg] Download failed: {_e}")
+        raise RuntimeError(f"[ffmpeg] Could not install ffmpeg: {_e}") from _e
+
 
 
 # ── Helpers ───────────────────────────────────────────────
