@@ -110,6 +110,10 @@ from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 _blog_task = None
 _BLOG_INTERVAL_DAYS = 3
 
+_showcase_task = None
+_SHOWCASE_INTERVAL_DAYS = 3
+_SHOWCASE_CARD_LIMIT = 3  # how many Fresh Pulls to pick per run
+
 
 async def _blog_loop():
     """Background loop: generate + publish a blog post every 3 days."""
@@ -180,9 +184,111 @@ async def _blog_loop():
             await asyncio.sleep(60 * 10)  # back-off 10 min on error
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Showcase Video Scheduler
+# Generates a New Cards Showcase video every 3 days using Fresh Pulls.
+# Skips the run if the top-N cards haven't changed since the last video.
+# ─────────────────────────────────────────────────────────────────────────────
+async def _showcase_loop():
+    """Background loop: generate a showcase video every 3 days if cards changed."""
+    import logging, json, os, sys
+    logger = logging.getLogger(__name__)
+    logger.info("[SHOWCASE] Showcase scheduler started")
+
+    while True:
+        try:
+            # ── Wait until next window ──────────────────────────────────────
+            now = _dt.now(_tz.utc)
+
+            # Try to read last_run from GCS to know when we last ran
+            last_run_at = None
+            last_card_ids: list = []
+            try:
+                from google.cloud import storage as _gcs_storage
+                import os as _os
+                _project  = _os.getenv("GCP_PROJECT_ID", "tcgnakama")
+                _bucket   = _os.getenv("GCS_BUCKET", "ready-bucket")
+                _gcs      = _gcs_storage.Client(project=_project)
+                _blob     = _gcs.bucket(_bucket).blob("showcase/last_run.json")
+                if _blob.exists():
+                    raw = json.loads(_blob.download_as_text())
+                    last_run_at   = _dt.fromisoformat(raw["run_at"])
+                    last_card_ids = raw.get("card_ids", [])
+                    logger.info(f"[SHOWCASE] Last run: {last_run_at.isoformat()} | {len(last_card_ids)} cards")
+            except Exception as e:
+                logger.warning(f"[SHOWCASE] Could not load last_run.json: {e}")
+
+            # Decide when next run should happen
+            if last_run_at:
+                next_run = last_run_at + _td(days=_SHOWCASE_INTERVAL_DAYS)
+            else:
+                next_run = now + _td(seconds=30)  # first ever run — start soon
+
+            wait_seconds = (next_run - now).total_seconds()
+            if wait_seconds > 0:
+                logger.info(f"[SHOWCASE] Next check in {wait_seconds/3600:.1f}h (at {next_run.isoformat()})")
+                await asyncio.sleep(wait_seconds)
+
+            # ── Time to run — check if cards changed ────────────────────────
+            logger.info("[SHOWCASE] Checking Fresh Pulls for new cards...")
+            try:
+                client = ShopifyClient()
+                products = await client.get_products()
+                in_stock = [p for p in products if p.get('totalInventory', 0) > 0]
+                fresh = sorted(in_stock, key=lambda x: x.get('createdAt', ''), reverse=True)
+                candidates = fresh[:_SHOWCASE_CARD_LIMIT]
+                candidate_ids = [p['id'] for p in candidates]
+            except Exception as e:
+                logger.error(f"[SHOWCASE] Shopify fetch failed: {e}")
+                await asyncio.sleep(60 * 30)  # retry in 30 min
+                continue
+
+            if set(candidate_ids) == set(last_card_ids) and last_card_ids:
+                logger.info(
+                    f"[SHOWCASE] Cards unchanged since last run — skipping video generation.\n"
+                    f"  Same cards: {[p['title'][:30] for p in candidates]}"
+                )
+                # Bump last_run_at so we wait another 3 days before checking again
+                try:
+                    bump = {"run_at": _dt.now(_tz.utc).isoformat(), "card_ids": last_card_ids}
+                    _gcs.bucket(_bucket).blob("showcase/last_run.json").upload_from_string(
+                        json.dumps(bump), content_type="application/json"
+                    )
+                except Exception:
+                    pass
+                continue
+
+            # ── Cards changed — kick off the full pipeline ──────────────────
+            logger.info(f"[SHOWCASE] New cards detected — starting video pipeline...")
+            try:
+                # Import and run the main showcase pipeline
+                sys.path.insert(0, '.')
+                import importlib
+                showcase = importlib.import_module("test_flywheel_video")
+                # Run in a thread so it doesn't block the event loop
+                # (ffmpeg + Pollo polls are blocking/synchronous)
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, lambda: asyncio.run(showcase.main()))
+                logger.info("[SHOWCASE] Pipeline complete.")
+            except Exception as e:
+                import traceback
+                logger.error(f"[SHOWCASE] Pipeline failed: {e}")
+                logger.error(traceback.format_exc())
+                await asyncio.sleep(60 * 10)  # back-off 10 min
+
+        except asyncio.CancelledError:
+            print("[SHOWCASE] Showcase scheduler cancelled", flush=True)
+            break
+        except Exception as e:
+            import traceback
+            print(f"[SHOWCASE ERROR] {e}", flush=True)
+            print(traceback.format_exc(), flush=True)
+            await asyncio.sleep(60 * 10)
+
+
 def start_background_tasks():
     """Start all background tasks."""
-    global _polling_task, _blog_task
+    global _polling_task, _blog_task, _showcase_task
 
     if _polling_task is None:
         _polling_task = asyncio.create_task(polling_task())
@@ -196,12 +302,18 @@ def start_background_tasks():
     else:
         print("[BACKGROUND] Blog scheduler task already running")
 
+    if _showcase_task is None:
+        _showcase_task = asyncio.create_task(_showcase_loop())
+        print("[BACKGROUND] Showcase video scheduler started")
+    else:
+        print("[BACKGROUND] Showcase video scheduler already running")
+
 
 async def stop_background_tasks():
     """Stop all background tasks."""
-    global _polling_task, _blog_task
+    global _polling_task, _blog_task, _showcase_task
 
-    for task, name in [(_polling_task, "polling"), (_blog_task, "blog")]:
+    for task, name in [(_polling_task, "polling"), (_blog_task, "blog"), (_showcase_task, "showcase")]:
         if task:
             task.cancel()
             try:
@@ -212,3 +324,4 @@ async def stop_background_tasks():
 
     _polling_task = None
     _blog_task = None
+    _showcase_task = None

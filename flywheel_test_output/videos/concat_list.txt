@@ -1,6 +1,0 @@
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_00.mp4'
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_01.mp4'
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_02.mp4'
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_03.mp4'
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_04.mp4'
-file 'C:\Users\amrca\Documents\antigravity\tcgnakama\flywheel_test_output\videos\seg_05.mp4'
