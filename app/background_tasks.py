@@ -218,10 +218,10 @@ async def _showcase_loop():
                 print(f"[SHOWCASE] Could not load last_run.json: {e}", flush=True)
 
             # Decide when next run should happen
-            if last_run_at:
+            if last_run_at and last_card_ids:  # only wait if previous run had actual cards
                 next_run = last_run_at + _td(days=_SHOWCASE_INTERVAL_DAYS)
             else:
-                next_run = now + _td(seconds=30)  # first ever run — start soon
+                next_run = now + _td(seconds=30)  # no valid last run — start soon
 
             wait_seconds = (next_run - now).total_seconds()
             if wait_seconds > 0:
