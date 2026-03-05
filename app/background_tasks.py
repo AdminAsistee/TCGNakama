@@ -192,8 +192,7 @@ async def _blog_loop():
 async def _showcase_loop():
     """Background loop: generate a showcase video every 3 days if cards changed."""
     import logging, json, os, sys
-    logger = logging.getLogger(__name__)
-    logger.info("[SHOWCASE] Showcase scheduler started")
+    print("[SHOWCASE] Scheduler started", flush=True)
 
     while True:
         try:
@@ -214,9 +213,9 @@ async def _showcase_loop():
                     raw = json.loads(_blob.download_as_text())
                     last_run_at   = _dt.fromisoformat(raw["run_at"])
                     last_card_ids = raw.get("card_ids", [])
-                    logger.info(f"[SHOWCASE] Last run: {last_run_at.isoformat()} | {len(last_card_ids)} cards")
+                    print(f"[SHOWCASE] Last run: {last_run_at.isoformat()} | {len(last_card_ids)} cards", flush=True)
             except Exception as e:
-                logger.warning(f"[SHOWCASE] Could not load last_run.json: {e}")
+                print(f"[SHOWCASE] Could not load last_run.json: {e}", flush=True)
 
             # Decide when next run should happen
             if last_run_at:
@@ -226,11 +225,11 @@ async def _showcase_loop():
 
             wait_seconds = (next_run - now).total_seconds()
             if wait_seconds > 0:
-                logger.info(f"[SHOWCASE] Next check in {wait_seconds/3600:.1f}h (at {next_run.isoformat()})")
+                print(f"[SHOWCASE] Next run in {wait_seconds/3600:.1f}h ({wait_seconds:.0f}s)", flush=True)
                 await asyncio.sleep(wait_seconds)
 
             # ── Time to run — check if cards changed ────────────────────────
-            logger.info("[SHOWCASE] Checking Fresh Pulls for new cards...")
+            print("[SHOWCASE] Checking Fresh Pulls...", flush=True)
             try:
                 client = ShopifyClient()
                 products = await client.get_products()
