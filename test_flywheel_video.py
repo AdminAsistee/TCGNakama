@@ -567,6 +567,9 @@ async def main():
     # 1. Fetch cards
     print(f"\n[SHOPIFY] Fetching top {CARD_LIMIT} cards...")
     cards = await get_fresh_pulls()
+    if not cards:
+        print("[SHOWCASE] No in-stock cards found — aborting pipeline (last_run.json NOT updated).")
+        return
     for i, c in enumerate(cards):
         print(f"  {i+1}. {eng(c['title']):26s} | {c.get('rarity',''):14s} | JPY {c['price']:,.0f}")
 
@@ -643,16 +646,19 @@ async def main():
     print(f"\n[GCS] Uploading...")
     video_uri, video_public_url = gcs_upload(gcs, final, f"showcase/new_cards_{ts}.mp4")
 
-    # Record which card IDs were used so the scheduler can deduplicate next run
+    # Record which card IDs were used so the scheduler can deduplicate next run.
+    # Only write last_run.json if we actually processed cards — an empty list
+    # would cause the scheduler to treat this as "no valid run" and retrigger in 30s.
     used_ids = [c['id'] for c in cards]
-    last_run = {
-        "run_at": datetime.now(timezone.utc).isoformat(),
-        "card_ids": used_ids,
-    }
-    last_run_path = f"{OUTPUT_DIR}/last_run.json"
-    with open(last_run_path, 'w', encoding='utf-8') as f:
-        json.dump(last_run, f, ensure_ascii=False, indent=2)
-    gcs_upload(gcs, last_run_path, "showcase/last_run.json")
+    if used_ids:
+        last_run = {
+            "run_at": datetime.now(timezone.utc).isoformat(),
+            "card_ids": used_ids,
+        }
+        last_run_path = f"{OUTPUT_DIR}/last_run.json"
+        with open(last_run_path, 'w', encoding='utf-8') as f:
+            json.dump(last_run, f, ensure_ascii=False, indent=2)
+        gcs_upload(gcs, last_run_path, "showcase/last_run.json")
 
     manifest  = {
         "file": f"new_cards_{ts}.mp4",

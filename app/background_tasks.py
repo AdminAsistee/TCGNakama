@@ -192,6 +192,7 @@ async def _blog_loop():
 async def _showcase_loop():
     """Background loop: generate a showcase video every 3 days if cards changed."""
     import logging, json, os, sys
+    logger = logging.getLogger(__name__)  # define logger for the whole function
     print("[SHOWCASE] Scheduler started", flush=True)
 
     while True:
@@ -217,11 +218,21 @@ async def _showcase_loop():
             except Exception as e:
                 print(f"[SHOWCASE] Could not load last_run.json: {e}", flush=True)
 
-            # Decide when next run should happen
-            if last_run_at and last_card_ids:  # only wait if previous run had actual cards
+            # Decide when next run should happen.
+            # IMPORTANT: only honour a previous run if it actually processed cards.
+            # An empty card_ids list means the pipeline aborted (0 in-stock cards).
+            # Treat that as "no valid prior run" but schedule 3 days from now to
+            # avoid the 30-second infinite-loop when no cards are ever in stock.
+            if last_run_at and last_card_ids:
+                # Normal case: wait until 3 days after the last successful run
                 next_run = last_run_at + _td(days=_SHOWCASE_INTERVAL_DAYS)
+            elif last_run_at and not last_card_ids:
+                # Previous run had 0 cards (aborted). Wait 3 days from that run_at
+                # rather than re-triggering in 30 s — avoids the infinite loop.
+                next_run = last_run_at + _td(days=_SHOWCASE_INTERVAL_DAYS)
+                print("[SHOWCASE] Last run had 0 cards — waiting 3 days before retry", flush=True)
             else:
-                next_run = now + _td(seconds=30)  # no valid last run — start soon
+                next_run = now + _td(seconds=30)  # no last_run.json at all — start soon
 
             wait_seconds = (next_run - now).total_seconds()
             if wait_seconds > 0:
@@ -238,14 +249,15 @@ async def _showcase_loop():
                 candidates = fresh[:_SHOWCASE_CARD_LIMIT]
                 candidate_ids = [p['id'] for p in candidates]
             except Exception as e:
-                logger.error(f"[SHOWCASE] Shopify fetch failed: {e}")
+                print(f"[SHOWCASE] Shopify fetch failed: {e}", flush=True)
                 await asyncio.sleep(60 * 30)  # retry in 30 min
                 continue
 
             if set(candidate_ids) == set(last_card_ids) and last_card_ids:
-                logger.info(
+                print(
                     f"[SHOWCASE] Cards unchanged since last run — skipping video generation.\n"
-                    f"  Same cards: {[p['title'][:30] for p in candidates]}"
+                    f"  Same cards: {[p['title'][:30] for p in candidates]}",
+                    flush=True
                 )
                 # Bump last_run_at so we wait another 3 days before checking again
                 try:
