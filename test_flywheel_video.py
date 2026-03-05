@@ -44,20 +44,24 @@ if os.name == 'nt':
 
 
 def ensure_ffmpeg():
-    """Download a static ffmpeg binary on Linux servers that don't have it installed."""
-    import shutil as _sh
-    if _sh.which("ffmpeg"):
-        return  # already on PATH
+    """
+    On Linux servers, always use the full static ffmpeg build from johnvansickle.com
+    (includes drawtext, libfreetype, all filters). Prepends to PATH so it takes priority
+    over any minimal system apt ffmpeg that may lack certain filters.
+    """
     if os.name == 'nt':
-        return  # Windows handled above
+        return  # Windows handled above via PATH
 
     _bin = "/tmp/ffmpeg_static/ffmpeg"
     if os.path.exists(_bin):
-        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH","")
-        print("[ffmpeg] Using cached static binary")
+        # Already downloaded — make sure it's first in PATH
+        _p = os.environ.get("PATH", "")
+        if "/tmp/ffmpeg_static" not in _p:
+            os.environ["PATH"] = "/tmp/ffmpeg_static:" + _p
+        print("[ffmpeg] Using full static binary ✓")
         return
 
-    print("[ffmpeg] Downloading static binary (first-time setup)...")
+    print("[ffmpeg] Downloading full static binary (first-time setup)...")
     import tarfile, urllib.request as _u
     _url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
     _tar = "/tmp/ffmpeg.tar.xz"
@@ -71,8 +75,8 @@ def ensure_ffmpeg():
                     t.extract(m, "/tmp/ffmpeg_static")
                     break
         os.chmod(_bin, 0o755)
-        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH","")
-        print("[ffmpeg] Static binary ready ✓")
+        os.environ["PATH"] = "/tmp/ffmpeg_static:" + os.environ.get("PATH", "")
+        print("[ffmpeg] Full static binary ready ✓")
     except Exception as _e:
         print(f"[ffmpeg] Download failed: {_e}")
 
