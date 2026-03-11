@@ -26,6 +26,31 @@ _MODEL_FALLBACKS = [
 ]
 
 
+# ── Curated TCG Source Intelligence ───────────────────────────────────────────
+# These are the authoritative community sources to use when writing articles.
+# Reference their content, community narrative, and framing when relevant.
+_POKEMON_SOURCES = """
+Pokémon TCG Authoritative Sources:
+- PTCGRadio (Wossy): Daily meta news, competitive deck breakdowns, Japanese set leaks. Use for competitive hype and set reveal angles.
+- LittleDarkFury: Pack-opening and casual collector community. Use for chase card hype and pull-rate discussions.
+- Tricky Gym: High-energy deck building and competitive gameplay. Use for emerging rogue deck strategies.
+- DeepPocketMonster: Storytelling and high-value collecting. Use for narrative angles on vintage or high-rarity modern cards.
+- PokeBeach (pokebeach.com): Fastest source for Japanese card leaks, translations, and set lists before English markets.
+- PokeGuardian (pokeguardian.com): Daily updates on promos, merchandise, and tournament results.
+- JustinBasil (justinbasil.com): Ultimate deck-building resource. Use to verify meta relevance of newly revealed cards.
+"""
+
+_ONEPIECE_SOURCES = """
+One Piece TCG Authoritative Sources:
+- Joy Boys (YouTube): One Piece TCG news, card info, and match breakdowns. Use for community sentiment on new Leader cards.
+- VVTheory (YouTube): High-level deck breakdowns and meta analysis from former MTG players. Use for gameplay strategies and card synergies.
+- One Piece Top Decks (X/Web): Central hub for winning tournament lists from Eastern (Asia) and Western metas. Use for shifting tournament trends.
+- Official ONE PIECE Card Game Website (en.onepiece-cardgame.com): Announcements, ban lists, and set release dates.
+- Spellmana (spellmana.com): Guides and resources. Use for beginner-friendly explanations of complex mechanics.
+- TCGplayer Infinite One Piece section: Market watch, price spikes, and set reviews. Use for "Most Expensive Cards" lists and treasure/hype narrative.
+"""
+
+
 async def _call_gemini(user_prompt: str, system_prompt: str) -> str:
     """Call Gemini REST API, trying model fallbacks until one works."""
     payload = {
@@ -60,7 +85,12 @@ TOPIC_POOL = [
             "Write a 700-900 word blog article about the latest Pokémon TCG news. "
             "Topics may include: new set reveals (Scarlet & Violet era), special Illustration Rare cards, "
             "Pikachu ex cards, Charizard prices, upcoming Japanese set releases, or tournament meta. "
-            "Primary keyword: 'Pokémon TCG Japan'. Include card names naturally."
+            "Primary keyword: 'Pokémon TCG Japan'. Include card names naturally. "
+            "Ground your article in insights from PTCGRadio (Wossy) for competitive meta angles, "
+            "PokeBeach for Japanese set leaks and translations, and "
+            "PokeGuardian for recent promo and tournament news. "
+            "Reference LittleDarkFury's community perspective for chase card hype angles. "
+            "Use JustinBasil for verifying meta relevance of newly revealed cards."
         ),
         "tags": "pokemon, pokemon tcg, scarlet violet, japanese cards, tcg japan",
     },
@@ -71,7 +101,9 @@ TOPIC_POOL = [
             "Write a 700-900 word blog article about the Pokémon anime or movies. "
             "Topics may include: recent Pokémon anime episodes, Pokémon movie releases, "
             "character lore (Pikachu, Ash, Liko, Roy), or the new anime series. "
-            "Primary keyword: 'Pokémon anime 2025'. Mention related Pokémon TCG cards naturally."
+            "Primary keyword: 'Pokémon anime 2025'. Mention related Pokémon TCG cards naturally. "
+            "Draw on DeepPocketMonster's storytelling style for narrative and emotional angles "
+            "that connect anime moments to collectible card value."
         ),
         "tags": "pokemon, pokemon anime, pikachu, pokemon movie, tcg",
     },
@@ -82,7 +114,12 @@ TOPIC_POOL = [
             "Write a 700-900 word blog article about One Piece TCG. "
             "Topics may include: new One Piece card set reveals, Luffy Leader cards, "
             "One Piece TCG price spikes, tournament results, or tips for building One Piece decks. "
-            "Primary keyword: 'One Piece TCG Japan'. Include card names naturally."
+            "Primary keyword: 'One Piece TCG Japan'. Include card names naturally. "
+            "Ground your article in tournament data from One Piece Top Decks for meta trends, "
+            "VVTheory's high-level deck analysis for strategy angles, and "
+            "TCGplayer Infinite's One Piece section for price spike and value narrative. "
+            "Reference Joy Boys for community sentiment on new Leader cards. "
+            "Use official en.onepiece-cardgame.com for ban list and release date accuracy."
         ),
         "tags": "one piece, one piece tcg, luffy, op cards, tcg japan",
     },
@@ -93,7 +130,9 @@ TOPIC_POOL = [
             "Write a 700-900 word blog article about One Piece anime or movies. "
             "Topics may include: latest One Piece episodes, One Piece Film Red or similar movies, "
             "character lore (Monkey D. Luffy, Zoro, Nami, Shanks), arc summaries, or upcoming sagas. "
-            "Primary keyword: 'One Piece anime 2025'. Mention related One Piece TCG cards naturally."
+            "Primary keyword: 'One Piece anime 2025'. Mention related One Piece TCG cards naturally. "
+            "Use Spellmana's approachable writing style for mechanics explanations. "
+            "Draw on Joy Boys for community hype framing around key story moments and card tie-ins."
         ),
         "tags": "one piece, one piece anime, luffy, one piece film, tcg",
     },
@@ -126,9 +165,13 @@ TOPIC_POOL = [
         "weight": 2,
         "prompt_focus": (
             "Write a 700-900 word blog article about the latest TCG market news. "
-            "Use Google Search to find the most recent actual news about Pokémon TCG, "
-            "One Piece TCG, or Magic: The Gathering from the past week. "
+            "Draw on knowledge from these authoritative sources to frame the most relevant story: "
+            "PokeBeach and PokeGuardian for Pokémon TCG leaks/promos/tournament results; "
+            "PTCGRadio (Wossy) and Tricky Gym for competitive meta shifts; "
+            "One Piece Top Decks and TCGplayer Infinite for One Piece TCG tournament and price trends; "
+            "the official One Piece Card Game site for ban list or set announcements. "
             "Summarise what's happening and why it matters to collectors and players. "
+            "Structure the article around 2-3 distinct news items, not just one. "
             "Primary keyword: 'TCG news 2025 Japan'."
         ),
         "tags": "tcg news, pokemon news, one piece tcg news, mtg news, trading cards",
@@ -160,6 +203,14 @@ for Pokémon, One Piece, and Magic: The Gathering single cards.
 TODAY'S DATE: {today}. Always write about events, releases, and news from {month_year} or the
 very near future. Never reference past years as 'current'. If you mention a year, it must be
 {year} or later.
+
+You have deep knowledge of the following authoritative TCG community sources. When writing
+about Pokémon TCG, draw on the framing, narratives, and topics covered by:
+{pokemon_sources}
+When writing about One Piece TCG, draw on the framing, narratives, and topics covered by:
+{onepiece_sources}
+Cite or reference these creators/sites naturally where relevant (e.g. "as PTCGRadio reported",
+"according to PokeBeach", "tournament data from One Piece Top Decks shows...").
 
 Your articles must:
 1. Be written in clear, engaging English for a global TCG audience.
@@ -197,6 +248,8 @@ async def generate_article(db_session) -> Optional[object]:
         today=today_str,
         month_year=month_year_str,
         year=year_str,
+        pokemon_sources=_POKEMON_SOURCES,
+        onepiece_sources=_ONEPIECE_SOURCES,
     )
 
     topic = _pick_topic()
