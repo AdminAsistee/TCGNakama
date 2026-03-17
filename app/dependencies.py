@@ -1526,7 +1526,10 @@ class ShopifyClient:
             images_to_keep: List of existing Shopify CDN URLs that should be kept
             images_to_add: List of new image URLs to add (uploaded files or external URLs)
         """
-        token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+        from app.services.shopify_auth import get_admin_token as _dynamic_token
+        token = await _dynamic_token()
+        if not token:
+            token = os.getenv("SHOPIFY_ADMIN_TOKEN")
         if not token:
             print("[ERROR] No SHOPIFY_ADMIN_TOKEN found")
             return False
@@ -1874,7 +1877,10 @@ class ShopifyClient:
         Returns:
             bool: True if deletion was successful, False otherwise
         """
-        token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+        from app.services.shopify_auth import get_admin_token as _dynamic_token
+        token = await _dynamic_token()
+        if not token:
+            token = os.getenv("SHOPIFY_ADMIN_TOKEN")
         if not token:
             print("[ERROR] No SHOPIFY_ADMIN_TOKEN found")
             return False

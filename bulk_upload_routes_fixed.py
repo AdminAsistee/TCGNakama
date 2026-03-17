@@ -20,7 +20,10 @@ async def bulk_upload_appraise(
     Returns appraisal data for each card with 'exists' flag.
     """
     results = []
-    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    from app.services.shopify_auth import get_admin_token as _dynamic_token
+    admin_token = await _dynamic_token()
+    if not admin_token:
+        admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
     
     # Create temp directory for uploads
     temp_dir = Path("app/static/uploads/temp")
@@ -141,7 +144,10 @@ async def bulk_confirm(
     selected_cards = body.get("cards", [])
     
     results = []
-    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    from app.services.shopify_auth import get_admin_token as _dynamic_token
+    admin_token = await _dynamic_token()
+    if not admin_token:
+        admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
     
     for card in selected_cards:
         try:

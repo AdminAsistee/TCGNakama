@@ -30,7 +30,7 @@ SESSION_SECRET = os.getenv("SESSION_SECRET", secrets.token_hex(16))
 
 async def fetch_shopify_orders(limit: int = 50) -> list:
     """Fetch orders from Shopify Admin API."""
-    token = get_admin_token()
+    token = await get_admin_token()
     if not token:
         return []
     
@@ -421,7 +421,7 @@ async def admin_dashboard(
         return f"{int(val):,}"
     
     # Check OAuth connection status
-    oauth_connected = bool(get_admin_token())
+    oauth_connected = bool(await get_admin_token())
     
     # Pagination logic
     items_per_page = 20
@@ -1135,7 +1135,7 @@ async def add_card_page(
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     """Show the add card form."""
-    admin_token = get_admin_token()
+    admin_token = await get_admin_token()
     categories = []
     if admin_token:
         try:
@@ -1192,7 +1192,7 @@ async def edit_card_page(
             })
         
         # Fetch collections for dropdowns
-        admin_token = get_admin_token()
+        admin_token = await get_admin_token()
         categories = []
         if admin_token:
             try:
@@ -1284,7 +1284,7 @@ async def add_card(
     image_files: List[UploadFile] = File([])
 ):
     """Process the add card form and sync to Shopify."""
-    admin_token = get_admin_token()
+    admin_token = await get_admin_token()
     if not admin_token:
         # In a real app, we'd redirect to OAuth or show a better error
         return templates.TemplateResponse("admin/add_card.html", {
@@ -1392,7 +1392,7 @@ async def update_card(
     buy_price: Optional[float] = Form(None)
 ):
     """Process the edit card form and update product in Shopify."""
-    admin_token = get_admin_token()
+    admin_token = await get_admin_token()
     if not admin_token:
         return templates.TemplateResponse("admin/add_card.html", {
             "request": request,

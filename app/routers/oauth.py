@@ -16,6 +16,9 @@ router = APIRouter(prefix="/oauth", tags=["oauth"])
 oauth_state_store = {}
 token_store = {}
 
+# Dynamic token manager — always provides a fresh token
+from app.services.shopify_auth import get_admin_token as _get_dynamic_token
+
 
 def get_shop_name() -> str:
     """Extract shop name from SHOPIFY_STORE_URL."""
@@ -137,32 +140,39 @@ async def status():
     """
     Check if we have a valid Admin API token.
     """
-    token = token_store.get("admin_access_token") or os.getenv("SHOPIFY_ADMIN_TOKEN")
+    try:
+        token = await _get_dynamic_token()
+    except Exception:
+        token = token_store.get("admin_access_token") or os.getenv("SHOPIFY_ADMIN_TOKEN")
     return {
         "connected": bool(token),
         "token_preview": f"{token[:10]}..." if token else None
     }
 
 
-def get_admin_token() -> str | None:
+async def get_admin_token() -> str | None:
     """
     Helper function to get the current admin access token.
-    Prioritizes SHOPIFY_ADMIN_TOKEN from environment if set correctly.
+    Uses the dynamic ShopifyTokenManager (auto-fetches/refreshes via OAuth).
+    Falls back to env-var or token_store only if the dynamic fetch fails.
     """
-    env_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+    try:
+        token = await _get_dynamic_token()
+        if token:
+            return token
+    except Exception as e:
+        print(f"[WARN] Dynamic token fetch failed, falling back to env/store: {e}")
+
+    # Legacy fallbacks
     stored_token = token_store.get("admin_access_token")
-    
-    if env_token and env_token.startswith("shpat_"):
-        print(f"[DEBUG] Using Admin Token from Environment (prefix: {env_token[:10]}...)")
-        return env_token
-    
     if stored_token:
-        print(f"[DEBUG] Using Admin Token from token_store (prefix: {stored_token[:10]}...)")
+        print(f"[DEBUG] Fallback: Using Admin Token from token_store")
         return stored_token
-        
+
+    env_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
     if env_token:
-        print(f"[DEBUG] Using Admin Token from Environment (prefix: {env_token[:10]}...)")
+        print(f"[DEBUG] Fallback: Using Admin Token from env (prefix: {env_token[:10]}...)")
         return env_token
-        
-    print("[DEBUG] No Admin Token found!")
+
+    print("[DEBUG] No Admin Token available!")
     return None
