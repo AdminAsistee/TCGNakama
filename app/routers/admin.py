@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+﻿from typing import Optional, Any, List
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -1994,55 +1994,52 @@ async def bulk_upload_appraise(
             is_japanese = bool(card_name_japanese)
             safe_print(f"[BULK_UPLOAD] Language detected: {'Japanese' if is_japanese else 'English'} (jp_name='{card_name_japanese}')")
             
-            # Check if card exists in Shopify
+            # DUPLICATE CHECK DISABLED — every card is created as a new Shopify product
             exists = False
             shopify_product_id = None
             shopify_variant_id = None
             shopify_inventory_item_id = None
-            price = None
             current_quantity = 0
-            
-            if card_name:
-                # Normalize empty strings to None for symmetric matching
-                num = card_number.strip() if card_number else None
-                sname = set_name.strip() if set_name else None
+            price = None
+            # if card_name:
+            #     # Normalize empty strings to None for symmetric matching
+            #     num = card_number.strip() if card_number else None
+            #     sname = set_name.strip() if set_name else None
 
-                # Clean the card name (strip parentheses, set info, embedded card number)
-                import re as _re
-                clean_bulk_name = card_name
-                if num:
-                    clean_bulk_name = clean_bulk_name.replace(num, '')
-                clean_bulk_name = _re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_bulk_name)
-                clean_bulk_name = _re.sub(r'\s*[-–—]\s*.*$', '', clean_bulk_name)
-                clean_bulk_name = clean_bulk_name.strip()
+            #     # Clean the card name (strip parentheses, set info, embedded card number)
+            #     import re as _re
+            #     clean_bulk_name = card_name
+            #     if num:
+            #         clean_bulk_name = clean_bulk_name.replace(num, '')
+            #     clean_bulk_name = _re.sub(r'\s*[\(\[].*?[\)\]]', '', clean_bulk_name)
+            #     clean_bulk_name = _re.sub(r'\s*[-–—]\s*.*$', '', clean_bulk_name)
+            #     clean_bulk_name = clean_bulk_name.strip()
 
-                # Search Shopify: use card number if available, else card name
-                bulk_search_query = num if num else clean_bulk_name
-                safe_print(f"[BULK_UPLOAD] Duplicate check: name='{clean_bulk_name}', number='{num}', set='{sname}', query='{bulk_search_query}'")
+            #     # Search Shopify: use card number if available, else card name
+            #     bulk_search_query = num if num else clean_bulk_name
+            #     safe_print(f"[BULK_UPLOAD] Duplicate check: name='{clean_bulk_name}', number='{num}', set='{sname}', query='{bulk_search_query}'")
 
-                bulk_products = await client.get_products(query=bulk_search_query)
-                safe_print(f"[BULK_UPLOAD] Found {len(bulk_products)} candidates for duplicate check")
+            #     bulk_products = await client.get_products(query=bulk_search_query)
+            #     safe_print(f"[BULK_UPLOAD] Found {len(bulk_products)} candidates for duplicate check")
 
-                for bp in bulk_products:
-                    bp_title = bp.get('title', '')
-                    if _is_duplicate_card(clean_bulk_name, num, sname, bp_title, log_prefix="[BULK_UPLOAD]"):
-                        safe_print(f"[BULK_UPLOAD] ✓ DUPLICATE FOUND: {bp_title}")
-                        exists = True
-                        # Use search_product_by_card to get full inventory details
-                        # (get_products doesn't return inventory_item_id)
-                        search_term = num if num else clean_bulk_name
-                        existing_product = await client.search_product_by_card(
-                            admin_token, search_term, clean_bulk_name
-                        )
-                        if existing_product:
-                            shopify_product_id = existing_product["product_id"]
-                            shopify_variant_id = existing_product["variant_id"]
-                            shopify_inventory_item_id = existing_product["inventory_item_id"]
-                            current_quantity = existing_product.get("current_quantity", 0)
-                            price = existing_product.get("price")
-                        break
-
-
+            #     for bp in bulk_products:
+            #         bp_title = bp.get('title', '')
+            #         if _is_duplicate_card(clean_bulk_name, num, sname, bp_title, log_prefix="[BULK_UPLOAD]"):
+            #             safe_print(f"[BULK_UPLOAD] ✓ DUPLICATE FOUND: {bp_title}")
+            #             exists = True
+            #             # Use search_product_by_card to get full inventory details
+            #             # (get_products doesn't return inventory_item_id)
+            #             search_term = num if num else clean_bulk_name
+            #             existing_product = await client.search_product_by_card(
+            #                 admin_token, search_term, clean_bulk_name
+            #             )
+            #             if existing_product:
+            #                 shopify_product_id = existing_product["product_id"]
+            #                 shopify_variant_id = existing_product["variant_id"]
+            #                 shopify_inventory_item_id = existing_product["inventory_item_id"]
+            #                 current_quantity = existing_product.get("current_quantity", 0)
+            #                 price = existing_product.get("price")
+            #             break
 
             
             # If card is new, fetch price from PriceCharting
@@ -2112,74 +2109,56 @@ async def bulk_upload_appraise(
                 "filename": image_file.filename
             })
     
-    # Merge duplicates within the batch using direct field comparison
-    # card_number, set_name, card_name come directly from the appraisal — no parsing needed
-    merged_results = []
-    for result in results:
-        if "error" in result:
-            continue
+    # BATCH MERGE DISABLED — each card in batch creates its own new Shopify product
+    # (Duplicate merging within the same upload batch is also skipped)
+    # Add all non-error results directly
+    final_results = [r for r in results if "error" not in r]
+    # Assign quantity=1 to each
+    for r in final_results:
+        r.setdefault("quantity", 1)
+    # Add error results
+    final_results += [r for r in results if "error" in r]
 
-        card_name = (result.get("card_name") or "").strip()
-        card_number = (result.get("card_number") or "").strip() or None
-        set_name = (result.get("set_name") or "").strip() or None
+    # --- ORIGINAL BATCH MERGE LOGIC (disabled) ---
+    # merged_results = []
+    # for result in results:
+    #     if "error" in result:
+    #         continue
+    #     card_name = (result.get("card_name") or "").strip()
+    #     card_number = (result.get("card_number") or "").strip() or None
+    #     set_name = (result.get("set_name") or "").strip() or None
+    #     matched = False
+    #     for merged in merged_results:
+    #         m_name   = (merged.get("card_name") or "").strip()
+    #         m_number = (merged.get("card_number") or "").strip() or None
+    #         m_set    = (merged.get("set_name") or "").strip() or None
+    #         if _normalize_text(card_name) != _normalize_text(m_name):
+    #             continue
+    #         if bool(card_number) != bool(m_number):
+    #             continue
+    #         if card_number and m_number:
+    #             if _normalize_card_number(card_number) != _normalize_card_number(m_number):
+    #                 continue
+    #         if bool(set_name) != bool(m_set):
+    #             continue
+    #         if set_name and m_set:
+    #             if _normalize_text(set_name) != _normalize_text(m_set):
+    #                 continue
+    #         merged["quantity"] = merged.get("quantity", 1) + 1
+    #         matched = True
+    #         break
+    #     if not matched:
+    #         result["quantity"] = 1
+    #         merged_results.append(result)
+    # final_results = []
+    # for result in merged_results:
+    #     if result.get("exists") and result.get("duplicate_count", 1) > 1:
+    #         result["quantity_increment"] = result["duplicate_count"]
+    #     final_results.append(result)
+    # for result in results:
+    #     if "error" in result:
+    #         final_results.append(result)
 
-        # Check if this result matches any already-merged entry
-        matched = False
-        for merged in merged_results:
-            m_name   = (merged.get("card_name") or "").strip()
-            m_number = (merged.get("card_number") or "").strip() or None
-            m_set    = (merged.get("set_name") or "").strip() or None
-
-            # Names must match (case+accent insensitive)
-            if _normalize_text(card_name) != _normalize_text(m_name):
-                continue
-
-            # Card numbers: both must be present or both absent; if present, must normalize equal
-            if bool(card_number) != bool(m_number):
-                continue
-            if card_number and m_number:
-                if _normalize_card_number(card_number) != _normalize_card_number(m_number):
-                    continue
-
-            # Set names: both must be present or both absent; if present, must match
-            if bool(set_name) != bool(m_set):
-                continue
-            if set_name and m_set:
-                if _normalize_text(set_name) != _normalize_text(m_set):
-                    continue
-
-            # All fields match — merge into existing entry
-            if merged.get("exists"):
-                merged["duplicate_count"] = merged.get("duplicate_count", 1) + 1
-            else:
-                merged["quantity"] = merged.get("quantity", 1) + 1
-            safe_print(f"[BATCH_MERGE] Merged '{card_name}' #{card_number} into existing entry (qty={merged.get('quantity', merged.get('duplicate_count', 1))})")
-            matched = True
-            break
-
-        if not matched:
-            # First occurrence of this card in the batch
-            if result.get("exists"):
-                result["duplicate_count"] = 1
-            else:
-                result["quantity"] = 1
-            merged_results.append(result)
-
-
-    
-    # Convert to final list and update quantities for existing cards
-    final_results = []
-    for result in merged_results:
-        if result.get("exists") and result.get("duplicate_count", 1) > 1:
-            result["quantity_increment"] = result["duplicate_count"]
-        final_results.append(result)
-
-    
-    # Add back error results
-    for result in results:
-        if "error" in result:
-            final_results.append(result)
-    
     return JSONResponse(final_results)
 
 
@@ -2197,9 +2176,11 @@ async def bulk_confirm(
     body = await request.json()
     selected_cards = body.get("cards", [])
     
-    results = []
-    admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
-    
+    from app.services.shopify_auth import get_admin_token as _dynamic_token
+    admin_token = await _dynamic_token()
+    if not admin_token:
+        admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+
     for card in selected_cards:
         try:
             card_name = card.get("card_name")
@@ -2213,178 +2194,161 @@ async def bulk_confirm(
             shopify_inventory_item_id = card.get("shopify_inventory_item_id")
             current_quantity = int(card.get("current_quantity", 0))
             temp_path = card.get("temp_path")
-            
-            
-            if exists and shopify_inventory_item_id:
-                # Update existing product inventory
-                # Use duplicate_count if available (from merged duplicates), otherwise use quantity
-                increment = card.get("duplicate_count", card.get("quantity_increment", quantity))
-                new_quantity = current_quantity + increment
-                safe_print(f"[BULK_UPLOAD] Updating inventory for {card_name}: {current_quantity} + {increment} = {new_quantity}")
+
+            # DUPLICATE / INVENTORY INCREMENT DISABLED
+            # All cards are always created as new Shopify products.
+            # if exists and shopify_inventory_item_id:
+            #     increment = card.get("duplicate_count", card.get("quantity_increment", quantity))
+            #     new_quantity = current_quantity + increment
+            #     await client._update_inventory(admin_token, shopify_inventory_item_id, new_quantity)
+            #     results.append({"success": True, "card_name": card_name, "action": "inventory_updated", "quantity": quantity})
+            # Always create a new product (duplicate check disabled)
+            safe_print(f"[BULK_UPLOAD] Creating new product for {card_name}")
+
+            try:
+                # Prepare tags in the same format as add_card
+                full_set_name = card.get("full_set_name", "")
+                card_condition = card.get("card_condition", "Near Mint")
+                tags = [
+                    f"Set: {set_name}" if set_name else "Set: ",
+                    f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
+                    f"Number: {card_number}" if card_number else "Number: ",
+                    "Condition: Raw",
+                    f"Set Name: {full_set_name}" if full_set_name else "Set Name: ",
+                    f"Card: {card_condition}"
+                ]
                 
-                try:
-                    await client._update_inventory(admin_token, shopify_inventory_item_id, new_quantity)
-                    results.append({
-                        "success": True,
-                        "card_name": card_name,
-                        "action": "inventory_updated",
-                        "quantity": quantity
-                    })
-                except Exception as inv_error:
-                    safe_print(f"[BULK_UPLOAD] Error updating inventory: {inv_error}")
-                    results.append({
-                        "success": False,
-                        "card_name": card_name,
-                        "error": f"Failed to update inventory: {str(inv_error)}"
-                    })
-            else:
-                # Create new product in Shopify
-                safe_print(f"[BULK_UPLOAD] Creating new product for {card_name}")
                 
-                try:
-                    # Prepare tags in the same format as add_card
-                    full_set_name = card.get("full_set_name", "")
-                    card_condition = card.get("card_condition", "Near Mint")
-                    tags = [
-                        f"Set: {set_name}" if set_name else "Set: ",
-                        f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
-                        f"Number: {card_number}" if card_number else "Number: ",
-                        "Condition: Raw",
-                        f"Set Name: {full_set_name}" if full_set_name else "Set Name: ",
-                        f"Card: {card_condition}"
-                    ]
-                    
-                    
-                    # Build description HTML with all AI-extracted details
-                    card_name_jp = card.get("card_name_japanese", "")
-                    card_name_en = card.get("card_name_english", "")
-                    year = card.get("year", "")
-                    manufacturer = card.get("manufacturer", vendor)
-                    
-                    description_html = ""
-                    if card_name_jp:
-                        description_html += f"<p><strong>Japanese Name:</strong> {card_name_jp}</p>"
-                    if card_name_en:
-                        description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
-                    if set_name:
-                        description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
-                    if full_set_name:
-                        description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
-                    if card_number:
-                        description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
-                    if rarity:
-                        description_html += f"<p><strong>Rarity:</strong> {rarity}</p>"
-                    if year:
-                        description_html += f"<p><strong>Year:</strong> {year}</p>"
-                    if manufacturer:
-                        description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
-                    description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
-                    
-                    # Collections can be empty
-                    collections = []
-                    
-                    # Handle image upload using staged uploads (same as add_card)
-                    all_images = []
-                    
-                    if temp_path:
-                        # Extract filename from stored path
-                        temp_filename = Path(temp_path).name
+                # Build description HTML with all AI-extracted details
+                card_name_jp = card.get("card_name_japanese", "")
+                card_name_en = card.get("card_name_english", "")
+                year = card.get("year", "")
+                manufacturer = card.get("manufacturer", vendor)
+                
+                description_html = ""
+                if card_name_jp:
+                    description_html += f"<p><strong>Japanese Name:</strong> {card_name_jp}</p>"
+                if card_name_en:
+                    description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
+                if set_name:
+                    description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
+                if full_set_name:
+                    description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
+                if card_number:
+                    description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
+                if rarity:
+                    description_html += f"<p><strong>Rarity:</strong> {rarity}</p>"
+                if year:
+                    description_html += f"<p><strong>Year:</strong> {year}</p>"
+                if manufacturer:
+                    description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
+                description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
+                
+                # Collections can be empty
+                collections = []
+                
+                # Handle image upload using staged uploads (same as add_card)
+                all_images = []
+                
+                if temp_path:
+                    # Extract filename from stored path
+                    temp_filename = Path(temp_path).name
 
-                        # Use the SAME absolute path construction as when saving
-                        current_file_dir = Path(__file__).parent.parent  # app/ directory
-                        temp_dir = current_file_dir / "static" / "uploads" / "temp"
-                        temp_file_path = temp_dir / temp_filename
+                    # Use the SAME absolute path construction as when saving
+                    current_file_dir = Path(__file__).parent.parent  # app/ directory
+                    temp_dir = current_file_dir / "static" / "uploads" / "temp"
+                    temp_file_path = temp_dir / temp_filename
 
-                        # Fallback: if original file not found, try the .webp version
-                        # (handles uploads saved before the WebP migration)
-                        if not temp_file_path.exists():
-                            webp_stem = Path(temp_filename).stem
-                            # Remove old extension stem variants and try .webp
-                            webp_name = webp_stem + ".webp"
-                            webp_fallback = temp_dir / webp_name
-                            if webp_fallback.exists():
-                                safe_print(f"[BULK_UPLOAD] Original not found, using .webp fallback: {webp_fallback}")
-                                temp_file_path = webp_fallback
-                                temp_filename = webp_name
+                    # Fallback: if original file not found, try the .webp version
+                    # (handles uploads saved before the WebP migration)
+                    if not temp_file_path.exists():
+                        webp_stem = Path(temp_filename).stem
+                        # Remove old extension stem variants and try .webp
+                        webp_name = webp_stem + ".webp"
+                        webp_fallback = temp_dir / webp_name
+                        if webp_fallback.exists():
+                            safe_print(f"[BULK_UPLOAD] Original not found, using .webp fallback: {webp_fallback}")
+                            temp_file_path = webp_fallback
+                            temp_filename = webp_name
 
-                        safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
-                        safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
-                        safe_print(f"[BULK_UPLOAD] Absolute path: {temp_file_path.absolute()}")
+                    safe_print(f"[BULK_UPLOAD] Checking temp_path: {temp_file_path}")
+                    safe_print(f"[BULK_UPLOAD] Path exists: {temp_file_path.exists()}")
+                    safe_print(f"[BULK_UPLOAD] Absolute path: {temp_file_path.absolute()}")
 
-                        if temp_file_path.exists():
-                            try:
-                                with open(temp_file_path, "rb") as img_file:
-                                    img_content = img_file.read()
+                    if temp_file_path.exists():
+                        try:
+                            with open(temp_file_path, "rb") as img_file:
+                                img_content = img_file.read()
 
-                                # Determine mime type from actual file extension
-                                ext = temp_file_path.suffix.lower()
-                                if ext == ".webp":
-                                    mime_type = "image/webp"
-                                    upload_filename = Path(card.get("filename", "card.jpg")).stem + ".webp"
-                                elif ext in (".jpg", ".jpeg"):
-                                    mime_type = "image/jpeg"
-                                    upload_filename = card.get("filename", "card.jpg")
-                                else:
-                                    mime_type = "image/png"
-                                    upload_filename = card.get("filename", "card.png")
+                            # Determine mime type from actual file extension
+                            ext = temp_file_path.suffix.lower()
+                            if ext == ".webp":
+                                mime_type = "image/webp"
+                                upload_filename = Path(card.get("filename", "card.jpg")).stem + ".webp"
+                            elif ext in (".jpg", ".jpeg"):
+                                mime_type = "image/jpeg"
+                                upload_filename = card.get("filename", "card.jpg")
+                            else:
+                                mime_type = "image/png"
+                                upload_filename = card.get("filename", "card.png")
 
-                                # Create staged upload
-                                target = await client.staged_uploads_create(
-                                    admin_token=admin_token,
-                                    filename=upload_filename,
-                                    mime_type=mime_type,
-                                    file_size=str(len(img_content))
-                                )
+                            # Create staged upload
+                            target = await client.staged_uploads_create(
+                                admin_token=admin_token,
+                                filename=upload_filename,
+                                mime_type=mime_type,
+                                file_size=str(len(img_content))
+                            )
 
-                                # Upload file to staged target
-                                resource_url = await client.upload_file_to_staged_target(
-                                    target=target,
-                                    file_content=img_content,
-                                    mime_type=mime_type
-                                )
-                                all_images.append(resource_url)
-                                safe_print(f"[BULK_UPLOAD] Uploaded image: {resource_url}")
-                            except Exception as img_error:
-                                safe_print(f"[BULK_UPLOAD] Error uploading image: {img_error}")
-                                import traceback
-                                safe_print(traceback.format_exc())
-                        else:
-                            safe_print(f"[BULK_UPLOAD] ERROR: Temp file not found at {temp_file_path}")
+                            # Upload file to staged target
+                            resource_url = await client.upload_file_to_staged_target(
+                                target=target,
+                                file_content=img_content,
+                                mime_type=mime_type
+                            )
+                            all_images.append(resource_url)
+                            safe_print(f"[BULK_UPLOAD] Uploaded image: {resource_url}")
+                        except Exception as img_error:
+                            safe_print(f"[BULK_UPLOAD] Error uploading image: {img_error}")
+                            import traceback
+                            safe_print(traceback.format_exc())
                     else:
-                        safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
-                    
-                    product_data = {
-                        "title": card_name.strip(),
-                        "description": description_html,
-                        "price": price if price is not None else 0,  # Ensure price is never None
-                        "vendor": vendor if vendor else "TCG Nakama",
-                        "product_type": "Collectible Card",
-                        "tags": tags,
-                        "quantity": quantity,
-                        "images": all_images,
-                        "collections": collections
-                    }
-                    
-                    
-                    safe_print(f"[BULK_UPLOAD] Product data to send: {product_data}")
-                    created_product = await client.create_product(admin_token, product_data)
-                    safe_print(f"[BULK_UPLOAD] Product created successfully: {created_product['id']}")
-                    
-                    results.append({
-                        "success": True,
-                        "card_name": card_name,
-                        "action": "product_created",
-                        "product_id": created_product["id"]
-                    })
-                except Exception as create_error:
-                    safe_print(f"[BULK_UPLOAD] Error creating product for {card_name}: {create_error}")
-                    import traceback
-                    safe_print(f"[BULK_UPLOAD] Traceback: {traceback.format_exc()}")
-                    results.append({
-                        "success": False,
-                        "card_name": card_name,
-                        "error": f"Failed to create product: {str(create_error)}"
-                    })
+                        safe_print(f"[BULK_UPLOAD] ERROR: Temp file not found at {temp_file_path}")
+                else:
+                    safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
+                
+                product_data = {
+                    "title": card_name.strip(),
+                    "description": description_html,
+                    "price": price if price is not None else 0,  # Ensure price is never None
+                    "vendor": vendor if vendor else "TCG Nakama",
+                    "product_type": "Collectible Card",
+                    "tags": tags,
+                    "quantity": quantity,
+                    "images": all_images,
+                    "collections": collections
+                }
+                
+                
+                safe_print(f"[BULK_UPLOAD] Product data to send: {product_data}")
+                created_product = await client.create_product(admin_token, product_data)
+                safe_print(f"[BULK_UPLOAD] Product created successfully: {created_product['id']}")
+                
+                results.append({
+                    "success": True,
+                    "card_name": card_name,
+                    "action": "product_created",
+                    "product_id": created_product["id"]
+                })
+            except Exception as create_error:
+                safe_print(f"[BULK_UPLOAD] Error creating product for {card_name}: {create_error}")
+                import traceback
+                safe_print(f"[BULK_UPLOAD] Traceback: {traceback.format_exc()}")
+                results.append({
+                    "success": False,
+                    "card_name": card_name,
+                    "error": f"Failed to create product: {str(create_error)}"
+                })
             
             
             # Don't delete temp files immediately - let the 3-day cleanup handle it
