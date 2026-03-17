@@ -628,157 +628,20 @@
             }
         }
 
-        // Duplicate detection variables
-        let duplicateProductId = null;
-        let bypassDuplicateCheck = false;
-
-        // Check for duplicate card before submission
+        // DUPLICATE CHECK DISABLED — always proceed directly to submit
         async function checkDuplicateAndSubmit(event) {
-            console.log('[DUPLICATE CHECK] Form submission triggered');
-
-            // Prevent default form submission
             event.preventDefault();
-
-            // Check if we're in edit mode
-            const editMode = document.querySelector('input[name="product_id"]') !== null;
-            console.log('[DUPLICATE CHECK] Edit mode:', editMode, 'Bypass:', bypassDuplicateCheck);
-
-            // Get card name early to check if it changed
-            const cardNameInput = document.querySelector('input[name="name"]');
-            const currentCardName = cardNameInput ? cardNameInput.value.trim() : '';
-
-            // In edit mode, check if the card name has changed
-            let nameChanged = false;
-            if (editMode) {
-                // Get the original card name from the product data
-                const originalName = "{{ product.title if edit_mode else '' }}";
-                nameChanged = currentCardName !== originalName;
-                console.log('[DUPLICATE CHECK] Original name:', originalName);
-                console.log('[DUPLICATE CHECK] Current name:', currentCardName);
-                console.log('[DUPLICATE CHECK] Name changed:', nameChanged);
+            // Skip duplicate check; just validate and submit
+            if (showLoading()) {
+                event.target.onsubmit = null;
+                event.target.submit();
             }
-
-            // If we're in edit mode and name hasn't changed, OR bypassing duplicate check, proceed with validation
-            if ((editMode && !nameChanged) || bypassDuplicateCheck) {
-                console.log('[DUPLICATE CHECK] Bypassing duplicate check, running validation');
-                // Run validation
-                if (showLoading()) {
-                    console.log('[DUPLICATE CHECK] Validation passed, submitting form');
-                    // Remove the onsubmit handler to prevent infinite loop
-                    event.target.onsubmit = null;
-                    // Validation passed, submit the form
-                    event.target.submit();
-                } else {
-                    console.log('[DUPLICATE CHECK] Validation failed');
-                }
-                return false;
-            }
-
-            // Get card name and rarity (already got cardNameInput above)
-            // const cardNameInput = document.querySelector('input[name="name"]'); // Removed duplicate declaration
-
-            console.log('[DUPLICATE CHECK] Card name input:', cardNameInput);
-
-            if (!cardNameInput) {
-                console.error('[DUPLICATE CHECK] Could not find card name input');
-                // Proceed with normal validation if input not found
-                if (showLoading()) {
-                    event.target.onsubmit = null;
-                    event.target.submit();
-                }
-                return false;
-            }
-
-            const cardName = cardNameInput.value.trim();
-
-            console.log('[DUPLICATE CHECK] Card name:', cardName);
-
-            if (!cardName) {
-                console.log('[DUPLICATE CHECK] No card name, proceeding with normal validation');
-                // If no card name, proceed with normal validation
-                if (showLoading()) {
-                    event.target.onsubmit = null;
-                    event.target.submit();
-                }
-                return false;
-            }
-
-            try {
-                console.log('[DUPLICATE CHECK] Calling duplicate check endpoint');
-
-                // Read card_number and set_name directly from the form fields
-                // (user may have edited them after appraisal)
-                const cardNumberInput = document.querySelector('input[name="card_number"]');
-                const cardNumber = cardNumberInput ? cardNumberInput.value.trim() : '';
-                const setNameInput = document.querySelector('input[name="set_name"]');
-                const setName = setNameInput ? setNameInput.value.trim() : '';
-                console.log('[DUPLICATE CHECK] Card number from form:', cardNumber, 'Set name:', setName);
-
-                // Build the API URL - include current product ID if in edit mode
-                let apiUrl = `/admin/check-duplicate-card?card_name=${encodeURIComponent(cardName)}`;
-                if (cardNumber) {
-                    apiUrl += `&card_number=${encodeURIComponent(cardNumber)}`;
-                }
-                if (setName) {
-                    apiUrl += `&set_name=${encodeURIComponent(setName)}`;
-                }
-                if (editMode) {
-                    const currentProductId = document.querySelector('input[name="product_id"]').value;
-                    apiUrl += `&current_product_id=${encodeURIComponent(currentProductId)}`;
-                    console.log('[DUPLICATE CHECK] Edit mode - excluding current product:', currentProductId);
-                }
-
-                // Call duplicate check endpoint
-                const response = await fetch(apiUrl);
-                const data = await response.json();
-
-                console.log('[DUPLICATE CHECK] Response:', data);
-
-                if (data.exists) {
-                    console.log('[DUPLICATE CHECK] Duplicate found, showing modal');
-                    // Show duplicate modal
-                    duplicateProductId = data.product_id;
-                    document.getElementById('duplicate-card-name').textContent = data.product_title;
-                    document.getElementById('duplicate-modal').classList.remove('hidden');
-                    document.getElementById('duplicate-modal').classList.add('flex');
-                    return false;
-                } else {
-                    console.log('[DUPLICATE CHECK] No duplicate, proceeding with submission');
-                    // No duplicate, proceed with validation and submission
-                    bypassDuplicateCheck = true;
-                    if (showLoading()) {
-                        console.log('[DUPLICATE CHECK] Submitting form');
-                        event.target.onsubmit = null;
-                        event.target.submit();
-                    }
-                }
-            } catch (error) {
-                console.error('[DUPLICATE CHECK] Error:', error);
-                // On error, proceed with normal validation and submission
-                bypassDuplicateCheck = true;
-                if (showLoading()) {
-                    event.target.onsubmit = null;
-                    event.target.submit();
-                }
-            }
-
             return false;
         }
 
-        // Close duplicate modal
-        function closeDuplicateModal() {
-            document.getElementById('duplicate-modal').classList.add('hidden');
-            document.getElementById('duplicate-modal').classList.remove('flex');
-            duplicateProductId = null;
-        }
-
-        // Redirect to edit existing card
-        function editExistingCard() {
-            if (duplicateProductId) {
-                // URL-encode to preserve special characters like :// in Shopify GIDs
-                window.location.href = `/admin/edit-card?product_id=${encodeURIComponent(duplicateProductId)}`;
-            }
-        }
+        // Duplicate modal helpers kept for reference (not triggered anymore)
+        function closeDuplicateModal() {}
+        function editExistingCard() {}
 
         function showLoading() {
             // Validate at least one collection is selected

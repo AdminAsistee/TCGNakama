@@ -351,37 +351,30 @@
 
                     const newResults = await response.json();
 
-                    // Merge new results with existing results, detecting duplicates
+                    // BATCH MERGE DISABLED — each card is always added as a separate item
                     newResults.forEach(newCard => {
-                        if (newCard.error) {
-                            appraisalResults.push(newCard);
-                            return;
-                        }
-
-                        // Find existing card with same card_number (case-insensitive)
-                        const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
-                        const existingIndex = appraisalResults.findIndex(existing => {
-                            const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
-                            // Only merge if card numbers match AND exists status is the same
-                            return existingNumber === cardNumber && !existing.error && existing.exists === newCard.exists;
-                        });
-
-                        if (existingIndex !== -1) {
-                            // Duplicate found - merge quantities
-                            const existing = appraisalResults[existingIndex];
-                            if (existing.exists) {
-                                // For existing cards, increment duplicate_count
-                                existing.duplicate_count = (existing.duplicate_count || 1) + (newCard.duplicate_count || 1);
-                                existing.quantity_increment = existing.duplicate_count;
-                            } else {
-                                // For new cards, increment quantity
-                                existing.quantity = (existing.quantity || 1) + (newCard.quantity || 1);
-                            }
-                        } else {
-                            // New unique card
-                            appraisalResults.push(newCard);
-                        }
+                        appraisalResults.push(newCard);
                     });
+                    // --- ORIGINAL MERGE LOGIC (disabled) ---
+                    // newResults.forEach(newCard => {
+                    //     if (newCard.error) { appraisalResults.push(newCard); return; }
+                    //     const cardNumber = (newCard.card_number || newCard.card_name || '').toLowerCase().trim();
+                    //     const existingIndex = appraisalResults.findIndex(existing => {
+                    //         const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
+                    //         return existingNumber === cardNumber && !existing.error && existing.exists === newCard.exists;
+                    //     });
+                    //     if (existingIndex !== -1) {
+                    //         const existing = appraisalResults[existingIndex];
+                    //         if (existing.exists) {
+                    //             existing.duplicate_count = (existing.duplicate_count || 1) + (newCard.duplicate_count || 1);
+                    //             existing.quantity_increment = existing.duplicate_count;
+                    //         } else {
+                    //             existing.quantity = (existing.quantity || 1) + (newCard.quantity || 1);
+                    //         }
+                    //     } else {
+                    //         appraisalResults.push(newCard);
+                    //     }
+                    // });
                 }
 
                 displayResults();
@@ -648,37 +641,11 @@
                 if (newResults && newResults.length > 0) {
                     const newResult = newResults[0];
 
-                    // Check if this card is a duplicate of another card in the results
-                    const cardNumber = (newResult.card_number || newResult.card_name || '').toLowerCase().trim();
-                    const existingIndex = appraisalResults.findIndex((existing, idx) => {
-                        if (idx === index) return false; // Skip the card we're reappraising
-                        const existingNumber = (existing.card_number || existing.card_name || '').toLowerCase().trim();
-                        // Only merge if card numbers match AND exists status is the same
-                        return existingNumber === cardNumber && !existing.error && existing.exists === newResult.exists;
-                    });
-
-                    if (existingIndex !== -1) {
-                        // Duplicate found - merge with existing card and remove the reappraised one
-                        const existing = appraisalResults[existingIndex];
-                        if (existing.exists) {
-                            // For existing cards, increment duplicate_count
-                            existing.duplicate_count = (existing.duplicate_count || 1) + (newResult.duplicate_count || 1);
-                            existing.quantity_increment = existing.duplicate_count;
-                        } else {
-                            // For new cards, increment quantity
-                            existing.quantity = (existing.quantity || 1) + (newResult.quantity || 1);
-                        }
-
-                        // Remove the reappraised card (it's now merged)
-                        appraisalResults.splice(index, 1);
-
-                        alert('Card reappraised and merged with existing duplicate!');
-                    } else {
-                        // No duplicate - update in place
-                        newResult.selected = result.selected;
-                        appraisalResults[index] = newResult;
-                        alert('Card reappraised successfully!');
-                    }
+                    // BATCH MERGE DISABLED — reappraised card always replaces in-place
+                    // Always update in place
+                    newResult.selected = result.selected;
+                    appraisalResults[index] = newResult;
+                    alert('Card reappraised successfully!');
 
                     // Re-render the table
                     displayResults();
