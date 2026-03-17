@@ -1,4 +1,4 @@
-﻿from typing import Optional, Any, List
+from typing import Optional, Any, List
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -2180,6 +2180,8 @@ async def bulk_confirm(
     admin_token = await _dynamic_token()
     if not admin_token:
         admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
+
+    results = []
 
     for card in selected_cards:
         try:
