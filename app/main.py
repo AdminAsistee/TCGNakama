@@ -154,12 +154,18 @@ app.include_router(store.router)
 
 from app.routers import admin
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+# Seller-facing alias: same routes but at /seller-admin to avoid confusion
+app.include_router(admin.router, prefix="/seller-admin", tags=["seller-admin"])
 
 from app.routers import oauth
 app.include_router(oauth.router, tags=["oauth"])
 
 # Blog routes (/blog, /blog/{slug}, /admin/blog)
 app.include_router(blog_router.router, tags=["blog"])
+
+# Seller routes (/seller/login, /seller/register, /seller/logout)
+from app.routers import seller
+app.include_router(seller.router, prefix="/seller", tags=["seller"])
 
 # Search tracking endpoint
 from fastapi import HTTPException

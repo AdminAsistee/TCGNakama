@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Seller Management — TCG Nakama</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "glass": "rgba(255, 255, 255, 0.03)",
+                        "glass-border": "rgba(255, 255, 255, 0.1)",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                        "teal-accent": "#00f2ea",
+                    },
+                    fontFamily: { "display": ["Space Grotesk", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body class="bg-background-dark font-display text-white min-h-screen pb-24">
+    <header class="sticky top-0 z-50 glass-panel border-b border-glass-border">
+        <div class="flex items-center p-4 justify-between h-16">
+            <div class="flex items-center -ml-2 mr-4">
+                <img src="/static/live_logo.png" alt="TCG Nakama Logo" class="h-8 w-auto object-contain">
+            </div>
+            <h1
+                class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white">
+                Seller Management
+            </h1>
+            <a href="/admin"
+                class="flex items-center gap-1 text-primary text-[10px] uppercase tracking-wider font-bold border border-primary/30 px-2 py-1 rounded hover:bg-primary/10 transition-colors">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Dashboard
+            </a>
+        </div>
+    </header>
+
+    <main class="p-4 max-w-4xl mx-auto">
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-3 mb-6">
+            {% set pending = sellers|selectattr('status', 'equalto', 'pending')|list|length %}
+            {% set approved = sellers|selectattr('status', 'equalto', 'approved')|list|length %}
+            {% set rejected = sellers|selectattr('status', 'equalto', 'rejected')|list|length %}
+            {% set suspended = sellers|selectattr('status', 'equalto', 'suspended')|list|length %}
+
+            <div class="glass-panel rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-neon-gold font-mono">{{ pending }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-white/40 font-bold mt-1">Pending</div>
+            </div>
+            <div class="glass-panel rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-neon-green font-mono">{{ approved }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-white/40 font-bold mt-1">Approved</div>
+            </div>
+            <div class="glass-panel rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-danger-red font-mono">{{ rejected }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-white/40 font-bold mt-1">Rejected</div>
+            </div>
+            <div class="glass-panel rounded-xl p-3 text-center">
+                <div class="text-2xl font-bold text-white/40 font-mono">{{ suspended }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-white/40 font-bold mt-1">Suspended</div>
+            </div>
+        </div>
+
+        <!-- Seller List -->
+        <div class="glass-panel rounded-xl overflow-hidden">
+            <div class="p-3 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                <h2 class="text-[10px] font-bold tracking-widest text-white uppercase flex items-center gap-2">
+                    <span class="material-symbols-outlined text-neon-purple text-sm">group</span>
+                    All Sellers ({{ sellers|length }})
+                </h2>
+            </div>
+
+            {% if sellers %}
+            <div class="divide-y divide-white/5">
+                {% for seller in sellers %}
+                <div class="p-4 hover:bg-white/[0.02] transition-colors">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="material-symbols-outlined text-neon-blue text-lg">storefront</span>
+                                <span class="text-sm font-bold text-white truncate">{{ seller.store_name }}</span>
+                                <!-- Status Badge -->
+                                {% if seller.status == 'pending' %}
+                                <span
+                                    class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-neon-gold/10 text-neon-gold border border-neon-gold/20">
+                                    Pending
+                                </span>
+                                {% elif seller.status == 'approved' %}
+                                <span
+                                    class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-neon-green/10 text-neon-green border border-neon-green/20">
+                                    Approved
+                                </span>
+                                {% elif seller.status == 'rejected' %}
+                                <span
+                                    class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-danger-red/10 text-danger-red border border-danger-red/20">
+                                    Rejected
+                                </span>
+                                {% elif seller.status == 'suspended' %}
+                                <span
+                                    class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-white/10 text-white/50 border border-white/20">
+                                    Suspended
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="text-xs text-white/40 flex items-center gap-3">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">mail</span>
+                                    {{ seller.email }}
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">location_on</span>
+                                    {{ seller.location }}
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">calendar_today</span>
+                                    {{ seller.created_at }}
+                                </span>
+                            </div>
+                        </div>
+                        <!-- Action Buttons -->
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            {% if seller.status == 'pending' %}
+                            <form method="POST" action="/admin/sellers/{{ seller.id }}/approve"
+                                style="display:inline;">
+                                <button type="submit"
+                                    class="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-neon-green/20 text-neon-green border border-neon-green/30 hover:bg-neon-green/30 transition-colors">
+                                    Approve
+                                </button>
+                            </form>
+                            <form method="POST" action="/admin/sellers/{{ seller.id }}/reject"
+                                style="display:inline;">
+                                <button type="submit"
+                                    class="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-danger-red/20 text-danger-red border border-danger-red/30 hover:bg-danger-red/30 transition-colors">
+                                    Reject
+                                </button>
+                            </form>
+                            {% elif seller.status == 'approved' %}
+                            <form method="POST" action="/admin/sellers/{{ seller.id }}/suspend"
+                                style="display:inline;">
+                                <button type="submit"
+                                    class="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-white/10 text-white/50 border border-white/20 hover:bg-white/20 transition-colors">
+                                    Suspend
+                                </button>
+                            </form>
+                            {% elif seller.status == 'rejected' or seller.status == 'suspended' %}
+                            <form method="POST" action="/admin/sellers/{{ seller.id }}/approve"
+                                style="display:inline;">
+                                <button type="submit"
+                                    class="px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-neon-green/20 text-neon-green border border-neon-green/30 hover:bg-neon-green/30 transition-colors">
+                                    Re-Approve
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-12 text-center">
+                <span class="material-symbols-outlined text-white/10 text-5xl">group_off</span>
+                <p class="text-sm text-white/30 mt-3">No seller applications yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Bottom Nav (Admin) -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-glass-border pb-safe pt-2 px-6 z-50 rounded-t-2xl">
+        <div class="flex justify-between items-center h-16 max-w-md mx-auto">
+            <button onclick="window.location.href='/admin'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">grid_view</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Vault</span>
+            </button>
+            <button onclick="window.location.href='/admin/add-card'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">add_circle</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Add Card</span>
+            </button>
+            <button onclick="window.location.href='/admin/bulk-upload'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">upload_file</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+            </button>
+            <button onclick="window.location.href='/admin/sellers'"
+                class="flex flex-col items-center gap-1 text-primary group transition-colors">
+                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(37,123,244,0.8)] transition-all">group</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Sellers</span>
+            </button>
+            <button onclick="window.location.href='/admin/settings'"
+                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
+                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">settings</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Settings</span>
+            </button>
+        </div>
+    </nav>
+</body>
+
+</html>

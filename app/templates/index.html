@@ -45,10 +45,26 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
 
 {% block content %}
 <!-- ==================== HEADER / NAVBAR ==================== -->
+<!-- Top Utility Bar (TCGPlayer-style) -->
+<div class="bg-surface-dark/80 border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-end gap-4 h-8">
+        <a href="/seller/register"
+            class="text-[11px] font-medium text-gray-400 hover:text-white transition-colors tracking-wide">
+            Become a Seller
+        </a>
+        <span class="text-white/10">|</span>
+        <a href="/seller/login"
+            class="text-[11px] font-medium text-gray-400 hover:text-white transition-colors tracking-wide">
+            Sign In
+        </a>
+    </div>
+</div>
+
+<!-- Main Header -->
 <header class="sticky top-0 z-50 bg-background-dark/90 backdrop-blur-md border-b border-white/5">
-    <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto">
+    <div class="flex items-center p-3 px-4 md:p-4 md:px-6 justify-between max-w-7xl mx-auto gap-4">
         <!-- Logo -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
             <img src="/static/live_logo.webp" alt="TCG Nakama" class="h-8 w-8 rounded-full" width="32" height="32">
             <h1 class="text-lg font-bold tracking-tight text-primary">TCGNakama</h1>
         </div>
@@ -86,35 +102,33 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
             </span>
         </nav>
 
-        <!-- Cart -->
-        <button id="cart-btn"
-            class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-            hx-get="/cart/drawer" hx-target="#cart-drawer-container">
-            <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
-            <span id="cart-count"
-                class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
-                cart_count or 0 }}</span>
-        </button>
-    </div>
-
-    <!-- Search Bar -->
-    <div class="px-3 pb-3 md:px-6 md:pb-4 max-w-7xl mx-auto">
-        <label class="flex flex-col w-full relative">
-            <div
-                class="flex w-full items-stretch rounded-full h-10 md:h-11 bg-white/5 border border-white/10 focus-within:border-primary/50 transition-colors">
-                <div class="text-gray-400 flex items-center justify-center pl-4">
-                    <span class="material-symbols-outlined text-lg">search</span>
+        <!-- Search + Cart -->
+        <div class="flex items-center gap-3 flex-1 md:flex-none md:w-auto">
+            <!-- Search Bar -->
+            <div class="flex-1 md:w-72 lg:w-96">
+                <div
+                    class="flex w-full items-stretch rounded-full h-10 bg-white/5 border border-white/10 focus-within:border-primary/50 transition-colors">
+                    <div class="text-gray-400 flex items-center justify-center pl-4">
+                        <span class="material-symbols-outlined text-lg">search</span>
+                    </div>
+                    <input id="search-input" name="q"
+                        class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
+                        placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/filter"
+                        hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-swap="innerHTML"
+                        hx-indicator="#grid-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
                 </div>
-                <input id="search-input" name="q"
-                    class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
-                    placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/filter"
-                    hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-swap="innerHTML"
-                    hx-indicator="#grid-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
             </div>
-    </div>
-    </label>
 
-
+            <!-- Cart -->
+            <button id="cart-btn"
+                class="relative w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
+                hx-get="/cart/drawer" hx-target="#cart-drawer-container">
+                <span class="material-symbols-outlined text-white text-xl">shopping_cart</span>
+                <span id="cart-count"
+                    class="absolute -top-1 -right-1 w-5 h-5 bg-neon-red text-[10px] font-black text-white rounded-full flex items-center justify-center">{{
+                    cart_count or 0 }}</span>
+            </button>
+        </div>
     </div>
 </header>
 
@@ -386,6 +400,7 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 <input type="hidden" name="package_type" id="package-type-input" value="" />
                 <input type="hidden" name="card_condition" id="card-condition-input" value="" />
                 <input type="hidden" name="max_price" id="price-slider" value="" />
+                <input type="hidden" name="min_price" id="min-price-hidden" value="" />
 
                 <!-- ═══════ MOBILE: Compact Filter Bar ═══════ -->
                 <div class="md:hidden px-3 py-1">
@@ -407,12 +422,6 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
 
                 <!-- ═══════ DESKTOP: Inline Filter Bar (unchanged) ═══════ -->
                 <div class="hidden md:flex items-center gap-3">
-                    <!-- Resync Button (outside the filter box) -->
-                    <button type="button" onclick="resyncShopifyProducts()" id="resync-btn"
-                        class="flex items-center gap-2 h-9 px-4 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all group">
-                        <span class="material-symbols-outlined text-primary text-sm" id="resync-icon">sync</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-primary">Resync</span>
-                    </button>
 
                     <!-- Filter Box -->
                     <div class="flex-1 px-4 py-3 bg-white/[0.02] rounded-xl border border-white/5">
@@ -581,14 +590,15 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 <div>
                     <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Price Range</h4>
                     <div id="sheet-price-filter" class="px-1">
-                        <!-- Price slider will be synced via JS -->
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-[10px] text-gray-400">Price Under</span>
-                            <span id="sheet-price-display" class="text-[10px] font-black text-primary">¥30,000+</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-gray-500">¥</span>
+                            <input type="number" id="sheet-min-price" placeholder="Min"
+                                class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white placeholder-gray-500 focus:ring-1 focus:ring-primary focus:border-primary/50 outline-none transition-all appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+                            <span class="text-[10px] text-gray-500">–</span>
+                            <span class="text-[10px] text-gray-500">¥</span>
+                            <input type="number" id="sheet-max-price" placeholder="Max"
+                                class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white placeholder-gray-500 focus:ring-1 focus:ring-primary focus:border-primary/50 outline-none transition-all appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                         </div>
-                        <input type="range" id="sheet-price-slider" min="0" max="30000" value="30000" step="500"
-                            oninput="syncPriceFromSheet(this.value)"
-                            class="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary">
                     </div>
                 </div>
 
@@ -696,64 +706,151 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
     </section>
 
     <!-- ==================== FOOTER ==================== -->
-    <footer class="mt-16 border-t border-white/5 pt-12 pb-32 md:pb-12">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <!-- About -->
-            <div>
-                <h4 class="text-sm font-bold text-white mb-4">About</h4>
-                <p class="text-xs text-gray-400 leading-relaxed mb-3">TCGNakama.com is the premier marketplace for
-                    trading
-                    card enthusiasts and investors.</p>
-                <a href="/about" class="text-xs text-primary hover:underline font-semibold">Learn more →</a>
-            </div>
-            <!-- Support (Hidden for now)
-            <div>
-                <h4 class="text-sm font-bold text-white mb-4">Support</h4>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Help Center</a>
-                    <span class="text-gray-600 text-[10px]">·</span>
-                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Shipping</a>
-                    <span class="text-gray-600 text-[10px]">·</span>
-                    <a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Returns</a>
+    <footer class="mt-16 border-t border-white/5 bg-surface/30">
+        <!-- Main Footer Columns -->
+        <div class="max-w-7xl mx-auto px-4 md:px-6 pt-12 pb-10">
+    <!-- Footer grid responsive override (md:grid-cols-5 not in compiled Tailwind) -->
+    <style>
+        @media (min-width: 768px) {
+            #footer-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 1.5rem !important; }
+        }
+    </style>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-10" id="footer-grid">
+
+                <!-- Column 1: Shop -->
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4">Shop</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Pokémon Cards</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">One Piece Cards</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Magic: The Gathering</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Yu-Gi-Oh!</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Dragon Ball Super</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Digimon Card Game</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Weiss Schwarz</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Sealed Products</a></li>
+                        <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">All Games</a></li>
+                    </ul>
+                </div>
+
+                <!-- Column 2: Sell -->
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4">Sell</h4>
+                    <ul class="space-y-2">
+                        <li><a href="/seller/register" class="text-xs text-gray-400 hover:text-primary transition-colors">Sell on TCGNakama</a></li>
+                        <li><a href="/seller/login" class="text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold">🔒 Seller Login</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Pricing & Listing Tools</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Fulfillment Solutions</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Seller Blog</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Trade-In Program</a></li>
+                    </ul>
+                </div>
+
+                <!-- Column 3: Articles & Decks -->
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4">Articles & Decks</h4>
+                    <ul class="space-y-2">
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">TCGNakama Blog</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Pokémon Deck Lists</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">One Piece Strategy</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">MTG Meta Guides</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Yu-Gi-Oh! Staples</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Price & Market Trends</a></li>
+                        <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Investment Guide</a></li>
+                    </ul>
+                </div>
+
+                <!-- Column 4: Help & Contact -->
+                <div>
+                    <h4 class="text-sm font-bold text-white mb-4">Help & Contact</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Contact Us</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Help Center</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Refund & Return Policy</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Shipping Policy</a></li>
+                        <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Security Center</a></li>
+                        <li><a href="/about" class="text-xs text-gray-400 hover:text-primary transition-colors">About TCGNakama</a></li>
+                        <li><a href="/admin/login" class="text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold">🔒 Merchant Login</a></li>
+                    </ul>
+                </div>
+
+                <!-- Column 5: Stay Connected -->
+                <div class="col-span-2 md:col-span-1">
+                    <h4 class="text-sm font-bold text-white mb-3">Stay Connected</h4>
+                    <p class="text-[11px] text-gray-500 mb-3 leading-relaxed">Get the latest drops, market trends, and exclusive deals delivered to your inbox.</p>
+                    <div class="flex gap-2 mb-3">
+                        <input type="email" placeholder="Your Email"
+                            class="flex-1 min-w-0 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 outline-none transition-all" />
+                        <button
+                            class="px-4 py-2.5 bg-primary text-background-dark text-[10px] font-black uppercase tracking-wider rounded-lg hover:bg-primary/80 transition-colors shrink-0">Subscribe</button>
+                    </div>
+                    <p class="text-[9px] text-gray-600 leading-relaxed mb-5">By subscribing, you consent to receive emails from TCGNakama in line with our <a href="#" class="underline hover:text-gray-400">Privacy Policy</a>.</p>
+
+                    <!-- Social Icons -->
+                    <div class="flex gap-3">
+                        <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank" rel="noopener"
+                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="Facebook">
+                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
+                        </a>
+                        <a href="https://x.com/tcgnakama" target="_blank" rel="noopener"
+                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="X (Twitter)">
+                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        </a>
+                        <a href="https://www.youtube.com/@tcg-nakama" target="_blank" rel="noopener"
+                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="YouTube">
+                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        </a>
+                        <a href="https://www.instagram.com/tcgnakama.official/" target="_blank" rel="noopener"
+                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="Instagram">
+                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                        </a>
+                    </div>
                 </div>
             </div>
-            -->
-            <!-- Social -->
-            <div>
-                <h4 class="text-sm font-bold text-white mb-4">Social</h4>
-                <div class="flex gap-3">
-                    <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank"
-                        class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
-                        <span class="material-symbols-outlined text-gray-400 text-sm">public</span>
-                    </a>
-                    <a href="https://www.instagram.com/tcgnakama.official/" target="_blank"
-                        class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
-                        <span class="material-symbols-outlined text-gray-400 text-sm">photo_camera</span>
-                    </a>
-                    <a href="https://www.youtube.com/@tcg-nakama" target="_blank"
-                        class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors">
-                        <span class="material-symbols-outlined text-gray-400 text-sm">smart_display</span>
-                    </a>
-                </div>
-            </div>
-            <!-- Newsletter (Hidden for now)
-            <div>
-                <h4 class="text-sm font-bold text-white mb-4">Newsletter</h4>
-                <div class="flex gap-2">
-                    <input type="email" placeholder="Your email"
-                        class="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:border-primary outline-none">
-                    <button
-                        class="px-3 py-2 bg-primary text-background-dark text-xs font-bold rounded-lg hover:bg-primary-dark transition-colors">→</button>
-                </div>
-            </div>
-            -->
         </div>
-        <!-- Copyright + Merchant Login -->
-        <div class="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-2">
-            <p class="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em]">© 2026 TCG Nakama</p>
-            <a href="/admin/login"
-                class="text-[10px] text-gray-600 hover:text-primary font-bold uppercase tracking-[0.3em] transition-colors">
-                🔐 Merchant Login</a>
+
+        <!-- SEO Power Paragraph + Legal -->
+        <div class="border-t border-white/5">
+            <div class="max-w-7xl mx-auto px-4 md:px-6 py-8">
+                <!-- Copyright -->
+                <p class="text-center text-[11px] text-gray-500 font-medium mb-6">Copyright © 2026 TCGNakama. All Rights Reserved.</p>
+
+                <!-- Trademark Acknowledgements -->
+                <div class="text-center space-y-1 mb-6">
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Pokémon</a>. ©1995 – 2026 Nintendo/Creatures Inc./GAME FREAK Inc. TM, ®Nintendo.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">One Piece Card Game</a> and its respective properties are © Bandai / Shueisha / Toei Animation.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Magic: The Gathering</a> and its respective properties are © <a href="#" class="underline hover:text-gray-400">Wizards of the Coast</a>.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Yu-Gi-Oh!</a> and its respective properties are © 2026 Studio Dice/SHUEISHA, TV TOKYO, KONAMI.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Dragon Ball Super Card Game</a> is © BIRD STUDIO/SHUEISHA, TOEI ANIMATION.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Digimon Card Game</a> is © Akiyoshi Hongo, Toei Animation. TM & © Bandai.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed">
+                        <a href="#" class="underline hover:text-gray-400">Weiss Schwarz</a> is © bushiroad. All Rights Reserved.
+                    </p>
+                    <p class="text-[10px] text-gray-600 leading-relaxed mt-2">
+                        All trademarks, logos, and brand names are the property of their respective owners. TCGNakama is not affiliated with, endorsed, sponsored, or specifically approved by any of the above companies.
+                    </p>
+                </div>
+
+                <!-- Legal Links -->
+                <div class="flex flex-wrap items-center justify-center gap-4">
+                    <a href="#" class="text-[10px] text-gray-500 hover:text-gray-300 underline transition-colors">Privacy Policy</a>
+                    <a href="#" class="text-[10px] text-gray-500 hover:text-gray-300 underline transition-colors">Terms of Service</a>
+                    <a href="#" class="text-[10px] text-gray-500 hover:text-gray-300 underline transition-colors">Accessibility</a>
+                    <a href="#" class="text-[10px] text-gray-500 hover:text-gray-300 underline transition-colors">Do Not Sell or Share My Personal Information</a>
+                </div>
+            </div>
         </div>
     </footer>
 
@@ -1119,11 +1216,16 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
         if (packageTypeInput) packageTypeInput.value = '';
         if (cardConditionInput) cardConditionInput.value = '';
         if (priceSlider) priceSlider.value = '';
-        if (mainPriceSlider) {
-            mainPriceSlider.value = 30000;
-            const display = document.getElementById('price-display');
-            if (display) display.textContent = "¥30,000+";
-        }
+        const minPriceHidden = document.getElementById('min-price-hidden');
+        if (minPriceHidden) minPriceHidden.value = '';
+        const minPriceInput = document.getElementById('min-price-input');
+        const maxPriceInput = document.getElementById('max-price-input');
+        if (minPriceInput) minPriceInput.value = '';
+        if (maxPriceInput) maxPriceInput.value = '';
+        const sheetMinPrice = document.getElementById('sheet-min-price');
+        const sheetMaxPrice = document.getElementById('sheet-max-price');
+        if (sheetMinPrice) sheetMinPrice.value = '';
+        if (sheetMaxPrice) sheetMaxPrice.value = '';
 
         clearFilterVisuals();
 
@@ -1291,15 +1393,13 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
             }
         });
 
-        // Sync price slider
-        const priceVal = document.getElementById('price-slider')?.value || '30000';
-        const sheetSlider = document.getElementById('sheet-price-slider');
-        const sheetDisplay = document.getElementById('sheet-price-display');
-        if (sheetSlider) sheetSlider.value = priceVal || 30000;
-        if (sheetDisplay) {
-            const v = parseInt(priceVal || 30000);
-            sheetDisplay.textContent = v >= 30000 ? '¥30,000+' : `¥${v.toLocaleString()}`;
-        }
+        // Sync price inputs
+        const minPriceHidden = document.getElementById('min-price-hidden');
+        const maxPriceHidden = document.getElementById('price-slider');
+        const sheetMinPrice = document.getElementById('sheet-min-price');
+        const sheetMaxPrice = document.getElementById('sheet-max-price');
+        if (sheetMinPrice) sheetMinPrice.value = minPriceHidden?.value || '';
+        if (sheetMaxPrice) sheetMaxPrice.value = maxPriceHidden?.value || '';
     }
 
     function resetFiltersFromSheet() {
@@ -1315,12 +1415,18 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
         if (packageTypeInput) packageTypeInput.value = '';
         if (cardConditionInput) cardConditionInput.value = '';
         if (priceSlider) priceSlider.value = '';
+        const minPriceHidden = document.getElementById('min-price-hidden');
+        if (minPriceHidden) minPriceHidden.value = '';
 
-        // Reset main price slider
-        const mainSlider = document.getElementById('main-price-slider');
-        if (mainSlider) mainSlider.value = 30000;
-        const mainDisplay = document.getElementById('price-display');
-        if (mainDisplay) mainDisplay.textContent = '¥30,000+';
+        // Reset all price inputs
+        const minPriceInput = document.getElementById('min-price-input');
+        const maxPriceInput = document.getElementById('max-price-input');
+        if (minPriceInput) minPriceInput.value = '';
+        if (maxPriceInput) maxPriceInput.value = '';
+        const sheetMinPrice = document.getElementById('sheet-min-price');
+        const sheetMaxPrice = document.getElementById('sheet-max-price');
+        if (sheetMinPrice) sheetMinPrice.value = '';
+        if (sheetMaxPrice) sheetMaxPrice.value = '';
 
         // Clear desktop visuals
         clearFilterVisuals();
@@ -1335,6 +1441,20 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
     }
 
     function applyFiltersFromSheet() {
+        // Sync sheet price values to hidden inputs
+        const sheetMin = document.getElementById('sheet-min-price');
+        const sheetMax = document.getElementById('sheet-max-price');
+        const hiddenMin = document.getElementById('min-price-hidden');
+        const hiddenMax = document.getElementById('price-slider');
+        if (hiddenMin) hiddenMin.value = sheetMin?.value || '';
+        if (hiddenMax) hiddenMax.value = sheetMax?.value || '';
+
+        // Also sync desktop inputs
+        const desktopMin = document.getElementById('min-price-input');
+        const desktopMax = document.getElementById('max-price-input');
+        if (desktopMin) desktopMin.value = sheetMin?.value || '';
+        if (desktopMax) desktopMax.value = sheetMax?.value || '';
+
         // Trigger HTMX update using hidden inputs
         const rarityInput = document.getElementById('rarity-input');
         if (rarityInput && typeof htmx !== 'undefined') {
@@ -1358,7 +1478,8 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
             document.getElementById('package-type-input')?.value,
             document.getElementById('card-condition-input')?.value,
             document.getElementById('collection-input')?.value,
-            (document.getElementById('price-slider')?.value && parseInt(document.getElementById('price-slider')?.value) < 30000) ? 'price' : ''
+            document.getElementById('min-price-hidden')?.value,
+            document.getElementById('price-slider')?.value
         ].filter(Boolean).length;
 
         const badge = document.getElementById('mobile-filter-count');

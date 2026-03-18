@@ -6,7 +6,7 @@ from app.utils.image_utils import convert_to_webp
 from app.dependencies import get_shopify_client, ShopifyClient
 from app.routers.oauth import get_admin_token
 from app import cost_db
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models import Banner, SystemSetting
 from app.services import appraisal
 from app.services.appraisal import safe_print
@@ -161,6 +161,29 @@ async def get_admin_session(request: Request) -> str:
     return stored_email
 
 
+async def get_admin_or_seller_session(request: Request) -> str:
+    """Accept either admin or approved-seller session. Used on shared routes (add-card, bulk-upload)."""
+    # 1. Try admin session
+    admin_session = request.cookies.get("admin_session")
+    if admin_session:
+        stored_email = os.getenv("ADMIN_EMAIL", "admin@tcgnakama.com")
+        expected_hash = hashlib.sha256(f"{stored_email}{SESSION_SECRET}".encode()).hexdigest()[:32]
+        if admin_session == expected_hash:
+            return stored_email
+
+    # 2. Try seller session
+    from app.services.seller_auth import get_current_user
+    try:
+        user = await get_current_user(request)
+        if user["role"] == "seller" and user.get("seller_status") == "approved":
+            return user["email"]
+    except Exception:
+        pass
+
+    # 3. Neither valid
+    raise HTTPException(status_code=302, headers={"Location": "/seller/login"})
+
+
 class CostUpdate(BaseModel):
     product_id: str
     buy_price: float
@@ -292,11 +315,82 @@ async def admin_dashboard(
     query: Optional[str] = None,
     rarity: Optional[str] = None,
     page: int = 1,
-    admin: str = Depends(get_admin_session),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
+    # Unified auth: accept both admin and seller sessions
+    from app.services.seller_auth import get_current_user
+    try:
+        user = await get_current_user(request)
+    except Exception:
+        # Fallback: try existing admin session check
+        try:
+            admin = await get_admin_session(request)
+            user = {"role": "admin", "email": admin, "seller_id": None, "seller_status": None, "store_name": None}
+        except Exception:
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/seller/login", status_code=302)
+
+    is_seller = user["role"] == "seller"
+    
+    # Block unapproved sellers from accessing the dashboard
+    if is_seller and user.get("seller_status") not in ("approved",):
+        return templates.TemplateResponse("seller/pending.html", {
+            "request": request,
+            "seller_status": user.get("seller_status", "pending"),
+            "store_name": user.get("store_name", ""),
+        })
+
+    # Pending seller count for admin alert card and nav badge (admins only)
+    pending_seller_count = 0
+    if not is_seller:
+        from app.models import SellerProfile as _SP
+        _db = SessionLocal()
+        try:
+            pending_seller_count = _db.query(_SP).filter(_SP.status == "pending").count()
+        finally:
+            _db.close()
+
     # Fetch real live data with search filters
     products = await client.get_products(query=query, rarity=rarity)
+    
+    # ── SELLER DATA ISOLATION: filter products by seller tag ──
+    if is_seller:
+        seller_tag = f"seller:{user['seller_id']}"
+        products = [
+            p for p in products
+            if seller_tag in (p.get("tags") or [])
+        ]
+
+        # ── DEV/TEST: inject mock cards when seller has no real Shopify products ──
+        if not products:
+            from datetime import datetime as _dt
+            _mock_cards = [
+                {"title": "Monkey D. Luffy - OP01-003", "set": "Romance Dawn", "rarity": "Super Rare", "price": 2500, "card_number": "OP01-003", "game": "One Piece"},
+                {"title": "Roronoa Zoro - OP01-025", "set": "Romance Dawn", "rarity": "Rare", "price": 1800, "card_number": "OP01-025", "game": "One Piece"},
+                {"title": "Nami - OP01-016", "set": "Romance Dawn", "rarity": "Uncommon", "price": 900, "card_number": "OP01-016", "game": "One Piece"},
+                {"title": "Shanks - OP01-120", "set": "Romance Dawn", "rarity": "Secret Rare", "price": 8500, "card_number": "OP01-120", "game": "One Piece"},
+                {"title": "Trafalgar Law - OP02-035", "set": "Paramount War", "rarity": "Super Rare", "price": 3200, "card_number": "OP02-035", "game": "One Piece"},
+                {"title": "Pikachu VMAX - 044/185", "set": "Vivid Voltage", "rarity": "Ultra Rare", "price": 4500, "card_number": "044/185", "game": "Pokemon"},
+                {"title": "Charizard V - 079/073", "set": "Champions Path", "rarity": "Secret Rare", "price": 12000, "card_number": "079/073", "game": "Pokemon"},
+                {"title": "Mewtwo GX - SM196", "set": "Sun & Moon Promo", "rarity": "Ultra Rare", "price": 3800, "card_number": "SM196", "game": "Pokemon"},
+                {"title": "Umbreon VMAX - 215/203", "set": "Evolving Skies", "rarity": "Secret Rare", "price": 15000, "card_number": "215/203", "game": "Pokemon"},
+                {"title": "Gengar VMAX - 271/264", "set": "Fusion Strike", "rarity": "Secret Rare", "price": 6500, "card_number": "271/264", "game": "Pokemon"},
+            ]
+            for idx, mc in enumerate(_mock_cards, 1):
+                products.append({
+                    "id": f"mock_seller_{idx}", "safe_id": f"mock_seller_{idx}",
+                    "variant_id": f"mock_variant_{idx}", "title": mc["title"],
+                    "set": mc["set"], "set_name": mc["set"], "rarity": mc["rarity"],
+                    "price": mc["price"], "card_number": mc["card_number"],
+                    "package_type": "Single", "card_condition": "Near Mint",
+                    "image": "https://images.pokemontcg.io/bg.jpg",
+                    "badge": mc["rarity"].upper(), "badge_color": "bg-green-500",
+                    "totalInventory": 1, "createdAt": _dt.now().isoformat() + "Z",
+                    "description": "", "status": "Sync", "tags": [seller_tag],
+                    "images": [], "vendor": user.get("store_name", "Seller"),
+                    "collections": [mc["game"]],
+                })
+            print(f"[SELLER] Injected {len(_mock_cards)} mock cards for seller {user['seller_id']}")
     
     # Get all costs, grades, and locations from local database
     all_costs = cost_db.get_all_costs()
@@ -345,76 +439,96 @@ async def admin_dashboard(
     vip_products = [p for p in active_products if p['price'] > vip_threshold]
     cart_value_vip = sum(p['price'] for p in vip_products)
 
-    # Save weekly value snapshot from ACTIVE inventory only
-    cost_db.save_value_snapshot(total_value, product_count=live_count)
-    value_history = cost_db.get_value_history(limit=12)
-
-    # --- Asset Distribution: aggregate inventory value per Shopify collection ---
-    shopify_collections = await client.get_collections()
+    # Admin-only: value snapshots and collection breakdown
+    value_history = []
     collection_breakdown = []
-    
     total_skus_sum = 0
     total_qty_sum = 0
     total_value_sum = 0
-    
-    for col in shopify_collections:
-        handle = col.get('handle', '')
-        col_products = await client.get_collection_products(handle=handle)
-        # Enrich with location so we can filter to active-only
-        active_col = [
-            p for p in col_products
-            if all_locations.get(p.get('id', ''), cost_db.DEFAULT_LOCATION) not in cost_db.INACTIVE_LOCATIONS
-        ]
-        
-        sku_count = len(active_col)
-        total_qty = sum(p.get('totalInventory', 0) or 0 for p in active_col)
-        total_val = sum(float(p.get('price', 0) or 0) for p in active_col)
-        
-        # Add to Grand Totals
-        total_skus_sum += sku_count
-        total_qty_sum += total_qty
-        total_value_sum += int(total_val)
-        
-        collection_breakdown.append({
-            'title':  col.get('title', handle),
-            'handle': handle,
-            'image':  col.get('image'),
-            'skus':   sku_count,
-            'qty':    total_qty,
-            'value':  int(total_val),
-        })
-    # Sort descending by value
-    collection_breakdown.sort(key=lambda x: x['value'], reverse=True)
 
-    # --- Catch-all for "Uncategorized" products (active but not in a collection) ---
-    uncategorized_skus = live_count - total_skus_sum
-    if uncategorized_skus > 0:
-        # We don't easily have qty/value for these without re-looping all active products, 
-        # but for accuracy of the Grand Total display, we should account for them.
-        # Since we want Grand Total to match accurately, we add them to the breakdown.
-        uncategorized_qty = sum(p.get('totalInventory', 0) or 0 for p in active_products) - total_qty_sum
-        uncategorized_val = sum(float(p.get('price', 0) or 0) for p in active_products) - total_value_sum
+    if not is_seller:
+        # Save weekly value snapshot from ACTIVE inventory only
+        cost_db.save_value_snapshot(total_value, product_count=live_count)
+        value_history = cost_db.get_value_history(limit=12)
+
+        # --- Asset Distribution: aggregate inventory value per Shopify collection ---
+        shopify_collections = await client.get_collections()
         
-        collection_breakdown.append({
-            'title': 'Uncategorized',
-            'handle': None,
-            'image': None,
-            'skus': uncategorized_skus,
-            'qty': max(0, uncategorized_qty),
-            'value': int(max(0, uncategorized_val)),
-        })
-        # Re-sort to include Uncategorized in the correct position or keep it? 
-        # Usually best to keep it sorted by value.
+        for col in shopify_collections:
+            handle = col.get('handle', '')
+            col_products = await client.get_collection_products(handle=handle)
+            # Enrich with location so we can filter to active-only
+            active_col = [
+                p for p in col_products
+                if all_locations.get(p.get('id', ''), cost_db.DEFAULT_LOCATION) not in cost_db.INACTIVE_LOCATIONS
+            ]
+            
+            sku_count = len(active_col)
+            total_qty = sum(p.get('totalInventory', 0) or 0 for p in active_col)
+            total_val = sum(float(p.get('price', 0) or 0) for p in active_col)
+            
+            # Add to Grand Totals
+            total_skus_sum += sku_count
+            total_qty_sum += total_qty
+            total_value_sum += int(total_val)
+            
+            collection_breakdown.append({
+                'title':  col.get('title', handle),
+                'handle': handle,
+                'image':  col.get('image'),
+                'skus':   sku_count,
+                'qty':    total_qty,
+                'value':  int(total_val),
+            })
+        # Sort descending by value
         collection_breakdown.sort(key=lambda x: x['value'], reverse=True)
 
-    # Add to Grand Totals (we update these to match the ACTUAL live_count/total_value)
-    # This ensures consistency even if some counts were missed in collection loops
-    total_skus_sum = live_count
-    total_qty_sum = sum(p.get('totalInventory', 0) or 0 for p in active_products)
-    total_value_sum = int(total_value)
+        # --- Catch-all for "Uncategorized" products (active but not in a collection) ---
+        uncategorized_skus = live_count - total_skus_sum
+        if uncategorized_skus > 0:
+            uncategorized_qty = sum(p.get('totalInventory', 0) or 0 for p in active_products) - total_qty_sum
+            uncategorized_val = sum(float(p.get('price', 0) or 0) for p in active_products) - total_value_sum
+            
+            collection_breakdown.append({
+                'title': 'Uncategorized',
+                'handle': None,
+                'image': None,
+                'skus': uncategorized_skus,
+                'qty': max(0, uncategorized_qty),
+                'value': int(max(0, uncategorized_val)),
+            })
+            collection_breakdown.sort(key=lambda x: x['value'], reverse=True)
 
-    # Keep Top 5 + Uncategorized if it's significant, or just Top 5 total
-    collection_breakdown = collection_breakdown[:6] 
+        # Add to Grand Totals
+        total_skus_sum = live_count
+        total_qty_sum = sum(p.get('totalInventory', 0) or 0 for p in active_products)
+        total_value_sum = int(total_value)
+
+        # Keep Top 5 + Uncategorized
+        collection_breakdown = collection_breakdown[:6] 
+
+    else:
+        # ── SELLER: compute asset distribution by game/collection (not card set) ──
+        from collections import Counter as _Counter
+        game_counter = _Counter()
+        for p in active_products:
+            cols = p.get('collections') or []
+            game = cols[0] if cols else 'Uncategorized'
+            game_counter[game] += 1
+        for game_name, count in game_counter.most_common():
+            game_products = [p for p in active_products if (p.get('collections') or ['Uncategorized'])[0] == game_name]
+            collection_breakdown.append({
+                'title': game_name,
+                'handle': None,
+                'image': None,
+                'skus': count,
+                'qty': sum(p.get('totalInventory', 0) or 0 for p in game_products),
+                'value': int(sum(float(p.get('price', 0) or 0) for p in game_products)),
+            })
+        total_skus_sum = live_count
+        total_qty_sum = sum(p.get('totalInventory', 0) or 0 for p in active_products)
+        total_value_sum = int(total_value)
+
 
     # Format currency for display
     def format_yen(val):
@@ -456,6 +570,12 @@ async def admin_dashboard(
         "total_skus_sum": total_skus_sum,
         "total_qty_sum": total_qty_sum,
         "total_value_sum": total_value_sum,
+        # RBAC context for template
+        "user_role": user["role"],
+        "user_store_name": user.get("store_name", ""),
+        "seller_status": user.get("seller_status"),
+        # Seller management
+        "pending_seller_count": pending_seller_count,
     })
 
 
@@ -1002,7 +1122,7 @@ async def check_duplicate_card(
     card_number: Optional[str] = None,  # Card number from the form field (e.g. No.094, OP09-051)
     set_name: Optional[str] = None,     # Set name from the form field (e.g. VSTAR Universe)
     current_product_id: Optional[str] = None,  # ID of product being edited (to exclude from check)
-    admin: str = Depends(get_admin_session),
+    admin: str = Depends(get_admin_or_seller_session),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     """
@@ -1131,7 +1251,7 @@ async def appraise_card_image(
 @router.get("/add-card", response_class=HTMLResponse)
 async def add_card_page(
     request: Request, 
-    admin: str = Depends(get_admin_session),
+    admin: str = Depends(get_admin_or_seller_session),
     client: ShopifyClient = Depends(get_shopify_client)
 ):
     """Show the add card form."""
@@ -1156,7 +1276,7 @@ async def add_card_page(
 @router.get("/add-card/success")
 async def add_card_success(
     request: Request,
-    admin: str = Depends(get_admin_session)
+    admin: str = Depends(get_admin_or_seller_session)
 ):
     """Display success page after adding a card."""
     return templates.TemplateResponse("admin/add_card_success.html", {
@@ -1265,7 +1385,6 @@ async def edit_card_page(
 @router.post("/add-card")
 async def add_card(
     request: Request,
-    admin: str = Depends(get_admin_session),
     client: ShopifyClient = Depends(get_shopify_client),
     name: str = Form(...),
     price: float = Form(...),
@@ -1334,6 +1453,17 @@ async def add_card(
         f"Condition: {condition}",
         f"Card: {card_condition}"
     ]
+
+    # ── SELLER TAG INJECTION: tag product with seller ownership ──
+    from app.services.seller_auth import get_current_user
+    try:
+        user = await get_current_user(request)
+    except Exception:
+        # Fallback for admin session
+        user = {"role": "admin", "seller_id": None}
+    
+    if user["role"] == "seller" and user.get("seller_id"):
+        tags.append(f"seller:{user['seller_id']}")
     
     # Convert newlines to HTML breaks for description
     description_html = description.replace('\n', '<br>').replace('\r', '') if description else ""
@@ -1617,6 +1747,10 @@ async def admin_settings(
     db: Session = Depends(get_db)
 ):
     """Admin settings page with banner management."""
+    # Read support email setting
+    support_email_setting = db.query(SystemSetting).filter(SystemSetting.key == "support_email").first()
+    support_email = support_email_setting.value if support_email_setting else ""
+
     banners_query = db.query(Banner).order_by(Banner.display_order).all()
     
     # Convert SQLAlchemy models to dictionaries for JSON serialization in template
@@ -1648,7 +1782,8 @@ async def admin_settings(
     return templates.TemplateResponse("admin/settings.html", {
         "request": request,
         "banners": banners,
-        "gradient_options": gradient_options
+        "gradient_options": gradient_options,
+        "support_email": support_email,
     })
 
 
@@ -1895,7 +2030,7 @@ async def check_temp_dir(admin: str = Depends(get_admin_session)):
 
 
 @router.get("/bulk-upload", response_class=HTMLResponse)
-async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_session)):
+async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_or_seller_session)):
     """Show bulk card upload page."""
     return templates.TemplateResponse("admin/bulk_upload.html", {"request": request})
 
@@ -1925,7 +2060,7 @@ def cleanup_old_temp_files(temp_dir: Path, days: int = 3):
 @router.post("/bulk-upload/appraise")
 async def bulk_upload_appraise(
     images: List[UploadFile] = File(...),
-    admin: str = Depends(get_admin_session),
+    admin: str = Depends(get_admin_or_seller_session),
 ):
     """
     Phase 1: Appraise multiple card images.
@@ -2207,6 +2342,7 @@ async def bulk_confirm(
             # Always create a new product (duplicate check disabled)
             safe_print(f"[BULK_UPLOAD] Creating new product for {card_name}")
 
+
             try:
                 # Prepare tags in the same format as add_card
                 full_set_name = card.get("full_set_name", "")
@@ -2220,7 +2356,16 @@ async def bulk_confirm(
                     f"Card: {card_condition}"
                 ]
                 
+                # ── SELLER TAG INJECTION (bulk upload) ──
+                from app.services.seller_auth import get_current_user
+                try:
+                    user = await get_current_user(request)
+                except Exception:
+                    user = {"role": "admin", "seller_id": None}
+                if user["role"] == "seller" and user.get("seller_id"):
+                    tags.append(f"seller:{user['seller_id']}")
                 
+
                 # Build description HTML with all AI-extracted details
                 card_name_jp = card.get("card_name_japanese", "")
                 card_name_en = card.get("card_name_english", "")
@@ -2262,10 +2407,8 @@ async def bulk_confirm(
                     temp_file_path = temp_dir / temp_filename
 
                     # Fallback: if original file not found, try the .webp version
-                    # (handles uploads saved before the WebP migration)
                     if not temp_file_path.exists():
                         webp_stem = Path(temp_filename).stem
-                        # Remove old extension stem variants and try .webp
                         webp_name = webp_stem + ".webp"
                         webp_fallback = temp_dir / webp_name
                         if webp_fallback.exists():
@@ -2318,7 +2461,10 @@ async def bulk_confirm(
                         safe_print(f"[BULK_UPLOAD] ERROR: Temp file not found at {temp_file_path}")
                 else:
                     safe_print(f"[BULK_UPLOAD] WARNING: No temp_path provided for {card_name}")
-                
+
+
+
+
                 product_data = {
                     "title": card_name.strip(),
                     "description": description_html,
@@ -2504,4 +2650,303 @@ async def pagespeed_history(admin: str = Depends(get_admin_session)):
 
     history = get_audit_history(limit=10, strategy="mobile")
     return JSONResponse({"history": history})
+
+
+# ── Seller Management (Admin Only) ──────────────────────────────────────────
+
+@router.get("/sellers", response_class=HTMLResponse)
+async def sellers_page(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+):
+    """Admin page to manage seller applications."""
+    from app.models import User, SellerProfile
+    db = SessionLocal()
+    try:
+        sellers = (
+            db.query(User, SellerProfile)
+            .join(SellerProfile, User.id == SellerProfile.user_id)
+            .filter(User.role == "seller")
+            .order_by(SellerProfile.created_at.desc())
+            .all()
+        )
+        seller_list = []
+        for user, profile in sellers:
+            seller_list.append({
+                "id": user.id,
+                "email": user.email,
+                "store_name": profile.store_name,
+                "location": profile.location or "—",
+                "status": profile.status,
+                "created_at": profile.created_at.strftime("%Y-%m-%d %H:%M") if profile.created_at else "—",
+                "reviewer_notes": profile.reviewer_notes or "",
+            })
+        return templates.TemplateResponse("admin/sellers.html", {
+            "request": request,
+            "sellers": seller_list,
+            "user_role": "admin",
+        })
+    finally:
+        db.close()
+
+
+@router.post("/sellers/{seller_id}/approve")
+async def approve_seller(
+    seller_id: int,
+    admin: str = Depends(get_admin_session),
+):
+    """Approve a seller application."""
+    from app.models import User, SellerProfile
+    db = SessionLocal()
+    try:
+        # Fetch both user and profile in one query
+        result = (
+            db.query(User, SellerProfile)
+            .join(SellerProfile, User.id == SellerProfile.user_id)
+            .filter(User.id == seller_id, User.role == "seller")
+            .first()
+        )
+        if not result:
+            return JSONResponse({"error": "Seller not found"}, status_code=404)
+
+        user, profile = result
+        profile.status = "approved"
+        profile.reviewed_at = datetime.now(timezone.utc)
+        db.commit()
+        print(f"[ADMIN] Seller {seller_id} approved")
+
+        # Capture email/name before session closes
+        seller_email = user.email
+        store_name = profile.store_name
+    finally:
+        db.close()
+
+    # Send approval email (non-blocking — after DB session closed)
+    try:
+        from app.email_service import send_seller_approval_email
+        send_seller_approval_email(to_email=seller_email, store_name=store_name)
+    except Exception as email_err:
+        print(f"[ADMIN] Approval email failed (non-fatal): {email_err}")
+
+    return RedirectResponse(url="/admin/sellers", status_code=303)
+
+
+@router.post("/sellers/{seller_id}/reject")
+async def reject_seller(
+    seller_id: int,
+    admin: str = Depends(get_admin_session),
+):
+    """Reject a seller application — hard-deletes the account so they can re-apply."""
+    from app.models import User, SellerProfile
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == seller_id, User.role == "seller").first()
+        if not user:
+            return JSONResponse({"error": "Seller not found"}, status_code=404)
+
+        # Hard-delete: remove profile first (FK), then the user row
+        db.query(SellerProfile).filter(SellerProfile.user_id == user.id).delete()
+        db.delete(user)
+        db.commit()
+        print(f"[ADMIN] Seller {seller_id} rejected and deleted — can re-apply")
+        return RedirectResponse(url="/admin/sellers", status_code=303)
+    finally:
+        db.close()
+
+
+
+@router.post("/sellers/{seller_id}/suspend")
+async def suspend_seller(
+    seller_id: int,
+    admin: str = Depends(get_admin_session),
+):
+    """Suspend an approved seller."""
+    from app.models import User, SellerProfile
+    db = SessionLocal()
+    try:
+        profile = (
+            db.query(SellerProfile)
+            .join(User, User.id == SellerProfile.user_id)
+            .filter(User.id == seller_id, User.role == "seller")
+            .first()
+        )
+        if not profile:
+            return JSONResponse({"error": "Seller not found"}, status_code=404)
+        
+        profile.status = "suspended"
+        profile.reviewed_at = datetime.now(timezone.utc)
+        db.commit()
+        print(f"[ADMIN] Seller {seller_id} suspended")
+        return RedirectResponse(url="/admin/sellers", status_code=303)
+    finally:
+        db.close()
+
+
+# ============= SUPPORT EMAIL SETTINGS =============
+
+@router.post("/settings/support-email")
+async def save_support_email(
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db),
+):
+    """Save the support email address for seller contact form."""
+    data = await request.json()
+    email_value = (data.get("email") or "").strip()
+
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "support_email").first()
+    if setting:
+        setting.value = email_value
+    else:
+        setting = SystemSetting(key="support_email", value=email_value)
+        db.add(setting)
+    db.commit()
+    print(f"[SETTINGS] Support email updated to: {email_value}")
+    return JSONResponse({"success": True, "email": email_value})
+
+
+# ============= CONTACT / SUPPORT TICKETS =============
+
+@router.get("/contact", response_class=HTMLResponse)
+async def contact_page(
+    request: Request,
+    session_email: str = Depends(get_admin_or_seller_session),
+    db: Session = Depends(get_db),
+):
+    """Sellers see contact form; admins see ticket inbox."""
+    from app.models import User, SupportTicket
+
+    # Determine if user is admin by checking admin session cookie
+    # (Admin auth is env-based, not in the User table)
+    is_admin = False
+    admin_session = request.cookies.get("admin_session")
+    if admin_session:
+        stored_email = os.getenv("ADMIN_EMAIL", "admin@tcgnakama.com")
+        expected_hash = hashlib.sha256(f"{stored_email}{SESSION_SECRET}".encode()).hexdigest()[:32]
+        if admin_session == expected_hash:
+            is_admin = True
+
+    if is_admin:
+        # Admin view: show all support tickets
+        status_filter = request.query_params.get("status", "all")
+        query = db.query(SupportTicket).order_by(SupportTicket.created_at.desc())
+        if status_filter != "all":
+            query = query.filter(SupportTicket.status == status_filter)
+        tickets = query.all()
+
+        # Ticket stats
+        total = db.query(SupportTicket).count()
+        open_count = db.query(SupportTicket).filter(SupportTicket.status == "open").count()
+        replied_count = db.query(SupportTicket).filter(SupportTicket.status == "replied").count()
+        closed_count = db.query(SupportTicket).filter(SupportTicket.status == "closed").count()
+
+        return templates.TemplateResponse("admin/contact_inbox.html", {
+            "request": request,
+            "tickets": tickets,
+            "status_filter": status_filter,
+            "total": total,
+            "open_count": open_count,
+            "replied_count": replied_count,
+            "closed_count": closed_count,
+        })
+    else:
+        # Seller view: show contact form
+        seller_name = ""
+        if user and user.seller_profile:
+            seller_name = user.seller_profile.store_name
+
+        return templates.TemplateResponse("admin/contact.html", {
+            "request": request,
+            "seller_email": session_email,
+            "seller_name": seller_name,
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
+        })
+
+
+@router.post("/contact")
+async def submit_contact(
+    request: Request,
+    session_email: str = Depends(get_admin_or_seller_session),
+    db: Session = Depends(get_db),
+):
+    """Process the seller contact form: save ticket to DB + send email."""
+    from app.models import User, SupportTicket
+
+    form = await request.form()
+    subject = (form.get("subject") or "").strip()
+    message = (form.get("message") or "").strip()
+
+    referer = request.headers.get("referer", "")
+    prefix = "/seller-admin" if "/seller-admin" in referer else "/admin"
+
+    if not subject or not message:
+        return RedirectResponse(
+            url=f"{prefix}/contact?error=Please+fill+in+all+fields",
+            status_code=303,
+        )
+
+    # Get seller name from profile
+    user = db.query(User).filter(User.email == session_email).first()
+    seller_name = session_email
+    if user and user.seller_profile:
+        seller_name = user.seller_profile.store_name
+
+    # Save ticket to database
+    ticket = SupportTicket(
+        seller_email=session_email,
+        seller_name=seller_name,
+        category=subject,
+        message=message,
+        status="open",
+    )
+    db.add(ticket)
+    db.commit()
+    print(f"[SUPPORT] Ticket #{ticket.id} created by {session_email}: {subject}")
+
+    # Also try to send email notification (non-blocking — ticket is saved regardless)
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "support_email").first()
+    support_email = setting.value if setting and setting.value else None
+    if support_email:
+        try:
+            from app.email_service import send_seller_contact_email
+            send_seller_contact_email(
+                to_email=support_email,
+                seller_email=session_email,
+                seller_name=seller_name,
+                subject=subject,
+                message=message,
+            )
+        except Exception as e:
+            print(f"[SUPPORT] Email notification failed (ticket still saved): {e}")
+
+    return RedirectResponse(
+        url=f"{prefix}/contact?success=Your+message+has+been+sent+successfully",
+        status_code=303,
+    )
+
+
+@router.post("/contact/{ticket_id}/status")
+async def update_ticket_status(
+    ticket_id: int,
+    request: Request,
+    admin: str = Depends(get_admin_session),
+    db: Session = Depends(get_db),
+):
+    """Admin-only: update a support ticket's status."""
+    from app.models import SupportTicket
+
+    data = await request.json()
+    new_status = data.get("status", "").strip()
+    if new_status not in ("open", "replied", "closed"):
+        return JSONResponse({"error": "Invalid status"}, status_code=400)
+
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        return JSONResponse({"error": "Ticket not found"}, status_code=404)
+
+    ticket.status = new_status
+    db.commit()
+    print(f"[SUPPORT] Ticket #{ticket_id} status → {new_status}")
+    return JSONResponse({"success": True, "status": new_status})
 

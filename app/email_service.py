@@ -194,3 +194,191 @@ def generate_daily_report_html(data: dict) -> str:
     """
     
     return html
+
+
+# ── Seller Notification Emails ────────────────────────────────────────────────
+
+def send_seller_registration_email(to_email: str, store_name: str) -> bool:
+    """
+    Send a registration confirmation email to a new seller.
+    Called immediately after successful registration.
+    Non-blocking — caller should wrap in try/except.
+    """
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }}
+            .container {{ max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
+            .header {{ background: linear-gradient(135deg, #0A0A0A 0%, #1a1a2e 100%); color: white; padding: 32px; text-align: center; }}
+            .header h1 {{ margin: 0 0 4px; font-size: 22px; letter-spacing: 2px; }}
+            .header p {{ margin: 0; opacity: 0.6; font-size: 13px; }}
+            .body {{ padding: 32px; }}
+            .status-badge {{ display: inline-block; background: #ffd70020; color: #b8960c; border: 1px solid #ffd70040; border-radius: 20px; padding: 4px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }}
+            h2 {{ margin: 0 0 12px; font-size: 18px; color: #111; }}
+            p {{ color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 16px; }}
+            .footer {{ background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #aaa; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🃏 TCG NAKAMA</h1>
+                <p>Seller Portal</p>
+            </div>
+            <div class="body">
+                <div class="status-badge">⏳ Pending Review</div>
+                <h2>Application Received!</h2>
+                <p>Hi <strong>{store_name}</strong>, thanks for applying to become a seller on TCG Nakama.</p>
+                <p>Our team will review your application within <strong>24–48 hours</strong>. You'll receive another email as soon as a decision is made.</p>
+                <p>In the meantime, you can log in to check your status at any time:</p>
+                <p style="text-align:center;">
+                    <a href="https://tcgnakama.com/seller/login"
+                       style="background:#257bf4;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:bold;">
+                        Check Status
+                    </a>
+                </p>
+            </div>
+            <div class="footer">TCG Nakama · Japan's Premier TCG Marketplace</div>
+        </div>
+    </body>
+    </html>
+    """
+    return send_email(
+        subject="Your TCG Nakama Seller Application — Under Review",
+        html_content=html,
+        to_email=to_email,
+    )
+
+
+def send_seller_approval_email(to_email: str, store_name: str) -> bool:
+    """
+    Send an approval notification email to a seller.
+    Called after admin approves the seller application.
+    Non-blocking — caller should wrap in try/except.
+    """
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }}
+            .container {{ max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
+            .header {{ background: linear-gradient(135deg, #0b3d1f 0%, #0A0A0A 100%); color: white; padding: 32px; text-align: center; }}
+            .header h1 {{ margin: 0 0 4px; font-size: 22px; letter-spacing: 2px; }}
+            .header p {{ margin: 0; opacity: 0.6; font-size: 13px; }}
+            .body {{ padding: 32px; }}
+            .status-badge {{ display: inline-block; background: #0bda5e20; color: #0a7a35; border: 1px solid #0bda5e40; border-radius: 20px; padding: 4px 14px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }}
+            h2 {{ margin: 0 0 12px; font-size: 18px; color: #111; }}
+            p {{ color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 16px; }}
+            .footer {{ background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #aaa; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🃏 TCG NAKAMA</h1>
+                <p>Seller Portal</p>
+            </div>
+            <div class="body">
+                <div class="status-badge">✓ Approved</div>
+                <h2>Welcome aboard, {store_name}!</h2>
+                <p>Great news — your seller application has been <strong>approved</strong>. You can now log in to your seller dashboard and start listing cards.</p>
+                <p style="text-align:center;">
+                    <a href="https://tcgnakama.com/seller/login"
+                       style="background:#0bda5e;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:bold;">
+                        Go to My Dashboard
+                    </a>
+                </p>
+                <p style="font-size:12px;color:#aaa;text-align:center;">
+                    Direct link: https://tcgnakama.com/seller/login
+                </p>
+            </div>
+            <div class="footer">TCG Nakama · Japan's Premier TCG Marketplace</div>
+        </div>
+    </body>
+    </html>
+    """
+    return send_email(
+        subject="🎉 You're Approved — Welcome to TCG Nakama Sellers!",
+        html_content=html,
+        to_email=to_email,
+    )
+
+
+def send_seller_contact_email(
+    to_email: str,
+    seller_email: str,
+    seller_name: str,
+    subject: str,
+    message: str,
+) -> bool:
+    """
+    Send a seller support request to the configured support email address.
+
+    Args:
+        to_email: Support email address (from SystemSetting)
+        seller_email: Seller's email address
+        seller_name: Seller's store name
+        subject: Issue subject/category
+        message: Issue description
+
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    html = f"""
+    <html>
+    <head>
+    <style>
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #111; color: #fff; margin: 0; padding: 20px; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; border: 1px solid #333; overflow: hidden; }}
+        .header {{ background: linear-gradient(135deg, #257bf4, #bc13fe); padding: 24px; text-align: center; }}
+        .header h1 {{ color: #fff; margin: 0; font-size: 22px; letter-spacing: 2px; }}
+        .header p {{ color: rgba(255,255,255,0.8); margin: 8px 0 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }}
+        .body {{ padding: 24px; }}
+        .field {{ margin-bottom: 16px; }}
+        .label {{ font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; margin-bottom: 4px; }}
+        .value {{ font-size: 14px; color: #eee; padding: 10px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #333; }}
+        .message-box {{ font-size: 14px; color: #eee; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #333; white-space: pre-wrap; line-height: 1.6; }}
+        .footer {{ text-align: center; padding: 16px; color: #666; font-size: 11px; border-top: 1px solid #333; }}
+    </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🛟 Seller Support Request</h1>
+                <p>TCG Nakama Seller Portal</p>
+            </div>
+            <div class="body">
+                <div class="field">
+                    <div class="label">From Seller</div>
+                    <div class="value">{seller_name}</div>
+                </div>
+                <div class="field">
+                    <div class="label">Seller Email</div>
+                    <div class="value"><a href="mailto:{seller_email}" style="color: #257bf4; text-decoration: none;">{seller_email}</a></div>
+                </div>
+                <div class="field">
+                    <div class="label">Category</div>
+                    <div class="value">{subject}</div>
+                </div>
+                <div class="field">
+                    <div class="label">Message</div>
+                    <div class="message-box">{message}</div>
+                </div>
+            </div>
+            <div class="footer">
+                TCG Nakama · Seller Support · Reply directly to the seller at {seller_email}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return send_email(
+        subject=f"[Seller Support] {subject} — from {seller_name}",
+        html_content=html,
+        to_email=to_email,
+    )

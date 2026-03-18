@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Seller Dashboard — TCG Nakama</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                        "teal-accent": "#00f2ea",
+                    },
+                    fontFamily: { "display": ["Space Grotesk", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        .action-tile {
+            transition: all 0.2s ease;
+        }
+        .action-tile:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body class="bg-background-dark font-display text-white min-h-screen pb-10">
+
+    <!-- Ambient background -->
+    <div class="fixed inset-0 bg-gradient-to-br from-neon-green/5 via-transparent to-neon-blue/5 pointer-events-none"></div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-white/10">
+        <div class="flex items-center px-4 justify-between h-16">
+            <img src="/static/live_logo.png" alt="TCG Nakama" class="h-8 w-auto object-contain">
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-neon-green/10 text-neon-green border border-neon-green/30">
+                    ✓ Approved Seller
+                </span>
+            </div>
+            <a href="/seller/logout"
+                class="flex items-center gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
+                <span class="material-symbols-outlined text-sm">logout</span>
+                Logout
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-lg mx-auto px-4 pt-8 relative z-10">
+
+        <!-- Store Identity -->
+        <div class="text-center mb-10">
+            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-neon-green/20 to-neon-blue/20 border border-neon-green/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(11,218,94,0.15)]">
+                <span class="material-symbols-outlined text-neon-green text-4xl">storefront</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight mb-1">{{ store_name }}</h1>
+            <p class="text-sm text-white/40">
+                <span class="material-symbols-outlined text-xs align-middle mr-1">mail</span>{{ email }}
+                {% if location %}
+                <span class="mx-2 text-white/20">·</span>
+                <span class="material-symbols-outlined text-xs align-middle mr-1">location_on</span>{{ location }}
+                {% endif %}
+            </p>
+            {% if member_since %}
+            <p class="text-[11px] text-white/25 mt-1">Member since {{ member_since }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="mb-8">
+            <h2 class="text-[10px] font-bold tracking-[0.2em] text-white/40 uppercase mb-4 px-1">Seller Tools</h2>
+            <div class="grid grid-cols-1 gap-3">
+
+                <!-- Manage Vault -->
+                <a href="/seller-admin" class="action-tile glass-panel rounded-2xl p-5 flex items-center gap-4 hover:border-neon-green/30 hover:bg-neon-green/5 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center group-hover:bg-neon-green/20 transition-colors flex-shrink-0">
+                        <span class="material-symbols-outlined text-neon-green text-2xl">inventory_2</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-white text-sm">Manage Vault</div>
+                        <div class="text-xs text-white/40 mt-0.5">View, edit and track your inventory</div>
+                    </div>
+                    <span class="material-symbols-outlined text-white/20 group-hover:text-neon-green transition-colors">chevron_right</span>
+                </a>
+
+                <!-- Add Card -->
+                <a href="/seller-admin/add-card" class="action-tile glass-panel rounded-2xl p-5 flex items-center gap-4 hover:border-neon-blue/30 hover:bg-neon-blue/5 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center group-hover:bg-neon-blue/20 transition-colors flex-shrink-0">
+                        <span class="material-symbols-outlined text-neon-blue text-2xl">add_circle</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-white text-sm">Add Single Card</div>
+                        <div class="text-xs text-white/40 mt-0.5">List a new card with AI-assisted pricing</div>
+                    </div>
+                    <span class="material-symbols-outlined text-white/20 group-hover:text-neon-blue transition-colors">chevron_right</span>
+                </a>
+
+                <!-- Bulk Upload -->
+                <a href="/seller-admin/bulk-upload" class="action-tile glass-panel rounded-2xl p-5 flex items-center gap-4 hover:border-neon-purple/30 hover:bg-neon-purple/5 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center group-hover:bg-neon-purple/20 transition-colors flex-shrink-0">
+                        <span class="material-symbols-outlined text-neon-purple text-2xl">upload_file</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-white text-sm">Bulk Upload</div>
+                        <div class="text-xs text-white/40 mt-0.5">Upload multiple cards via CSV or image scan</div>
+                    </div>
+                    <span class="material-symbols-outlined text-white/20 group-hover:text-neon-purple transition-colors">chevron_right</span>
+                </a>
+
+            </div>
+        </div>
+
+        <!-- Help Note -->
+        <div class="glass-panel rounded-xl p-4 text-center border-neon-blue/10">
+            <p class="text-xs text-white/30">
+                Need help?
+                <a href="mailto:support@tcgnakama.com" class="text-neon-blue hover:underline">Contact Support</a>
+            </p>
+        </div>
+
+        <!-- Back to Marketplace -->
+        <div class="text-center mt-6">
+            <a href="/"
+                class="text-xs text-white/20 hover:text-white/50 transition-colors inline-flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Back to Marketplace
+            </a>
+        </div>
+
+    </main>
+
+</body>
+
+</html>

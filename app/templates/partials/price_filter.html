@@ -1,33 +1,38 @@
 <div id="price-filter-container"
-    class="flex flex-col gap-1 px-1 w-full md:min-w-[160px] md:w-auto cursor-pointer group">
-    <div class="flex items-center justify-between">
-        <p class="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Price Under</p>
-        <p id="price-display" class="text-[10px] font-black text-primary">¥30,000+</p>
+    class="flex items-center gap-2 px-1 w-full md:min-w-[200px] md:w-auto">
+    <p class="text-[10px] font-bold uppercase text-gray-400 tracking-wider shrink-0">Price</p>
+    <div class="flex items-center gap-1.5">
+        <span class="text-[10px] text-gray-500">¥</span>
+        <input type="number" id="min-price-input" placeholder="Min"
+            class="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white placeholder-gray-500 focus:ring-1 focus:ring-primary focus:border-primary/50 outline-none transition-all appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            onchange="applyPriceFilter()" />
+        <span class="text-[10px] text-gray-500">–</span>
+        <span class="text-[10px] text-gray-500">¥</span>
+        <input type="number" id="max-price-input" placeholder="Max"
+            class="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white placeholder-gray-500 focus:ring-1 focus:ring-primary focus:border-primary/50 outline-none transition-all appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            onchange="applyPriceFilter()" />
+        <button type="button" onclick="applyPriceFilter()"
+            class="h-7 px-2.5 rounded-lg bg-primary/15 border border-primary/30 text-[9px] font-black uppercase tracking-wider text-primary hover:bg-primary/25 hover:border-primary/50 transition-all active:scale-95">
+            Go
+        </button>
     </div>
-    <input type="range" id="main-price-slider" min="0" max="30000" step="500" value="30000"
-        class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/20 transition-all"
-        oninput="syncPriceAndFilter(this.value)">
 </div>
 
 <script>
-    function syncPriceAndFilter(val) {
-        const display = document.getElementById('price-display');
-        const hiddenInput = document.getElementById('price-slider');
+    function applyPriceFilter() {
+        const minInput = document.getElementById('min-price-input');
+        const maxInput = document.getElementById('max-price-input');
+        const hiddenMin = document.getElementById('min-price-hidden');
+        const hiddenMax = document.getElementById('price-slider');
 
-        // Update display logic
-        if (parseInt(val) >= 30000) {
-            display.textContent = "¥30,000+";
-            hiddenInput.value = ""; // No limit
-        } else {
-            display.textContent = `¥${parseInt(val).toLocaleString()}`;
-            hiddenInput.value = val;
-        }
+        if (hiddenMin) hiddenMin.value = minInput.value || '';
+        if (hiddenMax) hiddenMax.value = maxInput.value || '';
 
         // Trigger HTMX filter
         if (typeof htmx !== 'undefined') {
-            htmx.trigger(hiddenInput, 'change');
+            htmx.trigger(hiddenMax || hiddenMin, 'change');
         } else {
-            hiddenInput.dispatchEvent(new Event('change'));
+            (hiddenMax || hiddenMin).dispatchEvent(new Event('change'));
         }
     }
 </script>

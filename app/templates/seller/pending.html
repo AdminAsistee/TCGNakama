@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Application Under Review — TCG Nakama</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                        "teal-accent": "#00f2ea",
+                    },
+                    fontFamily: { "display": ["Space Grotesk", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body class="bg-background-dark font-display text-white min-h-screen flex items-center justify-center p-4">
+
+    <div class="fixed inset-0 bg-gradient-to-br from-neon-gold/5 via-transparent to-neon-purple/5 pointer-events-none">
+    </div>
+
+    <div class="w-full max-w-md relative z-10 text-center">
+
+        <div class="inline-flex items-center gap-3 mb-6">
+            <img src="/static/live_logo.png" alt="TCG Nakama" class="h-10 w-auto">
+        </div>
+
+        <div class="glass-panel rounded-2xl p-8">
+            {% if seller_status == 'pending' %}
+            <!-- Pending Review -->
+            <div
+                class="w-20 h-20 rounded-full bg-neon-gold/10 border border-neon-gold/30 flex items-center justify-center mx-auto mb-5">
+                <span class="material-symbols-outlined text-neon-gold text-4xl">hourglass_top</span>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Application Under Review</h2>
+            <p class="text-sm text-white/50 mb-4">
+                Hi <span class="text-white font-bold">{{ store_name }}</span>, your seller application is being
+                reviewed by the TCG Nakama team.
+            </p>
+            <div class="bg-surface-dark rounded-xl p-4 border border-white/5 text-left space-y-2 mb-6">
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="material-symbols-outlined text-neon-gold text-sm">pending</span>
+                    <span class="text-white/60">Status:</span>
+                    <span class="text-neon-gold font-bold uppercase tracking-wider">Pending</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-white/40">
+                    <span class="material-symbols-outlined text-sm">schedule</span>
+                    Typical review time: 24–48 hours
+                </div>
+            </div>
+
+            {% elif seller_status == 'rejected' %}
+            <!-- Rejected -->
+            <div
+                class="w-20 h-20 rounded-full bg-danger-red/10 border border-danger-red/30 flex items-center justify-center mx-auto mb-5">
+                <span class="material-symbols-outlined text-danger-red text-4xl">block</span>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Application Not Approved</h2>
+            <p class="text-sm text-white/50 mb-6">
+                Unfortunately, your seller application was not approved at this time.
+                Please contact support for more information.
+            </p>
+
+            {% elif seller_status == 'suspended' %}
+            <!-- Suspended -->
+            <div
+                class="w-20 h-20 rounded-full bg-danger-red/10 border border-danger-red/30 flex items-center justify-center mx-auto mb-5">
+                <span class="material-symbols-outlined text-danger-red text-4xl">gpp_bad</span>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Account Suspended</h2>
+            <p class="text-sm text-white/50 mb-6">
+                This seller account has been suspended. Please contact support.
+            </p>
+            {% endif %}
+
+            <a href="/seller/logout"
+                class="inline-flex items-center gap-2 text-xs text-white/40 hover:text-white/60 transition-colors">
+                <span class="material-symbols-outlined text-sm">logout</span>
+                Sign Out
+            </a>
+        </div>
+
+        <div class="mt-6">
+            <a href="/"
+                class="text-xs text-white/30 hover:text-white/60 transition-colors inline-flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Back to Marketplace
+            </a>
+        </div>
+    </div>
+
+</body>
+
+</html>

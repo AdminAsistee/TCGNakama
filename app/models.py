@@ -1,8 +1,8 @@
 """
 Database models for TCG Nakama.
 """
-from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime, Text, Enum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, DateTime, Text, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 import enum
 from app.database import Base
@@ -127,3 +127,68 @@ class BlogPost(Base):
     @property
     def tags_list(self) -> list:
         return [t.strip() for t in (self.tags or '').split(',') if t.strip()]
+
+
+# ── Seller Onboarding Models ────────────────────────────────────────────────
+
+class UserRole(str, enum.Enum):
+    admin  = "admin"
+    seller = "seller"
+
+
+class SellerStatus(str, enum.Enum):
+    pending   = "pending"
+    approved  = "approved"
+    rejected  = "rejected"
+    suspended = "suspended"
+
+
+class User(Base):
+    """Platform user — admin or seller."""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    password_salt: Mapped[str] = mapped_column(String(64))
+    role: Mapped[str] = mapped_column(String(20), default="seller")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    seller_profile: Mapped["SellerProfile | None"] = relationship(
+        "SellerProfile", back_populates="user", uselist=False
+    )
+
+
+class SellerProfile(Base):
+    """Seller store profile — linked 1:1 to User."""
+    __tablename__ = "seller_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    store_name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    reviewer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    user: Mapped["User"] = relationship("User", back_populates="seller_profile")
+
+
+class SupportTicket(Base):
+    """Seller support / contact form submissions."""
+    __tablename__ = "support_tickets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    seller_email: Mapped[str] = mapped_column(String(255), index=True)
+    seller_name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(100))
+    message: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)  # open, replied, closed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+

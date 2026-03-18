@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Seller Login — TCG Nakama</title>
+    <meta name="description" content="Sign in to your TCG Nakama seller account to manage your store and inventory." />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                    },
+                    fontFamily: { "display": ["Space Grotesk", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { background: #0A0A0A; }
+
+        /* Ambient orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            opacity: 0.12;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 64px rgba(0,0,0,0.6);
+            backdrop-filter: blur(24px);
+        }
+
+        .input-field {
+            width: 100%;
+            background: rgba(255,255,255,0.04) !important;
+            border: 1px solid rgba(255,255,255,0.10) !important;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 15px;
+            color: white !important;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .input-field::placeholder { color: rgba(255,255,255,0.2) !important; }
+        .input-field:focus {
+            border-color: rgba(188, 19, 254, 0.5) !important;
+            box-shadow: 0 0 0 3px rgba(188, 19, 254, 0.10) !important;
+            background: rgba(255,255,255,0.06) !important;
+            color: white !important;
+        }
+        .input-field:not(:placeholder-shown):not(:focus) {
+            border-color: rgba(255,255,255,0.15) !important;
+            background: rgba(255,255,255,0.04) !important;
+            color: white !important;
+        }
+        /* Prevent readonly white flash from Chrome */
+        .input-field[readonly] {
+            background: rgba(255,255,255,0.04) !important;
+            color: white !important;
+            cursor: text;
+        }
+        /* Override Chrome autofill yellow/white background */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px #121212 inset !important;
+            -webkit-text-fill-color: white !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        .btn-signin {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, #bc13fe 0%, #257bf4 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 0 24px rgba(188, 19, 254, 0.2);
+        }
+        .btn-signin:hover {
+            opacity: 0.88;
+            transform: translateY(-1px);
+            box-shadow: 0 0 36px rgba(188, 19, 254, 0.35);
+        }
+        .btn-signin:active { transform: translateY(0); opacity: 1; }
+
+        .seller-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(11, 218, 94, 0.08);
+            border: 1px solid rgba(11, 218, 94, 0.2);
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #0bda5e;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.15);
+            font-size: 11px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+        }
+    </style>
+</head>
+
+<body class="font-display text-white min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+
+    <!-- Ambient orbs -->
+    <div class="orb w-96 h-96 bg-purple-600" style="top: -8rem; right: -4rem;"></div>
+    <div class="orb w-64 h-64 bg-blue-500" style="bottom: -4rem; left: -2rem;"></div>
+
+    <div class="w-full max-w-sm relative z-10">
+
+        <!-- Top branding area -->
+        <div class="text-center mb-8">
+            <a href="/" class="inline-block mb-5">
+                <img src="/static/live_logo.png" alt="TCG Nakama" class="h-10 w-auto mx-auto">
+            </a>
+            <div class="mb-3">
+                <span class="seller-badge">
+                    <span class="material-symbols-outlined" style="font-size:13px;">storefront</span>
+                    Seller Portal
+                </span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white mt-3">Welcome back</h1>
+            <p class="text-sm text-white/35 mt-1">Sign in to manage your store</p>
+        </div>
+
+        <!-- Card -->
+        <div class="card rounded-2xl p-7">
+
+            {% if error %}
+            <div class="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-red-400 text-lg mt-0.5 flex-shrink-0">error</span>
+                <span class="text-sm text-red-300 leading-snug">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% if success %}
+            <div class="mb-5 p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-green-400 text-lg mt-0.5 flex-shrink-0">check_circle</span>
+                <span class="text-sm text-green-300 leading-snug">{{ success }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Login form — readonly trick prevents Chrome autofill -->
+            <form method="POST" action="/seller/login" autocomplete="off" class="space-y-4">
+                <!-- Honeypot hidden inputs to absorb browser autofill -->
+                <input type="text" name="__fakeuser" style="display:none" tabindex="-1" autocomplete="off" />
+                <input type="password" name="__fakepwd" style="display:none" tabindex="-1" autocomplete="off" />
+
+                <div>
+                    <label for="seller-email" class="block text-[11px] font-bold uppercase tracking-widest text-white/40 mb-2">Email address</label>
+                    <input
+                        id="seller-email"
+                        type="text"
+                        name="email"
+                        required
+                        readonly
+                        onfocus="this.removeAttribute('readonly')"
+                        autocomplete="off"
+                        class="input-field"
+                        placeholder="you@example.com"
+                    />
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="seller-password" class="block text-[11px] font-bold uppercase tracking-widest text-white/40">Password</label>
+                        <a href="#" class="text-[11px] text-neon-purple/70 hover:text-neon-purple transition-colors">Forgot password?</a>
+                    </div>
+                    <div class="relative">
+                        <input
+                            id="seller-password"
+                            type="password"
+                            name="password"
+                            required
+                            readonly
+                            onfocus="this.removeAttribute('readonly')"
+                            autocomplete="new-password"
+                            class="input-field"
+                            style="padding-right: 48px;"
+                            placeholder="8-character password"
+                        />
+                        <button type="button"
+                            onclick="togglePwd()"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-neon-purple transition-colors p-1"
+                            tabindex="-1" id="pwd-toggle" aria-label="Toggle password visibility">
+                            <span class="material-symbols-outlined text-lg" id="pwd-icon">visibility</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-1">
+                    <button type="submit" class="btn-signin">Sign In</button>
+                </div>
+
+            </form>
+
+            <!-- Divider -->
+            <div class="divider my-5">or</div>
+
+            <!-- Register CTA -->
+            <a href="/seller/register"
+                class="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/10 hover:border-neon-purple/30 hover:bg-neon-purple/5 transition-all group text-center">
+                <span class="material-symbols-outlined text-white/30 group-hover:text-neon-purple transition-colors text-lg">add_business</span>
+                <span class="text-sm text-white/50 group-hover:text-white transition-colors">Become a Seller</span>
+            </a>
+        </div>
+
+        <!-- Back link -->
+        <div class="text-center mt-6">
+            <a href="/" class="text-xs text-white/20 hover:text-white/50 transition-colors inline-flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Back to Marketplace
+            </a>
+        </div>
+
+    </div>
+
+    <script>
+        function togglePwd() {
+            const input = document.getElementById('seller-password');
+            const icon = document.getElementById('pwd-icon');
+            input.removeAttribute('readonly');
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            icon.textContent = isHidden ? 'visibility_off' : 'visibility';
+        }
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Become a Seller — TCG Nakama</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#257bf4",
+                        "background-dark": "#0A0A0A",
+                        "surface-dark": "#121212",
+                        "glass": "rgba(255, 255, 255, 0.03)",
+                        "glass-border": "rgba(255, 255, 255, 0.1)",
+                        "neon-blue": "#00f0ff",
+                        "neon-purple": "#bc13fe",
+                        "neon-green": "#0bda5e",
+                        "neon-gold": "#ffd700",
+                        "danger-red": "#ff2a6d",
+                        "teal-accent": "#00f2ea",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Wizard step transitions */
+        .wizard-step {
+            display: none;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .wizard-step.active {
+            display: block;
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Validation error state */
+        .field-error {
+            border-color: #ff2a6d !important;
+            box-shadow: 0 0 0 2px rgba(255, 42, 109, 0.2) !important;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+        .shake { animation: shake 0.4s ease; }
+    </style>
+</head>
+
+<body class="bg-background-dark font-display text-white min-h-screen flex items-center justify-center p-4">
+
+    <!-- Background gradient -->
+    <div class="fixed inset-0 bg-gradient-to-br from-neon-purple/5 via-transparent to-neon-blue/5 pointer-events-none">
+    </div>
+
+    <div class="w-full max-w-lg relative z-10">
+        <!-- Logo & Brand -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center gap-3 mb-4">
+                <img src="/static/live_logo.png" alt="TCG Nakama" class="h-10 w-auto">
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight">Become a Seller</h1>
+            <p class="text-sm text-white/40 mt-1">Join Japan's TCG marketplace and start selling cards</p>
+        </div>
+
+        <!-- Success Message -->
+        {% if success %}
+        <div class="glass-panel rounded-2xl p-8 text-center">
+            <div
+                class="w-16 h-16 rounded-full bg-neon-green/10 border border-neon-green/30 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-neon-green text-3xl">check_circle</span>
+            </div>
+            <h2 class="text-lg font-bold mb-2">Application Submitted!</h2>
+            <p class="text-sm text-white/60 mb-6">{{ success }}</p>
+            <a href="/seller/login"
+                class="inline-block py-3 px-8 rounded-xl text-sm font-bold uppercase tracking-[0.15em] bg-gradient-to-r from-neon-purple to-primary hover:from-neon-purple/90 hover:to-primary/90 transition-all shadow-[0_0_20px_rgba(188,19,254,0.15)]">
+                Go to Login
+            </a>
+        </div>
+        {% else %}
+
+        <!-- Registration Card -->
+        <div class="glass-panel rounded-2xl p-8">
+            {% if error %}
+            <div class="mb-6 p-3 rounded-lg bg-danger-red/10 border border-danger-red/20 flex items-center gap-2">
+                <span class="material-symbols-outlined text-danger-red text-lg">error</span>
+                <span class="text-sm text-danger-red">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Step-level error banner -->
+            <div class="mb-4 p-3 rounded-lg bg-danger-red/10 border border-danger-red/20 items-center gap-2 hidden" id="step-error">
+                <span class="material-symbols-outlined text-danger-red text-lg">error</span>
+                <span class="text-sm text-danger-red" id="step-error-text"></span>
+            </div>
+
+            <!-- Step Indicator -->
+            <div class="flex items-center justify-center gap-2 mb-8">
+                <div class="flex items-center gap-2" id="step-indicator-1">
+                    <div class="w-8 h-8 rounded-full bg-neon-purple/20 border border-neon-purple/50 flex items-center justify-center transition-all"
+                        id="step-dot-1">
+                        <span class="text-xs font-bold text-neon-purple">1</span>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-neon-purple hidden sm:inline">Account</span>
+                </div>
+                <div class="w-8 h-px bg-white/20"></div>
+                <div class="flex items-center gap-2" id="step-indicator-2">
+                    <div class="w-8 h-8 rounded-full bg-white/5 border border-white/20 flex items-center justify-center transition-all"
+                        id="step-dot-2">
+                        <span class="text-xs font-bold text-white/40">2</span>
+                    </div>
+                    <span
+                        class="text-[10px] font-bold uppercase tracking-wider text-white/40 hidden sm:inline">Store</span>
+                </div>
+                <div class="w-8 h-px bg-white/20"></div>
+                <div class="flex items-center gap-2" id="step-indicator-3">
+                    <div class="w-8 h-8 rounded-full bg-white/5 border border-white/20 flex items-center justify-center transition-all"
+                        id="step-dot-3">
+                        <span class="text-xs font-bold text-white/40">3</span>
+                    </div>
+                    <span
+                        class="text-[10px] font-bold uppercase tracking-wider text-white/40 hidden sm:inline">Confirm</span>
+                </div>
+            </div>
+
+            <form method="POST" action="/seller/register" id="register-form">
+                <!-- Step 1: Account Details -->
+                <div class="wizard-step active" id="step-1">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-white/60 mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-neon-purple text-lg">person</span>
+                        Account Details
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Email<span
+                                    class="text-danger-red ml-1">*</span></label>
+                            <input type="email" name="email" id="reg-email" required autocomplete="email"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all"
+                                placeholder="you@example.com" />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Password<span
+                                    class="text-danger-red ml-1">*</span></label>
+                            <div class="relative">
+                                <input type="password" name="password" id="reg-password" required minlength="8"
+                                    autocomplete="new-password"
+                                    class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all"
+                                    placeholder="Minimum 8 characters" />
+                                <button type="button" onclick="togglePassword('reg-password', this)"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors p-1"
+                                    tabindex="-1" title="Show password">
+                                    <span class="material-symbols-outlined text-lg">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Confirm
+                                Password<span class="text-danger-red ml-1">*</span></label>
+                            <div class="relative">
+                                <input type="password" name="confirm_password" id="reg-confirm" required minlength="8"
+                                    autocomplete="new-password"
+                                    class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all"
+                                    placeholder="Re-enter your password" />
+                                <button type="button" onclick="togglePassword('reg-confirm', this)"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors p-1"
+                                    tabindex="-1" title="Show password">
+                                    <span class="material-symbols-outlined text-lg">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="goToStep(2)"
+                        class="w-full mt-6 py-3 rounded-xl text-sm font-bold uppercase tracking-[0.15em] bg-gradient-to-r from-neon-purple to-primary hover:from-neon-purple/90 hover:to-primary/90 transition-all shadow-[0_0_20px_rgba(188,19,254,0.15)]">
+                        Next: Store Details →
+                    </button>
+                </div>
+
+                <!-- Step 2: Store Details -->
+                <div class="wizard-step" id="step-2">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-white/60 mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-neon-purple text-lg">storefront</span>
+                        Store Details
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Store
+                                Name<span class="text-danger-red ml-1">*</span></label>
+                            <input type="text" name="store_name" id="reg-store" required
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all"
+                                placeholder="e.g. Tokyo Card Vault" />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Country</label>
+                            <select id="reg-country" onchange="onCountryChange()"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all appearance-none cursor-pointer">
+                                <option value="" class="bg-surface-dark">Select Country (optional)</option>
+                            </select>
+                        </div>
+                        <div id="region-group" class="hidden">
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Region / State</label>
+                            <select id="reg-region" onchange="onRegionChange()"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all appearance-none cursor-pointer">
+                                <option value="" class="bg-surface-dark">Select Region</option>
+                            </select>
+                        </div>
+                        <div id="city-group" class="hidden">
+                            <label
+                                class="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">City / District</label>
+                            <select id="reg-city"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-neon-purple focus:border-neon-purple/50 outline-none transition-all appearance-none cursor-pointer">
+                                <option value="" class="bg-surface-dark">Select City</option>
+                            </select>
+                        </div>
+                        <input type="hidden" name="location" id="reg-location" />
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" onclick="goToStep(1)"
+                            class="flex-1 py-3 rounded-xl text-sm font-bold uppercase tracking-[0.15em] border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-all">
+                            ← Back
+                        </button>
+                        <button type="button" onclick="goToStep(3)"
+                            class="flex-[2] py-3 rounded-xl text-sm font-bold uppercase tracking-[0.15em] bg-gradient-to-r from-neon-purple to-primary hover:from-neon-purple/90 hover:to-primary/90 transition-all shadow-[0_0_20px_rgba(188,19,254,0.15)]">
+                            Next: Confirm →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Confirmation -->
+                <div class="wizard-step" id="step-3">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-white/60 mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-neon-purple text-lg">verified</span>
+                        Review & Submit
+                    </h3>
+                    <div class="space-y-3 bg-surface-dark rounded-xl p-4 border border-white/5">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-white/40 uppercase tracking-wider">Email</span>
+                            <span class="text-sm text-white font-mono" id="confirm-email">—</span>
+                        </div>
+                        <div class="border-t border-white/5"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-white/40 uppercase tracking-wider">Store Name</span>
+                            <span class="text-sm text-white font-bold" id="confirm-store">—</span>
+                        </div>
+                        <div class="border-t border-white/5"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-white/40 uppercase tracking-wider">Location</span>
+                            <span class="text-sm text-white/80" id="confirm-location">—</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-3 rounded-lg bg-neon-gold/5 border border-neon-gold/20">
+                        <p class="text-xs text-neon-gold/80 flex items-start gap-2">
+                            <span class="material-symbols-outlined text-sm mt-0.5">info</span>
+                            Your application will be reviewed by the TCG Nakama team. You'll be able to start listing
+                            cards once approved.
+                        </p>
+                    </div>
+
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" onclick="goToStep(2)"
+                            class="flex-1 py-3 rounded-xl text-sm font-bold uppercase tracking-[0.15em] border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-all">
+                            ← Back
+                        </button>
+                        <button type="submit" id="submit-btn"
+                            class="flex-[2] py-3 rounded-xl text-sm font-bold uppercase tracking-[0.15em] bg-gradient-to-r from-neon-purple to-primary hover:from-neon-purple/90 hover:to-primary/90 transition-all shadow-[0_0_20px_rgba(188,19,254,0.15)]">
+                            Submit Application
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% endif %}
+
+        <!-- Links -->
+        <div class="text-center mt-6 space-y-2">
+            <p class="text-xs text-white/40">
+                Already have an account?
+                <a href="/seller/login" class="text-neon-purple hover:text-neon-purple/80 font-bold transition-colors">Sign
+                    In</a>
+            </p>
+            <a href="/"
+                class="text-xs text-white/30 hover:text-white/60 transition-colors inline-flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Back to Marketplace
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('span');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+                btn.title = 'Hide password';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+                btn.title = 'Show password';
+            }
+        }
+
+        function showStepError(msg) {
+            const el = document.getElementById('step-error');
+            document.getElementById('step-error-text').textContent = msg;
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+            el.classList.add('shake');
+            setTimeout(() => el.classList.remove('shake'), 500);
+        }
+
+        function hideStepError() {
+            const el = document.getElementById('step-error');
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        function markFieldError(id) {
+            const el = document.getElementById(id);
+            el.classList.add('field-error', 'shake');
+            el.focus();
+            setTimeout(() => el.classList.remove('shake'), 500);
+            el.addEventListener('input', () => el.classList.remove('field-error'), { once: true });
+        }
+
+        function goToStep(step) {
+            hideStepError();
+
+            // Validate before moving forward
+            if (step > currentStep) {
+                if (currentStep === 1) {
+                    const email = document.getElementById('reg-email').value.trim();
+                    const password = document.getElementById('reg-password').value;
+                    const confirm = document.getElementById('reg-confirm').value;
+
+                    if (!email) {
+                        showStepError('Please enter your email address.');
+                        markFieldError('reg-email');
+                        return;
+                    }
+                    // Basic email format check
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                        showStepError('Please enter a valid email address.');
+                        markFieldError('reg-email');
+                        return;
+                    }
+                    if (!password) {
+                        showStepError('Please enter a password.');
+                        markFieldError('reg-password');
+                        return;
+                    }
+                    if (password.length < 8) {
+                        showStepError('Password must be at least 8 characters.');
+                        markFieldError('reg-password');
+                        return;
+                    }
+                    if (!confirm) {
+                        showStepError('Please confirm your password.');
+                        markFieldError('reg-confirm');
+                        return;
+                    }
+                    if (password !== confirm) {
+                        showStepError('Passwords do not match.');
+                        markFieldError('reg-confirm');
+                        return;
+                    }
+                }
+                if (currentStep === 2) {
+                    const store = document.getElementById('reg-store').value;
+                    if (!store.trim()) {
+                        showStepError('Please enter your store name.');
+                        markFieldError('reg-store');
+                        return;
+                    }
+                }
+            }
+
+            // Update confirmation display
+            if (step === 3) {
+                document.getElementById('confirm-email').textContent =
+                    document.getElementById('reg-email').value || '—';
+                document.getElementById('confirm-store').textContent =
+                    document.getElementById('reg-store').value || '—';
+                // Build location string from dropdowns
+                buildLocationValue();
+                document.getElementById('confirm-location').textContent =
+                    document.getElementById('reg-location').value || 'Not specified';
+            }
+
+            // Hide current step
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+
+            // Show new step
+            currentStep = step;
+            document.getElementById(`step-${currentStep}`).classList.add('active');
+
+            // Update step indicators
+            for (let i = 1; i <= 3; i++) {
+                const dot = document.getElementById(`step-dot-${i}`);
+                const label = dot.parentElement.querySelector('span:last-child');
+                if (i <= currentStep) {
+                    dot.className =
+                        'w-8 h-8 rounded-full bg-neon-purple/20 border border-neon-purple/50 flex items-center justify-center transition-all';
+                    dot.querySelector('span').className = 'text-xs font-bold text-neon-purple';
+                    if (label) label.className =
+                        'text-[10px] font-bold uppercase tracking-wider text-neon-purple hidden sm:inline';
+                } else {
+                    dot.className =
+                        'w-8 h-8 rounded-full bg-white/5 border border-white/20 flex items-center justify-center transition-all';
+                    dot.querySelector('span').className = 'text-xs font-bold text-white/40';
+                    if (label) label.className =
+                        'text-[10px] font-bold uppercase tracking-wider text-white/40 hidden sm:inline';
+                }
+            }
+        }
+
+        // Prevent double-submit
+        document.getElementById('register-form').addEventListener('submit', function () {
+            buildLocationValue();
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerHTML =
+                '<span class="material-symbols-outlined animate-spin text-sm align-middle">sync</span> Submitting...';
+        });
+
+        // ── CASCADING LOCATION DATA ──
+        const locationData = {
+            "Japan": {
+                "Hokkaido": ["Sapporo", "Asahikawa", "Hakodate", "Obihiro", "Kushiro"],
+                "Aomori": ["Aomori", "Hirosaki", "Hachinohe"],
+                "Miyagi": ["Sendai", "Ishinomaki", "Shiogama"],
+                "Tokyo": ["Shibuya-ku", "Shinjuku-ku", "Chiyoda-ku", "Minato-ku", "Setagaya-ku", "Nerima-ku", "Toshima-ku", "Nakano-ku", "Meguro-ku", "Ota-ku", "Suginami-ku", "Taito-ku", "Koto-ku", "Akihabara", "Ikebukuro", "Hachioji"],
+                "Kanagawa": ["Yokohama", "Kawasaki", "Sagamihara", "Kamakura", "Fujisawa"],
+                "Saitama": ["Saitama", "Kawagoe", "Kawaguchi", "Urawa"],
+                "Chiba": ["Chiba", "Funabashi", "Kashiwa", "Matsudo"],
+                "Aichi": ["Nagoya", "Toyota", "Okazaki", "Toyohashi"],
+                "Niigata": ["Niigata", "Nagaoka", "Joetsu"],
+                "Ishikawa": ["Kanazawa", "Hakusan"],
+                "Nagano": ["Nagano", "Matsumoto", "Ueda"],
+                "Shizuoka": ["Shizuoka", "Hamamatsu", "Numazu"],
+                "Osaka": ["Osaka", "Sakai", "Toyonaka", "Suita", "Takatsuki", "Namba", "Umeda"],
+                "Kyoto": ["Kyoto", "Uji", "Maizuru"],
+                "Hyogo": ["Kobe", "Himeji", "Nishinomiya", "Amagasaki"],
+                "Nara": ["Nara", "Kashihara", "Ikoma"],
+                "Hiroshima": ["Hiroshima", "Fukuyama", "Kure"],
+                "Okayama": ["Okayama", "Kurashiki"],
+                "Ehime": ["Matsuyama", "Imabari", "Niihama"],
+                "Kagawa": ["Takamatsu", "Marugame"],
+                "Fukuoka": ["Fukuoka", "Kitakyushu", "Kurume"],
+                "Nagasaki": ["Nagasaki", "Sasebo"],
+                "Kumamoto": ["Kumamoto", "Yatsushiro"],
+                "Kagoshima": ["Kagoshima", "Kirishima"],
+                "Okinawa": ["Naha", "Okinawa City", "Ginowan", "Chatan"]
+            },
+            "United States": {
+                "California": ["Los Angeles", "San Francisco", "San Diego", "San Jose", "Sacramento"],
+                "New York": ["New York City", "Buffalo", "Rochester", "Albany"],
+                "Texas": ["Houston", "Dallas", "Austin", "San Antonio", "Fort Worth"],
+                "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
+                "Illinois": ["Chicago", "Springfield", "Naperville"],
+                "Washington": ["Seattle", "Tacoma", "Spokane"],
+                "Massachusetts": ["Boston", "Cambridge", "Worcester"],
+                "Pennsylvania": ["Philadelphia", "Pittsburgh", "Allentown"],
+                "Georgia": ["Atlanta", "Savannah", "Augusta"],
+                "Colorado": ["Denver", "Colorado Springs", "Boulder"]
+            },
+            "United Kingdom": {
+                "England": ["London", "Manchester", "Birmingham", "Liverpool", "Leeds", "Bristol"],
+                "Scotland": ["Edinburgh", "Glasgow", "Aberdeen"],
+                "Wales": ["Cardiff", "Swansea", "Newport"],
+                "Northern Ireland": ["Belfast", "Derry"]
+            },
+            "Canada": {
+                "Ontario": ["Toronto", "Ottawa", "Mississauga", "Hamilton"],
+                "British Columbia": ["Vancouver", "Victoria", "Surrey"],
+                "Quebec": ["Montreal", "Quebec City", "Laval"],
+                "Alberta": ["Calgary", "Edmonton", "Red Deer"]
+            },
+            "Australia": {
+                "New South Wales": ["Sydney", "Newcastle", "Wollongong"],
+                "Victoria": ["Melbourne", "Geelong", "Ballarat"],
+                "Queensland": ["Brisbane", "Gold Coast", "Cairns"],
+                "Western Australia": ["Perth", "Fremantle"]
+            },
+            "Germany": {
+                "Bavaria": ["Munich", "Nuremberg", "Augsburg"],
+                "Berlin": ["Berlin"],
+                "North Rhine-Westphalia": ["Cologne", "Düsseldorf", "Dortmund"],
+                "Hamburg": ["Hamburg"],
+                "Hesse": ["Frankfurt", "Wiesbaden"]
+            },
+            "France": {
+                "Île-de-France": ["Paris", "Versailles", "Boulogne-Billancourt"],
+                "Provence-Alpes-Côte d'Azur": ["Marseille", "Nice", "Toulon"],
+                "Auvergne-Rhône-Alpes": ["Lyon", "Grenoble", "Saint-Étienne"]
+            },
+            "South Korea": {
+                "Seoul Capital": ["Gangnam-gu", "Jongno-gu", "Mapo-gu", "Yongsan-gu"],
+                "Gyeonggi": ["Suwon", "Seongnam", "Incheon"],
+                "Busan": ["Haeundae-gu", "Busanjin-gu", "Nam-gu"]
+            },
+            "Philippines": {
+                "Metro Manila": ["Makati", "Quezon City", "Manila", "Taguig", "Pasig"],
+                "Cebu": ["Cebu City", "Mandaue", "Lapu-Lapu"],
+                "Davao": ["Davao City", "Tagum"]
+            },
+            "Singapore": {
+                "Central": ["Orchard", "Marina Bay", "Bugis", "Tanjong Pagar"],
+                "East": ["Tampines", "Bedok", "Changi"],
+                "West": ["Jurong", "Clementi", "Bukit Batok"]
+            },
+            "Taiwan": {
+                "Northern": ["Taipei", "New Taipei", "Keelung", "Taoyuan"],
+                "Central": ["Taichung", "Hsinchu", "Miaoli"],
+                "Southern": ["Kaohsiung", "Tainan", "Pingtung"]
+            },
+            "Thailand": {
+                "Bangkok Metro": ["Bangkok", "Nonthaburi", "Pathum Thani"],
+                "Northern": ["Chiang Mai", "Chiang Rai"],
+                "Southern": ["Phuket", "Hat Yai", "Surat Thani"]
+            },
+            "Indonesia": {
+                "Java": ["Jakarta", "Surabaya", "Bandung", "Yogyakarta"],
+                "Bali": ["Denpasar", "Ubud", "Kuta"],
+                "Sumatra": ["Medan", "Palembang"]
+            },
+            "Malaysia": {
+                "Kuala Lumpur": ["KL City Centre", "Bukit Bintang", "Mont Kiara"],
+                "Selangor": ["Petaling Jaya", "Shah Alam", "Subang Jaya"],
+                "Penang": ["George Town", "Bayan Lepas"]
+            },
+            "Brazil": {
+                "São Paulo": ["São Paulo", "Campinas", "Santos"],
+                "Rio de Janeiro": ["Rio de Janeiro", "Niterói"],
+                "Minas Gerais": ["Belo Horizonte", "Uberlândia"]
+            },
+            "Mexico": {
+                "Mexico City": ["CDMX Centro", "Polanco", "Coyoacán"],
+                "Jalisco": ["Guadalajara", "Puerto Vallarta"],
+                "Nuevo León": ["Monterrey", "San Pedro"]
+            },
+            "Italy": {
+                "Lombardy": ["Milan", "Bergamo", "Brescia"],
+                "Lazio": ["Rome", "Latina"],
+                "Veneto": ["Venice", "Verona", "Padua"]
+            },
+            "Spain": {
+                "Madrid": ["Madrid"],
+                "Catalonia": ["Barcelona", "Girona", "Tarragona"],
+                "Andalusia": ["Seville", "Málaga", "Granada"]
+            },
+            "Netherlands": {
+                "North Holland": ["Amsterdam", "Haarlem"],
+                "South Holland": ["Rotterdam", "The Hague", "Leiden"],
+                "Utrecht": ["Utrecht"]
+            },
+            "India": {
+                "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
+                "Delhi": ["New Delhi", "Noida", "Gurgaon"],
+                "Karnataka": ["Bangalore", "Mysore"],
+                "Tamil Nadu": ["Chennai", "Coimbatore"]
+            },
+            "China": {
+                "Beijing": ["Beijing"],
+                "Shanghai": ["Shanghai"],
+                "Guangdong": ["Guangzhou", "Shenzhen", "Dongguan"],
+                "Sichuan": ["Chengdu", "Chongqing"]
+            },
+            "New Zealand": {
+                "Auckland": ["Auckland City", "North Shore", "Manukau"],
+                "Wellington": ["Wellington", "Lower Hutt"],
+                "Canterbury": ["Christchurch", "Timaru"]
+            }
+        };
+
+        // Populate country dropdown on load
+        (function initCountries() {
+            const sel = document.getElementById('reg-country');
+            Object.keys(locationData).sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                opt.className = 'bg-surface-dark';
+                sel.appendChild(opt);
+            });
+        })();
+
+        function onCountryChange() {
+            const country = document.getElementById('reg-country').value;
+            const regionSel = document.getElementById('reg-region');
+            const citySel = document.getElementById('reg-city');
+            regionSel.innerHTML = '<option value="" class="bg-surface-dark">Select Region</option>';
+            citySel.innerHTML = '<option value="" class="bg-surface-dark">Select City</option>';
+            document.getElementById('city-group').classList.add('hidden');
+
+            if (country && locationData[country]) {
+                document.getElementById('region-group').classList.remove('hidden');
+                Object.keys(locationData[country]).forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r;
+                    opt.textContent = r;
+                    opt.className = 'bg-surface-dark';
+                    regionSel.appendChild(opt);
+                });
+            } else {
+                document.getElementById('region-group').classList.add('hidden');
+            }
+        }
+
+        function onRegionChange() {
+            const country = document.getElementById('reg-country').value;
+            const region = document.getElementById('reg-region').value;
+            const citySel = document.getElementById('reg-city');
+            citySel.innerHTML = '<option value="" class="bg-surface-dark">Select City</option>';
+
+            if (country && region && locationData[country] && locationData[country][region]) {
+                document.getElementById('city-group').classList.remove('hidden');
+                locationData[country][region].forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    opt.className = 'bg-surface-dark';
+                    citySel.appendChild(opt);
+                });
+            } else {
+                document.getElementById('city-group').classList.add('hidden');
+            }
+        }
+
+        function buildLocationValue() {
+            const parts = [
+                document.getElementById('reg-city').value,
+                document.getElementById('reg-region').value,
+                document.getElementById('reg-country').value
+            ].filter(Boolean);
+            document.getElementById('reg-location').value = parts.join(', ');
+        }
+    </script>
+
+</body>
+
+</html>
