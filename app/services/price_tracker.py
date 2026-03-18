@@ -13,6 +13,8 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import quote_plus
 
+from app.prompt_context import get_context
+
 import httpx
 
 from app.database import SessionLocal
@@ -59,6 +61,7 @@ Return ONLY the indices as a JSON array, e.g. [1] or [2, 5]. If no match: []"""
         async with _gemini_lock:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 payload = {
+                    "system_instruction": {"parts": [{"text": get_context("price_tracker")}]},
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"temperature": 0.1, "maxOutputTokens": 64},
                 }

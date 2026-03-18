@@ -16,6 +16,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+from app.prompt_context import get_context
+
 # ── Gemini REST config ─────────────────────────────────────────────────────────────
 _GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 _GEMINI_BASE    = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -250,7 +252,7 @@ async def generate_article(db_session) -> Optional[object]:
         year=year_str,
         pokemon_sources=_POKEMON_SOURCES,
         onepiece_sources=_ONEPIECE_SOURCES,
-    )
+    ) + "\n\n" + get_context("blog")
 
     topic = _pick_topic()
     logger.info(f"[BLOG] Generating article — category: {topic['category']}")
