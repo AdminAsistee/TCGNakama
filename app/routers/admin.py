@@ -2851,6 +2851,7 @@ async def contact_page(
         })
     else:
         # Seller view: show contact form
+        user = db.query(User).filter(User.email == session_email).first()
         seller_name = ""
         if user and user.seller_profile:
             seller_name = user.seller_profile.store_name
