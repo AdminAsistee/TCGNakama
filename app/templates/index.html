@@ -46,7 +46,7 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
 {% block content %}
 <!-- ==================== HEADER / NAVBAR ==================== -->
 <!-- Top Utility Bar (TCGPlayer-style) -->
-<div class="bg-surface-dark/80 border-b border-white/5">
+<div class="hidden md:block bg-surface-dark/80 border-b border-white/5">
     <div class="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-end gap-4 h-8">
         <a href="/seller/register"
             class="text-[11px] font-medium text-gray-400 hover:text-white transition-colors tracking-wide">
@@ -113,7 +113,7 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                     </div>
                     <input id="search-input" name="q"
                         class="form-input w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-500 text-white"
-                        placeholder='Search for cards, sets, or investment picks...' type="text" hx-get="/filter"
+                        placeholder='Search...' type="text" hx-get="/filter"
                         hx-trigger="keyup changed delay:300ms" hx-target="#product-grid" hx-swap="innerHTML"
                         hx-indicator="#grid-loading" hx-include="#filter-form" hx-on:input="clearFilterVisuals()" />
                 </div>
@@ -706,21 +706,32 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
     </section>
 
     <!-- ==================== FOOTER ==================== -->
-    <footer class="mt-16 border-t border-white/5 bg-surface/30">
+    <footer class="mt-16 border-t border-white/5 bg-surface/30 pb-20 md:pb-0">
         <!-- Main Footer Columns -->
         <div class="max-w-7xl mx-auto px-4 md:px-6 pt-12 pb-10">
-    <!-- Footer grid responsive override (md:grid-cols-5 not in compiled Tailwind) -->
+    <!-- Footer grid responsive override -->
     <style>
         @media (min-width: 768px) {
             #footer-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 1.5rem !important; }
+            .footer-section-links { display: block !important; max-height: none !important; }
+            .footer-section-toggle { pointer-events: none; }
+            .footer-section-toggle .material-symbols-outlined { display: none !important; }
+        }
+        @media (max-width: 767px) {
+            .footer-section-links { display: none; }
+            .footer-section-links.active { display: block; }
         }
     </style>
-            <div class="grid grid-cols-2 gap-x-8 gap-y-10" id="footer-grid">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-y-0 md:gap-x-8 md:gap-y-10" id="footer-grid">
 
                 <!-- Column 1: Shop -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4">Shop</h4>
-                    <ul class="space-y-2">
+                <div class="border-b border-white/5 md:border-0">
+                    <button class="footer-section-toggle w-full flex items-center justify-between py-4 md:py-0 md:mb-4"
+                        onclick="this.nextElementSibling.classList.toggle('active'); this.querySelector('.material-symbols-outlined').classList.toggle('rotate-180')">
+                        <h4 class="text-sm font-bold text-white">Shop</h4>
+                        <span class="material-symbols-outlined text-sm text-gray-500 transition-transform duration-200">expand_more</span>
+                    </button>
+                    <ul class="footer-section-links space-y-2 pb-4 md:pb-0">
                         <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Pokémon Cards</a></li>
                         <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">One Piece Cards</a></li>
                         <li><a href="#all-cards-section" class="text-xs text-gray-400 hover:text-primary transition-colors">Magic: The Gathering</a></li>
@@ -734,9 +745,13 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 </div>
 
                 <!-- Column 2: Sell -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4">Sell</h4>
-                    <ul class="space-y-2">
+                <div class="border-b border-white/5 md:border-0">
+                    <button class="footer-section-toggle w-full flex items-center justify-between py-4 md:py-0 md:mb-4"
+                        onclick="this.nextElementSibling.classList.toggle('active'); this.querySelector('.material-symbols-outlined').classList.toggle('rotate-180')">
+                        <h4 class="text-sm font-bold text-white">Sell</h4>
+                        <span class="material-symbols-outlined text-sm text-gray-500 transition-transform duration-200">expand_more</span>
+                    </button>
+                    <ul class="footer-section-links space-y-2 pb-4 md:pb-0">
                         <li><a href="/seller/register" class="text-xs text-gray-400 hover:text-primary transition-colors">Sell on TCGNakama</a></li>
                         <li><a href="/seller/login" class="text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold">🔒 Seller Login</a></li>
                         <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Pricing & Listing Tools</a></li>
@@ -747,9 +762,13 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 </div>
 
                 <!-- Column 3: Articles & Decks -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4">Articles & Decks</h4>
-                    <ul class="space-y-2">
+                <div class="border-b border-white/5 md:border-0">
+                    <button class="footer-section-toggle w-full flex items-center justify-between py-4 md:py-0 md:mb-4"
+                        onclick="this.nextElementSibling.classList.toggle('active'); this.querySelector('.material-symbols-outlined').classList.toggle('rotate-180')">
+                        <h4 class="text-sm font-bold text-white">Articles & Decks</h4>
+                        <span class="material-symbols-outlined text-sm text-gray-500 transition-transform duration-200">expand_more</span>
+                    </button>
+                    <ul class="footer-section-links space-y-2 pb-4 md:pb-0">
                         <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">TCGNakama Blog</a></li>
                         <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">Pokémon Deck Lists</a></li>
                         <li><a href="/blog" class="text-xs text-gray-400 hover:text-primary transition-colors">One Piece Strategy</a></li>
@@ -761,9 +780,13 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 </div>
 
                 <!-- Column 4: Help & Contact -->
-                <div>
-                    <h4 class="text-sm font-bold text-white mb-4">Help & Contact</h4>
-                    <ul class="space-y-2">
+                <div class="border-b border-white/5 md:border-0">
+                    <button class="footer-section-toggle w-full flex items-center justify-between py-4 md:py-0 md:mb-4"
+                        onclick="this.nextElementSibling.classList.toggle('active'); this.querySelector('.material-symbols-outlined').classList.toggle('rotate-180')">
+                        <h4 class="text-sm font-bold text-white">Help & Contact</h4>
+                        <span class="material-symbols-outlined text-sm text-gray-500 transition-transform duration-200">expand_more</span>
+                    </button>
+                    <ul class="footer-section-links space-y-2 pb-4 md:pb-0">
                         <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Contact Us</a></li>
                         <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Help Center</a></li>
                         <li><a href="#" class="text-xs text-gray-400 hover:text-primary transition-colors">Refund & Return Policy</a></li>
@@ -774,11 +797,11 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                     </ul>
                 </div>
 
-                <!-- Column 5: Stay Connected -->
-                <div class="col-span-2 md:col-span-1">
+                <!-- Column 5: Stay Connected (always visible) -->
+                <div class="pt-4 md:pt-0">
                     <h4 class="text-sm font-bold text-white mb-3">Stay Connected</h4>
                     <p class="text-[11px] text-gray-500 mb-3 leading-relaxed">Get the latest drops, market trends, and exclusive deals delivered to your inbox.</p>
-                    <div class="flex gap-2 mb-3">
+                    <div class="flex flex-col sm:flex-row gap-2 mb-3">
                         <input type="email" placeholder="Your Email"
                             class="flex-1 min-w-0 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 outline-none transition-all" />
                         <button
@@ -787,22 +810,22 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                     <p class="text-[9px] text-gray-600 leading-relaxed mb-5">By subscribing, you consent to receive emails from TCGNakama in line with our <a href="#" class="underline hover:text-gray-400">Privacy Policy</a>.</p>
 
                     <!-- Social Icons -->
-                    <div class="flex gap-3">
+                    <div class="flex flex-wrap gap-3 mb-6">
                         <a href="https://www.facebook.com/people/TCGNakama/61587475310578/" target="_blank" rel="noopener"
-                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="Facebook">
-                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
+                            class="w-10 h-10 bg-white/15 border border-white/10 rounded-full flex items-center justify-center hover:bg-primary/30 hover:border-primary/50 transition-all" title="Facebook">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
                         </a>
                         <a href="https://x.com/tcgnakama" target="_blank" rel="noopener"
-                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="X (Twitter)">
-                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            class="w-10 h-10 bg-white/15 border border-white/10 rounded-full flex items-center justify-center hover:bg-primary/30 hover:border-primary/50 transition-all" title="X (Twitter)">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                         </a>
                         <a href="https://www.youtube.com/@tcg-nakama" target="_blank" rel="noopener"
-                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="YouTube">
-                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                            class="w-10 h-10 bg-white/15 border border-white/10 rounded-full flex items-center justify-center hover:bg-primary/30 hover:border-primary/50 transition-all" title="YouTube">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                         </a>
                         <a href="https://www.instagram.com/tcgnakama.official/" target="_blank" rel="noopener"
-                            class="w-9 h-9 bg-white/5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors group" title="Instagram">
-                            <svg class="w-[18px] h-[18px] text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                            class="w-10 h-10 bg-white/15 border border-white/10 rounded-full flex items-center justify-center hover:bg-primary/30 hover:border-primary/50 transition-all" title="Instagram">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
                         </a>
                     </div>
                 </div>

@@ -23,7 +23,8 @@
                     {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=320&format=webp 320w,
                     {{ product.image }}{% if '?' in product.image %}&{% else %}?{% endif %}width=400&format=webp 400w"
             sizes="(max-width: 480px) calc(50vw - 22px), (max-width: 768px) calc(33vw - 16px), 300px" width="300"
-            height="420" loading="lazy" decoding="async" />
+            height="420" loading="lazy" decoding="async"
+            onerror="this.onerror=null; this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin','<div class=\'w-full h-full flex flex-col items-center justify-center bg-white/5\' style=\'aspect-ratio:5/7\'><span class=\'material-symbols-outlined text-4xl text-gray-600\'>image_not_supported</span><span class=\'text-[10px] text-gray-500 mt-2\'>Image unavailable</span></div>')" />
         <!-- Rarity/Type Badge -->
         <div
             class="absolute top-2.5 left-2.5 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[8px] font-black text-white/90 border border-white/10 uppercase tracking-widest">
