@@ -1,6 +1,7 @@
 # ============================================================================
 # BULK UPLOAD ROUTES
 # ============================================================================
+from app.utils.filename_parser import parse_batch_filename
 
 @router.get("/bulk-upload", response_class=HTMLResponse)
 async def bulk_upload_page(request: Request, admin: str = Depends(get_admin_session)):
@@ -43,7 +44,7 @@ async def bulk_upload_appraise(
             
             # Appraise the card using image bytes
             appraisal_result = await appraisal.appraise_card_from_image(image_data=content)
-            
+
             if appraisal_result.get("error"):
                 results.append({
                     "error": appraisal_result["error"],
@@ -51,7 +52,7 @@ async def bulk_upload_appraise(
                     "filename": image_file.filename
                 })
                 continue
-            
+
             # Extract card details
             card_name = appraisal_result.get("card_name", "Unknown")
             set_name = appraisal_result.get("set_name", "")
@@ -60,6 +61,14 @@ async def bulk_upload_appraise(
             vendor = appraisal_result.get("manufacturer", "TCG Nakama")
             card_condition = appraisal_result.get("card_condition", "Near Mint")
             full_set_name = appraisal_result.get("full_set_name", "")
+
+            # --- Filename-based batch metadata (RULE-014, RULE-015) ---
+            parsed = parse_batch_filename(image_file.filename)
+            batch_id = parsed["batch_id"]
+            intake_date = parsed["intake_date"]
+            # Override rarity from filename if a canonical mapping was found
+            if parsed["rarity"] is not None:
+                rarity = parsed["rarity"]
             
             # DUPLICATE CHECK DISABLED — every card is created as a new Shopify product
             exists = False
@@ -111,7 +120,9 @@ async def bulk_upload_appraise(
                 "current_quantity": current_quantity,
                 "image_url": f"/static/uploads/temp/{temp_filename}",
                 "temp_path": str(temp_path),
-                "filename": image_file.filename
+                "filename": image_file.filename,
+                "batch_id": batch_id,
+                "intake_date": intake_date,
             })
             
         except Exception as e:
@@ -177,6 +188,8 @@ async def bulk_confirm(
             try:
                 # Prepare product data
                 product_title = card_name.strip()
+                batch_id = card.get("batch_id", "")
+                intake_date = card.get("intake_date", "")
                 tags = []
                 if rarity:
                     tags.append(f"Rarity: {rarity.capitalize()}")
@@ -190,6 +203,9 @@ async def bulk_confirm(
                     tags.append(f"Condition: {condition}")
                 if card_number:
                     tags.append(f"Number: {card_number}")
+                # Always send Batch ID and Intake Date, even if empty (RULE-014)
+                tags.append(f"Batch ID: {batch_id}")
+                tags.append(f"Intake Date: {intake_date}")
                 
                 description_html = f"<p><strong>Set:</strong> {set_name}</p>" if set_name else ""
                 description_html += f"<p><strong>Card Number:</strong> {card_number}</p>" if card_number else ""

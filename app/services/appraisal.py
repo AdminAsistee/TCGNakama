@@ -137,7 +137,16 @@ Then fill in:
 
 1. card_type: "TRAINER" header → "Trainer" | "ENERGY" → "Energy" | otherwise → "Pokemon"
 2. card_name_japanese: Japanese name if visible, else ""
-3. card_name_english: ALWAYS provide English name — translate if needed. Never leave empty for known cards.
+3. card_name_english: ALWAYS provide the FULL official English name — translate if needed. Never leave empty for known cards.
+   - Japanese Pokémon TCG name prefixes MUST be expanded to their standard English equivalents:
+     * "M <Name>ex" or "M<Name>ex" or "M-<Name>" → "Mega <Name> EX"  (e.g. Mサーナイトex → "Mega Gardevoir EX", Mリザードンex → "Mega Charizard EX")
+     * "<Name>VMAX" → "<Name> VMAX"
+     * "<Name>VSTAR" → "<Name> VSTAR"
+     * "<Name>V" (alone, not VMAX/VSTAR) → "<Name> V"
+     * "<Name>-GX" or "<Name>GX" → "<Name>-GX"
+     * "<Name>-EX" or "<Name>EX" or "<Name>ex" → "<Name> EX"
+     * "TAG TEAM" cards → include both Pokémon names (e.g. "ピカチュウ&ゼクロムGX" → "Pikachu & Zekrom-GX")
+     * Never abbreviate — always use the full expanded English name as it appears on the official English card.
 4. set_name:
    - Provide the short alphanumeric SET CODE or identifier.
    - Japanese modern (2016+): set code at bottom left (e.g. "SV5M", "sA", "s10b") — ignore single regulation letters (D/E/F/G/H).

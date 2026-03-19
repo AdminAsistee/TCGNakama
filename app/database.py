@@ -34,5 +34,5 @@ def get_db():
 
 def init_db():
     """Initialize database tables."""
-    from app.models import Banner, PriceSnapshot, SystemSetting, PageSpeedAudit, User, SellerProfile, SupportTicket  # Import here to avoid circular imports
+    from app.models import Banner, PriceSnapshot, SystemSetting, PageSpeedAudit, BlogPost, User, SellerProfile, SupportTicket  # noqa: F401
     Base.metadata.create_all(bind=engine)

@@ -22,6 +22,7 @@ from pathlib import Path
 from PIL import Image
 import hashlib
 from urllib.parse import quote, unquote
+from app.utils.filename_parser import parse_batch_filename
 
 
 # Session secret for signing cookies
@@ -1232,11 +1233,25 @@ async def appraise_card_image(
         if 'error' in result:
             safe_print(f"[APPRAISE_IMAGE] Error: {result['error']}")
             return JSONResponse(result, status_code=500)
-        
+
+        # --- Filename-based batch metadata ---
+        filename = ""
+        if image_file and image_file.filename:
+            filename = image_file.filename
+        parsed = parse_batch_filename(filename)
+        # Resolve rarity: filename abbreviation wins if mapped; otherwise keep Gemini result
+        if parsed["rarity"] is not None:
+            result["rarity"] = parsed["rarity"]
+
         safe_print(f"[APPRAISE_IMAGE] Success: {result}")
         return JSONResponse({
             'success': True,
-            'data': result
+            'data': {
+                **result,
+                'batch_id': parsed['batch_id'],
+                'intake_date': parsed['intake_date'],
+                'sequence_index': parsed['sequence_index'],
+            }
         })
         
     except Exception as e:
@@ -1400,7 +1415,10 @@ async def add_card(
     stock: int = Form(1),
     buy_price: Optional[float] = Form(None),
     image_urls: List[str] = Form([]),
-    image_files: List[UploadFile] = File([])
+    image_files: List[UploadFile] = File([]),
+    batch_id: str = Form(""),
+    intake_date: str = Form(""),
+    sequence_index: str = Form(""),
 ):
     """Process the add card form and sync to Shopify."""
     admin_token = await get_admin_token()
@@ -1451,7 +1469,10 @@ async def add_card(
         f"Rarity: {rarity.capitalize()}",
         f"Number: {card_number}",
         f"Condition: {condition}",
-        f"Card: {card_condition}"
+        f"Card: {card_condition}",
+        f"Batch ID: {batch_id}",
+        f"Intake Date: {intake_date}",
+        f"Sequence Index: {sequence_index}",
     ]
 
     # ── SELLER TAG INJECTION: tag product with seller ownership ──
@@ -2124,6 +2145,15 @@ async def bulk_upload_appraise(
             card_number = appraisal_result.get("card_number", "")
             rarity = appraisal_result.get("rarity", "")
             vendor = appraisal_result.get("manufacturer", "TCG Nakama")
+            card_condition = appraisal_result.get("card_condition", "Near Mint")
+
+            # --- Filename-based batch metadata (RULE-014, RULE-015) ---
+            parsed = parse_batch_filename(image_file.filename)
+            batch_id = parsed["batch_id"]
+            intake_date = parsed["intake_date"]
+            # Override rarity from filename abbreviation if a canonical mapping was found
+            if parsed["rarity"] is not None:
+                rarity = parsed["rarity"]
             
             # Detect language: card is Japanese if it has a Japanese name
             is_japanese = bool(card_name_japanese)
@@ -2222,18 +2252,20 @@ async def bulk_upload_appraise(
                 "shopify_variant_id": shopify_variant_id,
                 "shopify_inventory_item_id": shopify_inventory_item_id,
                 "current_quantity": current_quantity,
-                "image_url": f"/static/uploads/temp/{temp_filename}",  # Keep for backward compatibility
-                "image_base64": image_base64,  # NEW: base64 encoded image
-                "image_mime_type": mime_type,  # NEW: MIME type for base64
-                "temp_path": str(temp_path.absolute()),  # Use absolute path
+                "image_url": f"/static/uploads/temp/{temp_filename}",
+                "image_base64": image_base64,
+                "image_mime_type": mime_type,
+                "temp_path": str(temp_path.absolute()),
                 "filename": image_file.filename,
-                # Additional AI-extracted details for description
                 "year": appraisal_result.get("year"),
                 "card_name_japanese": appraisal_result.get("card_name_japanese"),
                 "card_name_english": appraisal_result.get("card_name_english"),
                 "full_set_name": appraisal_result.get("full_set_name", ""),
                 "card_condition": appraisal_result.get("card_condition", "Near Mint"),
-                "manufacturer": appraisal_result.get("manufacturer", "")
+                "manufacturer": appraisal_result.get("manufacturer", ""),
+                "batch_id": batch_id,
+                "intake_date": intake_date,
+                "sequence_index": parsed["sequence_index"],
             })
             
         except Exception as e:
@@ -2347,13 +2379,19 @@ async def bulk_confirm(
                 # Prepare tags in the same format as add_card
                 full_set_name = card.get("full_set_name", "")
                 card_condition = card.get("card_condition", "Near Mint")
+                batch_id = card.get("batch_id", "")
+                intake_date = card.get("intake_date", "")
+                sequence_index = card.get("sequence_index", "")
                 tags = [
                     f"Set: {set_name}" if set_name else "Set: ",
                     f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
                     f"Number: {card_number}" if card_number else "Number: ",
                     "Condition: Raw",
                     f"Set Name: {full_set_name}" if full_set_name else "Set Name: ",
-                    f"Card: {card_condition}"
+                    f"Card: {card_condition}",
+                    f"Batch ID: {batch_id}",
+                    f"Intake Date: {intake_date}",
+                    f"Sequence Index: {sequence_index}",
                 ]
                 
                 # ── SELLER TAG INJECTION (bulk upload) ──

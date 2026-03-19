@@ -446,6 +446,28 @@
                             </select>
                         </div>
                     </div>
+
+                    <!-- Batch Metadata -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Batch ID <span class="text-white/20">(Optional)</span></label>
+                            <input name="batch_id" id="batch-id-input"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
+                                placeholder="e.g. BATCH-1" type="text" value="" />
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Intake Date <span class="text-white/20">(Optional)</span></label>
+                            <input name="intake_date" id="intake-date-input"
+                                class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
+                                placeholder="e.g. 2025-02-13" type="text" value="" />
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Sequence Index <span class="text-white/20">(Optional)</span></label>
+                        <input name="sequence_index" id="sequence-index-input"
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
+                            placeholder="e.g. 1" type="text" value="" />
+                    </div>
                 </div>
             </section>
 
@@ -848,6 +870,10 @@
                     if (data.manufacturer) {
                         document.querySelector('input[name="vendor"]').value = data.manufacturer;
                     }
+                    // Batch metadata from filename parser
+                    document.getElementById('batch-id-input').value = data.batch_id || '';
+                    document.getElementById('intake-date-input').value = data.intake_date || '';
+                    document.getElementById('sequence-index-input').value = data.sequence_index || '';
 
                     // Build description with scanned information in bulleted form
                     let description = '**Card Detailed Information:**\n\n';
