@@ -327,6 +327,7 @@ graph LR
 | **ORM** | SQLAlchemy |
 | **Templates** | Jinja2 |
 | **Styling** | Tailwind CSS |
+| **AI Grounding** | Gemini `system_instruction` + `prompt_context.py` |
 | **Deployment** | DigitalOcean App Platform / Docker |
 | **Package Manager** | pip (`requirements.txt`) |
 
@@ -339,6 +340,7 @@ app/
 ├── database.py            # SQLAlchemy engine & session
 ├── models.py              # ORM models (Banner, BlogPost, User, etc.)
 ├── ontology.py            # Card domain types (enums, TypedDict)
+├── prompt_context.py      # Grounding context for Gemini AI calls
 ├── cost_db.py             # Business intelligence DB (costs, grades, locations)
 ├── email_service.py       # SMTP email templates
 ├── background_tasks.py    # Shopify poller, blog scheduler, showcase scheduler
@@ -417,3 +419,21 @@ python -m pytest tests/ -v --ignore=tests/archive
 
 > [!IMPORTANT]
 > All proper tests must be **offline** — no live API keys, no running server, no network calls. Mock external dependencies in `conftest.py`. Legacy scripts in `tests/archive/` are kept for reference only and are excluded from the test runner.
+
+---
+
+## 7. Platform Model & UX Standards
+
+### 7.1 Business Model
+TCGNakama is a **Multi-Vendor Marketplace**. While the platform manages its own "Vault" inventory, the architecture is designed to host third-party sellers who undergo an admin approval process.
+
+### 7.2 Search & Filter Specification
+To ensure a premium "TCGPlayer-style" experience, the following filters are mandatory for the Storefront:
+*   **Search**: Full-text keyword search across titles, sets, and card numbers.
+*   **Condition**: Multi-select for NM (Near Mint), LP (Lightly Played), MP (Moderately Played), HP (Heavily Played), and DAM (Damaged).
+*   **Price Range**: Dual-slider or numeric input for Min/Max USD/JPY.
+*   **Categories**: Rarity, Element, and Package Type (Single, Booster Box, Case).
+
+### 7.3 Inventory Transparency Policy
+*   **Vault Tags**: These are **internal-only** metadata (e.g. `BATCH-1-OP-SR`). They ensure picking accuracy and "Ground Truth" for physical inventory but are not displayed to the customer to maintain a clean, high-conversion UI.
+

@@ -95,6 +95,7 @@
 | **Function** | `generate_article()` |
 | **AI Model** | Gemini 2.5 Flash → fallback `gemini-2.0-flash-001` |
 | **Output** | `BlogPost` ORM object (title, HTML, markdown, slug, category, tags) |
+| **Grounding** | `app.prompt_context` roles `DOMAIN`, `BLOG`, `DESIGN` |
 | **Scheduler** | [background_tasks.py](file:///c:/Users/admin/.gemini/antigravity/scratch/TCGNakama/app/background_tasks.py) `_blog_loop()` |
 | **Cadence** | Every 3 days + random 0–12 hour offset |
 
@@ -161,6 +162,7 @@
 | **Function** | `run_batch_update()` |
 | **Throttle** | 1 request per 1.1 seconds |
 | **AI** | Gemini disambiguation only when >3 ambiguous PriceCharting results |
+| **Grounding** | `app.prompt_context` roles `DOMAIN`, `PRICE` |
 | **Output** | `PriceSnapshot` rows (product_id, USD, JPY, exchange_rate, timestamp) |
 
 **Scheduling options** (admin-configurable):
@@ -219,6 +221,22 @@
 
 ---
 
+## Grounding Layer
+
+> [!IMPORTANT]
+> To prevent hallucinations, specific agents are grounded via `app/prompt_context.py`. This module provides role-specific constants loaded into Gemini `system_instruction` payloads.
+
+| Role | Agents | Slices Included |
+|---|---|---|
+| `appraisal` | 1, 3 | `DOMAIN`, `APPRAISAL` |
+| `set_resolver` | 2 | `DOMAIN`, `APPRAISAL` |
+| `blog` | 4 | `DOMAIN`, `BLOG`, `DESIGN` |
+| `price_tracker` | 7 | `DOMAIN`, `PRICE` |
+| `ui` | Human/AI | `DOMAIN`, `DESIGN` |
+
+> [!NOTE]
+> **Multi-Vendor Support**: All autonomous agents are designed to process the unified inventory pool. Third-party listings benefit from the same Architect (Appraisal) and Stylist (SEO/Price) grounding as the platform's core inventory.
+
 ## Orchestration Architecture
 
 ### Startup Lifecycle
@@ -245,53 +263,70 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    subgraph On-Demand Agents
-        A1["🔍 Agent 1<br/>Card Vision Appraisal"]
-        A2["📝 Agent 2<br/>Set Name Resolver"]
-        A3["💰 Agent 3<br/>Market Value Estimator"]
-        A6["⚡ Agent 6<br/>PageSpeed Audit"]
+    %% Styling
+    classDef agent fill:#f5f3ff,stroke:#7c3aed,stroke-width:2px;
+    classDef service fill:#f0f9ff,stroke:#0284c7,stroke-width:2px;
+    classDef trigger fill:#ecfdf5,stroke:#059669,stroke-width:2px;
+
+    %% TOP LAYER: TRIGGERS
+    subgraph Triggers ["🕒 Triggers & Schedulers"]
+        T1["👤 User Upload / Action"]:::trigger
+        T2["📅 APScheduler (Cron/Loop)"]:::trigger
     end
 
-    subgraph Scheduled Agents
-        A4["✍️ Agent 4<br/>Blog Generator<br/>every 3 days"]
-        A5["📘 Agent 5<br/>Facebook Poster"]
-        A7["📊 Agent 7<br/>Price Tracker Batch<br/>daily/3d/weekly"]
-        A8["🎬 Agent 8<br/>Showcase Video<br/>every 3 days"]
-        A9["🔄 Agent 9<br/>Shopify Sync<br/>every 30 min"]
+    %% MIDDLE LAYER: AGENTS
+    subgraph AgentSwarm ["🤖 The Agent Swarm"]
+        direction LR
+        subgraph OnDemand ["⚡ On-Demand"]
+            A1["🔍 Card Appraisal"]:::agent
+            A2["📝 Set Resolver"]:::agent
+            A3["💰 Price Estimator"]:::agent
+            A6["⚡ PageSpeed Audit"]:::agent
+        end
+
+        subgraph Scheduled ["🔄 Scheduled"]
+            A4["✍️ Blog Gen"]:::agent
+            A5["📘 FB Poster"]:::agent
+            A7["📊 Price Batch"]:::agent
+            A8["🎬 Video Pipeline"]:::agent
+            A9["🔄 Shopify Sync"]:::agent
+        end
     end
 
-    subgraph External
-        SHOPIFY["🛍️ Shopify"]
-        GEMINI["🤖 Gemini AI"]
-        PC["💵 PriceCharting"]
-        POLLO["🎥 Pollo AI"]
-        GCS["☁️ GCS"]
-        ZAPIER["⚡ Zapier"]
+    %% BOTTOM LAYER: EXTERNAL
+    subgraph External ["🌐 External Services"]
+        direction LR
+        GEMINI["🤖 Gemini AI"]:::service
+        PC["💵 PriceCharting"]:::service
+        SHOPIFY["🛍️ Shopify"]:::service
+        GCS["☁️ GCS"]:::service
+        ZAP["⚡ Zapier"]:::service
+        POLLO["🎥 Pollo AI"]:::service
+        PSI["📈 Google PSI"]:::service
     end
 
+    %% FLOWS - Triggers to Agents
+    T1 --> A1
+    T1 --> A6
+    T2 --> A4
+    T2 --> A7
+    T2 --> A8
+    T2 --> A9
+
+    %% FLOWS - Agent Connections
     A1 -->|"calls"| A2
     A1 -->|"calls"| A3
-    A1 --> GEMINI
-    A2 --> GEMINI
-    A3 --> PC
-    A3 -->|"disambiguate"| GEMINI
-
-    A4 --> GEMINI
     A4 -->|"triggers"| A5
-    A4 -->|"fires webhook"| ZAPIER
 
-    A7 --> PC
-    A7 -->|"disambiguate >3 results"| GEMINI
-
-    A8 -->|"fetches cards"| SHOPIFY
-    A8 -->|"card analysis"| GEMINI
-    A8 -->|"img2vid backgrounds"| POLLO
-    A8 -->|"uploads"| GCS
-    A8 -->|"fires webhook"| ZAPIER
-
+    %% FLOWS - Services
+    A1 & A2 & A4 & A7 & A8 --> GEMINI
+    A3 -->|"disambiguate"| GEMINI
+    A3 & A7 --> PC
+    A4 & A5 & A8 --> ZAP
+    A8 --> POLLO
+    A8 --> GCS
     A9 --> SHOPIFY
-
-    A6 -->|"Google PSI"| PSI["📈 PageSpeed API"]
+    A6 --> PSI
 ```
 
 ### Shared Resources & Rate Limiting

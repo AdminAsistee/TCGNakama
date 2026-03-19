@@ -113,12 +113,12 @@
         </div>
     </header>
     <script>
-    (function(){
-        const isSeller = window.location.pathname.startsWith('/seller-admin');
-        const prefix = isSeller ? '/seller-admin' : '/admin';
-        document.getElementById('back-to-vault-btn').onclick = () => window.location.href = prefix;
-        document.getElementById('logout-link').href = isSeller ? '/seller/logout' : '/admin/logout';
-    })();
+            (function () {
+                const isSeller = window.location.pathname.startsWith('/seller-admin');
+                const prefix = isSeller ? '/seller-admin' : '/admin';
+                document.getElementById('back-to-vault-btn').onclick = () => window.location.href = prefix;
+                document.getElementById('logout-link').href = isSeller ? '/seller/logout' : '/admin/logout';
+            })();
     </script>
 
     <main class="flex flex-col gap-6 p-4 max-w-4xl mx-auto">
@@ -184,6 +184,42 @@
             <input type="hidden" name="product_id" value="{{ product.id }}">
             <input type="hidden" name="variant_id" value="{{ product.variant_id }}">
             {% endif %}
+
+            <!-- Quick Guide Banner -->
+            <div id="quick-guide" class="relative rounded-2xl overflow-hidden mb-2"
+                style="background: linear-gradient(135deg, rgba(0, 238, 255, 0.322) 0%, rgba(188,19,254,0.04) 100%); border: 1px solid rgba(0,240,255,0.12);">
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleGuide()">
+                        <p class="text-[13px] text-white/90 font-medium">
+                            First time here? Check out this quick guide.
+                        </p>
+                        <span id="guide-chevron"
+                            class="material-symbols-outlined text-white/40 hover:text-white/70 transition-all text-lg ml-3 flex-shrink-0">expand_more</span>
+                    </div>
+                    <ol id="guide-steps"
+                        class="flex flex-col gap-1.5 text-[11px] text-white/50 list-decimal list-inside mt-3">
+                        <li>Upload your card photo below.</li>
+                        <li>Tap the appraise button, AI will fill in the form for you.</li>
+                        <li>Review the details and fix anything that doesn't look right.</li>
+                        <li>Hit "Initialize Asset in Vault" to save your card.</li>
+                    </ol>
+                </div>
+            </div>
+            <script>
+                function toggleGuide() {
+                    const steps = document.getElementById('guide-steps');
+                    const chevron = document.getElementById('guide-chevron');
+                    if (steps.style.display === 'none') {
+                        steps.style.display = '';
+                        chevron.textContent = 'expand_more';
+                    } else {
+                        steps.style.display = 'none';
+                        chevron.textContent = 'expand_less';
+                    }
+                }
+            </script>
+
+
             <!-- Asset Section -->
             <section class="glass-panel rounded-2xl p-6 border border-white/10">
                 <div class="flex items-center justify-between mb-4">
@@ -248,7 +284,7 @@
                     {% if not edit_mode %}
                     <div class="flex flex-col gap-3">
                         <button type="button" id="appraise-btn" onclick="enableImageSelection()" disabled
-                            class="w-full py-4 rounded-xl bg-gradient-to-r from-neon-purple to-primary text-white font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/50">
+                            class="holo-glow w-full py-4 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-primary/50 uppercase tracking-widest">
                             <span class="material-symbols-outlined">auto_fix_high</span>
                             <span>Appraise Card with AI</span>
                         </button>
@@ -450,20 +486,23 @@
                     <!-- Batch Metadata -->
                     <div class="grid grid-cols-2 gap-4">
                         <div class="flex flex-col gap-2">
-                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Batch ID <span class="text-white/20">(Optional)</span></label>
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Batch ID <span
+                                    class="text-white/20">(Optional)</span></label>
                             <input name="batch_id" id="batch-id-input"
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
                                 placeholder="e.g. BATCH-1" type="text" value="" />
                         </div>
                         <div class="flex flex-col gap-2">
-                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Intake Date <span class="text-white/20">(Optional)</span></label>
+                            <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Intake Date
+                                <span class="text-white/20">(Optional)</span></label>
                             <input name="intake_date" id="intake-date-input"
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
                                 placeholder="e.g. 2025-02-13" type="text" value="" />
                         </div>
                     </div>
                     <div class="flex flex-col gap-2">
-                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Sequence Index <span class="text-white/20">(Optional)</span></label>
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Sequence Index
+                            <span class="text-white/20">(Optional)</span></label>
                         <input name="sequence_index" id="sequence-index-input"
                             class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
                             placeholder="e.g. 1" type="text" value="" />
@@ -529,33 +568,33 @@
         </div>
     </nav>
     <script>
-    (function() {
-        const isSeller = window.location.pathname.startsWith('/seller-admin');
-        const prefix = isSeller ? '/seller-admin' : '/admin';
-        const currentPage = 'add-card';
-        const nav = document.getElementById('bottom-nav-items');
-        const items = [
-            { label: 'Vault', icon: 'grid_view', href: prefix, page: 'vault' },
-            { label: 'Add Card', icon: 'add_circle', href: prefix + '/add-card', page: 'add-card' },
-            { label: 'Upload', icon: 'upload_file', href: prefix + '/bulk-upload', page: 'upload' },
-            { label: 'Contact', icon: 'support_agent', href: prefix + '/contact', page: 'contact' },
-        ];
-        if (!isSeller) {
-            items.push(
-                { label: 'Audit', icon: 'speed', href: '/admin/audit/pagespeed', page: 'audit' },
-                { label: 'Analytics', icon: 'monitoring', href: '/admin/analytics', page: 'analytics' },
-                { label: 'Settings', icon: 'settings', href: '/admin/settings', page: 'settings' },
-            );
-        }
-        items.forEach(item => {
-            const isActive = item.page === currentPage;
-            const btn = document.createElement('button');
-            btn.onclick = () => window.location.href = item.href;
-            btn.className = `flex flex-col items-center gap-1 ${isActive ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors group`;
-            btn.innerHTML = `<span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(${isActive ? '37,123,244' : '255,255,255'},0.8)] transition-all">${item.icon}</span><span class="text-[10px] font-bold uppercase tracking-wider">${item.label}</span>`;
-            nav.appendChild(btn);
-        });
-    })();
+        (function () {
+            const isSeller = window.location.pathname.startsWith('/seller-admin');
+            const prefix = isSeller ? '/seller-admin' : '/admin';
+            const currentPage = 'add-card';
+            const nav = document.getElementById('bottom-nav-items');
+            const items = [
+                { label: 'Vault', icon: 'grid_view', href: prefix, page: 'vault' },
+                { label: 'Add Card', icon: 'add_circle', href: prefix + '/add-card', page: 'add-card' },
+                { label: 'Upload', icon: 'upload_file', href: prefix + '/bulk-upload', page: 'upload' },
+                { label: 'Contact', icon: 'support_agent', href: prefix + '/contact', page: 'contact' },
+            ];
+            if (!isSeller) {
+                items.push(
+                    { label: 'Audit', icon: 'speed', href: '/admin/audit/pagespeed', page: 'audit' },
+                    { label: 'Analytics', icon: 'monitoring', href: '/admin/analytics', page: 'analytics' },
+                    { label: 'Settings', icon: 'settings', href: '/admin/settings', page: 'settings' },
+                );
+            }
+            items.forEach(item => {
+                const isActive = item.page === currentPage;
+                const btn = document.createElement('button');
+                btn.onclick = () => window.location.href = item.href;
+                btn.className = `flex flex-col items-center gap-1 ${isActive ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors group`;
+                btn.innerHTML = `<span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(${isActive ? '37,123,244' : '255,255,255'},0.8)] transition-all">${item.icon}</span><span class="text-[10px] font-bold uppercase tracking-wider">${item.label}</span>`;
+                nav.appendChild(btn);
+            });
+        })();
     </script>
 
     <script>
@@ -663,8 +702,8 @@
         }
 
         // Duplicate modal helpers kept for reference (not triggered anymore)
-        function closeDuplicateModal() {}
-        function editExistingCard() {}
+        function closeDuplicateModal() { }
+        function editExistingCard() { }
 
         function showLoading() {
             // Collections are optional — no validation needed
@@ -735,7 +774,6 @@
         let imageMetadata = []; // Store metadata about each image (file or URL)
 
         function enableImageSelection() {
-            selectionMode = true;
             const previews = document.getElementById('image-previews');
             const images = previews.querySelectorAll('div');
 
@@ -744,19 +782,27 @@
                 return;
             }
 
+            // AUTO-SELECT if only one image
+            if (images.length === 1) {
+                selectionMode = true; // Briefly enable to pass the check
+                selectImageForAppraisal(0);
+                return;
+            }
+
+            selectionMode = true;
             // Add selection borders to all images
             images.forEach((imgDiv, index) => {
-                imgDiv.classList.add('ring-4', 'ring-primary', 'ring-opacity-50', 'cursor-pointer');
+                imgDiv.classList.add('ring-4', 'ring-primary', 'ring-opacity-50', 'cursor-pointer', 'animate-pulse');
                 imgDiv.onclick = () => selectImageForAppraisal(index);
             });
 
-            // Update button text
+            // Update button text to be more instructional
             document.getElementById('appraise-btn').innerHTML = `
                 <span class="material-symbols-outlined">touch_app</span>
-                <span>Click on an image to appraise</span>
+                <span>Select Target Image Above</span>
             `;
 
-            showToast('Select Image', 'Click on the card image you want to analyze', 'loading');
+            showToast('Action Required', 'Click on the card image you want to analyze', 'success');
         }
 
         async function selectImageForAppraisal(index) {
