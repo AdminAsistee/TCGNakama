@@ -46,24 +46,22 @@
 </head>
 
 <body class="bg-background-dark font-display text-white min-h-screen pb-24">
-    <header class="sticky top-0 z-50 glass-panel border-b border-glass-border">
-        <div class="flex items-center p-4 justify-between h-16">
-            <div class="flex items-center -ml-2 mr-4">
-                <img src="/static/live_logo.png" alt="TCG Nakama Logo" class="h-8 w-auto object-contain">
+    <header class="sticky top-0 z-50 glass-panel border-b border-white/10">
+        <div class="flex items-center p-4 justify-between h-16 max-w-7xl mx-auto w-full">
+            <div class="flex items-center gap-3">
+                <a href="/admin" class="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/40 hover:text-primary transition-all active:scale-95">
+                    <span class="material-symbols-outlined text-xl">arrow_back</span>
+                </a>
+                <h1 class="text-sm font-bold tracking-[0.15em] uppercase text-white/90">Sellers</h1>
             </div>
-            <h1
-                class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white">
-                Seller Management
-            </h1>
-            <a href="/admin"
-                class="flex items-center gap-1 text-primary text-[10px] uppercase tracking-wider font-bold border border-primary/30 px-2 py-1 rounded hover:bg-primary/10 transition-colors">
-                <span class="material-symbols-outlined text-sm">arrow_back</span>
-                Dashboard
-            </a>
+            
+            <div class="p-2 rounded-lg bg-white/5 border border-white/10 text-neon-purple">
+                <span class="material-symbols-outlined text-lg">group</span>
+            </div>
         </div>
     </header>
 
-    <main class="p-4 max-w-4xl mx-auto">
+    <main class="flex flex-col gap-6 p-4 sm:p-6 mt-2 max-w-4xl mx-auto w-full">
         <!-- Stats -->
         <div class="grid grid-cols-4 gap-3 mb-6">
             {% set pending = sellers|selectattr('status', 'equalto', 'pending')|list|length %}
@@ -193,36 +191,9 @@
         </div>
     </main>
 
-    <!-- Bottom Nav (Admin) -->
-    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-glass-border pb-safe pt-2 px-6 z-50 rounded-t-2xl">
-        <div class="flex justify-between items-center h-16 max-w-md mx-auto">
-            <button onclick="window.location.href='/admin'"
-                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
-                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">grid_view</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Vault</span>
-            </button>
-            <button onclick="window.location.href='/admin/add-card'"
-                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
-                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">add_circle</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Add Card</span>
-            </button>
-            <button onclick="window.location.href='/admin/bulk-upload'"
-                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
-                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">upload_file</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Upload</span>
-            </button>
-            <button onclick="window.location.href='/admin/sellers'"
-                class="flex flex-col items-center gap-1 text-primary group transition-colors">
-                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(37,123,244,0.8)] transition-all">group</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Sellers</span>
-            </button>
-            <button onclick="window.location.href='/admin/settings'"
-                class="flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors group">
-                <span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all">settings</span>
-                <span class="text-[10px] font-bold uppercase tracking-wider">Settings</span>
-            </button>
-        </div>
-    </nav>
+    <!-- Shared Bottom Nav -->
+    {% set active_page = 'sellers' %}
+    {% include 'components/bottom_nav.html' %}
 </body>
 
 </html>

@@ -112,54 +112,57 @@
                 grid-template-columns: 1fr !important;
             }
         }
+
+        /* Leaderboard Snap Scroll */
+        @media (max-width: 640px) {
+            .mobile-snap-scroll {
+                display: flex !important;
+                overflow-x: auto !important;
+                scroll-snap-type: x mandatory !important;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 1rem;
+            }
+            .mobile-snap-scroll > * {
+                scroll-snap-align: start;
+                flex: 0 0 85%;
+                min-width: 85%;
+            }
+        }
     </style>
 </head>
 
 <body
     class="bg-background-light dark:bg-background-dark font-display text-white selection:bg-primary selection:text-white pb-24">
-    <header class="sticky top-0 z-50 glass-panel border-b border-glass-border">
-        <div class="flex items-center p-4 justify-between h-16">
-            <div class="flex items-center -ml-2 mr-4">
-                <img src="/static/live_logo.png" alt="TCG Nakama Logo" class="h-8 w-auto object-contain">
+    <header class="sticky top-0 z-50 glass-panel border-b border-white/10">
+        <div class="flex items-center p-4 justify-between h-16 max-w-7xl mx-auto w-full">
+            <div class="flex items-center gap-2">
+                <img src="/static/live_logo.png" alt="Logo" class="h-7 w-auto object-contain">
+                <h1 class="hidden sm:block text-sm font-bold tracking-[0.15em] uppercase text-white/90">Collector Intelligence</h1>
             </div>
-            <h1
-                class="text-lg font-bold tracking-[0.15em] text-center uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                Collector Intelligence
-            </h1>
-            {% if oauth_connected %}
-            <div
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neon-green/10 border border-neon-green/20">
-                <div class="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse shadow-[0_0_8px_#0bda5e]"></div>
-                <span class="text-[9px] font-black uppercase tracking-[0.1em] text-neon-green">Shopify Connected</span>
+
+            <!-- Mobile Compact Header Actions -->
+            <div class="flex items-center gap-2 ml-auto">
+                {% if oauth_connected %}
+                <div class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-neon-green/10 border border-neon-green/20">
+                    <div class="w-1.5 h-1.5 rounded-full bg-neon-green shadow-[0_0_8px_#0bda5e]"></div>
+                    <span class="hidden xs:block text-[8px] font-black uppercase tracking-widest text-neon-green">Live</span>
+                </div>
+                {% endif %}
+
+                <a href="/" target="_blank" class="p-2 rounded-lg bg-white/5 border border-white/10 text-primary hover:bg-primary/10 transition-colors">
+                    <span class="material-symbols-outlined text-lg">storefront</span>
+                </a>
+
+                {% set logout_url = '/seller/logout' if user_role == 'seller' else '/admin/logout' %}
+                <a href="{{ logout_url }}" class="p-2 rounded-lg bg-white/5 border border-white/10 text-danger-red hover:bg-danger-red/10 transition-colors">
+                    <span class="material-symbols-outlined text-lg">logout</span>
+                </a>
             </div>
-            {% else %}
-            <div
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-danger-red/10 border border-danger-red/20">
-                <div class="w-1.5 h-1.5 rounded-full bg-danger-red animate-pulse shadow-[0_0_8px_#ff2a6d]"></div>
-                <span class="text-[9px] font-black uppercase tracking-[0.1em] text-danger-red">Disconnected</span>
-            </div>
-            {% endif %}
-            <a href="/" target="_blank"
-                class="flex items-center gap-1 text-primary text-[10px] uppercase tracking-wider font-bold border border-primary/30 px-2 py-1 rounded hover:bg-primary/10 transition-colors ml-auto">
-                <span class="material-symbols-outlined text-sm">storefront</span>
-                Marketplace
-            </a>
-            {% if user_role == 'seller' %}
-            <a href="/seller/logout"
-                class="flex items-center ml-3 gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
-                <span class="material-symbols-outlined text-sm">logout</span>
-                Logout
-            </a>
-            {% else %}
-            <a href="/admin/logout"
-                class="flex items-center ml-3 gap-1 text-danger-red text-[10px] uppercase tracking-wider font-bold border border-danger-red/30 px-2 py-1 rounded hover:bg-danger-red/10 transition-colors">
-                <span class="material-symbols-outlined text-sm">logout</span>
-                Logout
-            </a>
-            {% endif %}
         </div>
     </header>
-    <main class="flex flex-col gap-6 p-4">
+
+    <!-- Main Content with adaptive top padding for sticky header -->
+    <main class="flex flex-col gap-6 p-4 sm:p-6 mt-2">
         {% if not oauth_connected %}
         <!-- Shopify Connection Warning -->
         <div class="relative group mb-2">
@@ -232,22 +235,19 @@
 
         <section>
             <div class="flex items-center justify-between mb-3 px-1">
-                <h2 class="text-xs font-bold tracking-[0.2em] text-white/50 uppercase">{% if user_role == 'seller' %}My Inventory{% else %}Global Collector List{% endif %}</h2>
+                <h2 class="text-xs font-bold tracking-[0.15em] text-white/40 uppercase">{% if user_role == 'seller' %}Active Inventory{% else %}Top Collector List{% endif %}</h2>
                 <div class="flex items-center gap-1">
-                    <span
-                        class="block w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse shadow-[0_0_5px_#0bda5e]"></span>
-                    <span class="text-[10px] text-neon-green font-mono uppercase">Live: {{ live_count|default('842')
-                        }}</span>
-                    <!-- Force Sync Button -->
+                    <span class="block w-1 h-1 rounded-full bg-neon-green shadow-[0_0_5px_#0bda5e]"></span>
+                    <span class="text-[9px] text-neon-green/80 font-mono uppercase">Live: {{ live_count|default('842') }}</span>
                     <form action="/admin/sync" method="post" class="ml-2 flex items-center">
-                        <button type="submit"
-                            class="text-[9px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-1.5 py-0.5 rounded hover:bg-neon-blue/10 transition-colors flex items-center gap-1"
-                            title="Force Sync">
-                            <span class="material-symbols-outlined text-[10px]">sync</span>
+                        <button type="submit" class="p-1 text-neon-blue/60 hover:text-neon-blue transition-colors">
+                            <span class="material-symbols-outlined text-sm">sync</span>
                         </button>
                     </form>
                 </div>
             </div>
+
+            <div class="flex flex-nowrap overflow-x-auto gap-4 scrollbar-hide mobile-snap-scroll" id="leaderboard-container">
 
             {% if user_role == 'admin' %}
             <!-- Global Presence Chips -->
@@ -763,104 +763,56 @@
 
             <!-- Pagination Controls -->
             {% if total_pages > 1 %}
-            <div class="glass-panel rounded-xl p-4 mt-4 flex items-center justify-between">
-                <div class="text-xs text-white/60">
-                    Showing page {{ current_page }} of {{ total_pages }} ({{ total_products }} total cards)
+            <div class="glass-panel rounded-2xl p-4 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                    Page <span class="text-white">{{ current_page }}</span> of {{ total_pages }}
                 </div>
-                <div class="flex items-center gap-2">
-                    <!-- Previous Button -->
+                
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <!-- Mobile-First "Mega" Buttons -->
                     {% if current_page > 1 %}
                     <a href="?page={{ current_page - 1 }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
-                        class="text-[10px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded hover:bg-neon-blue/10 transition-colors">
-                        ← Prev
+                        class="flex-1 sm:flex-none flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-neon-blue hover:bg-neon-blue/10 transition-all active:scale-95">
+                        <span class="material-symbols-outlined text-sm">arrow_back_ios</span> Prev
                     </a>
                     {% else %}
-                    <button disabled
-                        class="text-[10px] uppercase tracking-wider text-white/20 border border-white/10 px-3 py-1.5 rounded cursor-not-allowed">
-                        ← Prev
-                    </button>
+                    <div class="flex-1 sm:flex-none flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/20 opacity-50">
+                        <span class="material-symbols-outlined text-sm">arrow_back_ios</span> Prev
+                    </div>
                     {% endif %}
 
-                    <!-- Page Numbers -->
-                    <div class="flex items-center gap-1">
+                    <!-- Desktop Page Numbers (Hidden on small mobile) -->
+                    <div class="hidden md:flex items-center gap-1">
                         {% for page_num in range(1, total_pages + 1) %}
-                        {% if page_num == current_page %}
-                        <span
-                            class="text-[10px] font-bold text-neon-gold border border-neon-gold/40 bg-neon-gold/10 px-2.5 py-1 rounded">
-                            {{ page_num }}
-                        </span>
-                        {% elif page_num <= 3 or page_num> total_pages - 3 or (page_num >= current_page - 1 and page_num
-                            <= current_page + 1) %} <a
-                                href="?page={{ page_num }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
-                                class="text-[10px] text-white/60 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1 rounded transition-colors">
-                                {{ page_num }}
-                                </a>
-                                {% elif page_num == 4 or page_num == total_pages - 3 %}
-                                <span class="text-white/30 px-1">...</span>
-                                {% endif %}
-                                {% endfor %}
+                            {% if page_num == current_page %}
+                                <span class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-background-dark font-black text-xs">{{ page_num }}</span>
+                            {% elif page_num <= 2 or page_num > total_pages - 2 or (page_num >= current_page - 1 and page_num <= current_page + 1) %}
+                                <a href="?page={{ page_num }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
+                                    class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/60 text-xs transition-colors">{{ page_num }}</a>
+                            {% elif page_num == 3 or page_num == total_pages - 2 %}
+                                <span class="text-white/20 px-1">...</span>
+                            {% endif %}
+                        {% endfor %}
                     </div>
 
-                    <!-- Next Button -->
-                    {% if current_page < total_pages %} <a
-                        href="?page={{ current_page + 1 }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
-                        class="text-[10px] uppercase tracking-wider text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded hover:bg-neon-blue/10 transition-colors">
-                        Next →
-                        </a>
-                        {% else %}
-                        <button disabled
-                            class="text-[10px] uppercase tracking-wider text-white/20 border border-white/10 px-3 py-1.5 rounded cursor-not-allowed">
-                            Next →
-                        </button>
-                        {% endif %}
+                    {% if current_page < total_pages %}
+                    <a href="?page={{ current_page + 1 }}{% if current_query %}&query={{ current_query }}{% endif %}{% if current_rarity %}&rarity={{ current_rarity }}{% endif %}"
+                        class="flex-1 sm:flex-none flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-neon-blue hover:bg-neon-blue/10 transition-all active:scale-95">
+                        Next <span class="material-symbols-outlined text-sm">arrow_forward_ios</span>
+                    </a>
+                    {% else %}
+                    <div class="flex-1 sm:flex-none flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/20 opacity-50">
+                        Next <span class="material-symbols-outlined text-sm">arrow_forward_ios</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
         </section>
     </main>
-    <!-- Bottom Nav -->
-    <nav
-        class="fixed bottom-0 left-0 right-0 glass-panel border-t border-glass-border pb-safe pt-2 px-6 z-50 rounded-t-2xl">
-        <div class="flex justify-between items-center h-16 max-w-md mx-auto" id="bottom-nav-items">
-        </div>
-    </nav>
-    <script>
-    (function() {
-        const userRole = '{{ user_role }}';
-        const isSeller = userRole === 'seller';
-        const prefix = isSeller ? '/seller-admin' : '/admin';
-        const currentPage = 'vault';
-        const pendingCount = {{ pending_seller_count or 0 }};
-        const nav = document.getElementById('bottom-nav-items');
-        const items = [
-            { label: 'Vault', icon: 'grid_view', href: prefix, page: 'vault' },
-            { label: 'Add Card', icon: 'add_circle', href: prefix + '/add-card', page: 'add-card' },
-            { label: 'Upload', icon: 'upload_file', href: prefix + '/bulk-upload', page: 'upload' },
-            { label: 'Contact', icon: 'support_agent', href: prefix + '/contact', page: 'contact' },
-        ];
-        if (!isSeller) {
-            items.push(
-                { label: 'Audit', icon: 'speed', href: '/admin/audit/pagespeed', page: 'audit' },
-                { label: 'Analytics', icon: 'monitoring', href: '/admin/analytics', page: 'analytics' },
-                { label: 'Blog', icon: 'article', href: '/admin/blog', page: 'blog' },
-                { label: 'Sellers', icon: 'group', href: '/admin/sellers', page: 'sellers', badge: pendingCount },
-                { label: 'Settings', icon: 'settings', href: '/admin/settings', page: 'settings' },
-            );
-        }
-        items.forEach(item => {
-            const isActive = item.page === currentPage;
-            const btn = document.createElement('button');
-            btn.onclick = () => window.location.href = item.href;
-            btn.className = `flex flex-col items-center gap-1 ${isActive ? 'text-primary' : 'text-white/40 hover:text-white'} transition-colors group`;
-            let iconHtml = `<span class="material-symbols-outlined group-hover:drop-shadow-[0_0_8px_rgba(${isActive ? '37,123,244' : '255,255,255'},0.8)] transition-all">${item.icon}</span>`;
-            if (item.badge && item.badge > 0) {
-                iconHtml = `<div class="relative">${iconHtml}<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-gold text-black text-[8px] font-black flex items-center justify-center shadow-[0_0_6px_rgba(255,215,0,0.8)]">${item.badge < 10 ? item.badge : '9+'}</span></div>`;
-            }
-            btn.innerHTML = iconHtml + `<span class="text-[10px] font-bold uppercase tracking-wider">${item.label}</span>`;
-            nav.appendChild(btn);
-        });
-    })();
-    </script>
+    <!-- Shared Bottom Nav -->
+    {% set active_page = 'vault' %}
+    {% include 'components/bottom_nav.html' %}
 
     <script>
         function toggleColumn(colName) {
