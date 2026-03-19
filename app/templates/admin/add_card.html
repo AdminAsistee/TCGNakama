@@ -336,7 +336,7 @@
                         </div>
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Collections
-                                <span class="text-red-400">*</span></label>
+                                <span class="text-white/30">(Optional)</span></label>
                             <div
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl p-4 space-y-2 max-h-48 overflow-y-auto">
                                 {% for cat in categories %}
@@ -667,14 +667,7 @@
         function editExistingCard() {}
 
         function showLoading() {
-            // Validate at least one collection is selected
-            const checkboxes = document.querySelectorAll('.collection-checkbox');
-            const isChecked = Array.from(checkboxes).some(cb => cb.checked);
-
-            if (!isChecked) {
-                document.getElementById('collection-error').classList.remove('hidden');
-                return false;
-            }
+            // Collections are optional — no validation needed
 
             // Check if we're in edit mode
             const editMode = document.querySelector('input[name="product_id"]') !== null;
@@ -688,13 +681,11 @@
 
                 if (!hasFiles && !hasUrls) {
                     document.getElementById('image-error').classList.remove('hidden');
-                    document.getElementById('collection-error').classList.add('hidden');
                     return false;
                 }
             }
 
             document.getElementById('image-error').classList.add('hidden');
-
             document.getElementById('collection-error').classList.add('hidden');
             document.getElementById('loading-overlay').classList.remove('hidden');
             document.getElementById('loading-overlay').classList.add('flex');
@@ -909,6 +900,21 @@
                     const descriptionField = document.querySelector('textarea[name="description"]');
                     if (descriptionField) {
                         descriptionField.value = description;
+                    }
+
+                    // Auto-check TCG collection based on shopify_collection from Gemini appraisal.
+                    // Gemini returns the exact Shopify collection name (e.g. "Pokemon", "One Piece").
+                    if (data.shopify_collection) {
+                        const checkboxes = document.querySelectorAll('.collection-checkbox');
+                        // Uncheck all first
+                        checkboxes.forEach(cb => { cb.checked = false; });
+                        // Direct match (Gemini returns exact name), with lowercase fallback
+                        checkboxes.forEach(cb => {
+                            if (cb.value === data.shopify_collection ||
+                                cb.value.toLowerCase() === data.shopify_collection.toLowerCase()) {
+                                cb.checked = true;
+                            }
+                        });
                     }
 
                     // Remove selection highlight

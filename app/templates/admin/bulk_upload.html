@@ -171,6 +171,9 @@
                                 Rarity</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                                TCG</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
                                 Condition</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
@@ -409,7 +412,7 @@
 
                 if (result.error) {
                     row.innerHTML = `
-                    <td colspan="10" class="px-4 py-3 text-danger-red text-xs bg-danger-red/5">
+                    <td colspan="11" class="px-4 py-3 text-danger-red text-xs bg-danger-red/5">
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-sm">error</span>
                             Error: ${result.error} (${result.filename})
@@ -433,6 +436,12 @@
                     <td class="px-4 py-3 text-white/70 text-xs">${result.set_name || '-'}</td>
                     <td class="px-4 py-3 text-white/70 text-xs font-mono">${result.card_number || '-'}</td>
                     <td class="px-4 py-3 text-white/70 text-xs">${result.rarity || '-'}</td>
+                    <td class="px-4 py-3">
+                        ${result.shopify_collection
+                            ? `<span class="px-2 py-0.5 rounded-full bg-neon-purple/20 border border-neon-purple/30 text-neon-purple text-[10px] font-bold uppercase tracking-wider">${result.shopify_collection}</span>`
+                            : '<span class="text-white/30 text-xs">—</span>'
+                        }
+                    </td>
                     <td class="px-4 py-3 text-white/70 text-xs">
                         <span class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
                             ${result.card_condition || 'NM'}

@@ -177,6 +177,7 @@ Then fill in:
    - Default to "Near Mint" if unsure.
 10. year: copyright year if visible, else ""
 11. manufacturer: provide the PUBLISHING COMPANY name if visible (e.g., "Nintendo", "Wizards of the Coast", "Bandai", "Konami"). DO NOT put the set name or full set name here.
+12. shopify_collection: From the following Shopify collection options — "Pokemon", "One Piece", "Yu-Gi-Oh!", "Magic: TG" — return the EXACT option that best matches this card's TCG game franchise. Return "" if none match. Examples: a Pok\u00e9mon card → "Pokemon"; a One Piece card → "One Piece"; a Magic: The Gathering card → "Magic: TG".
 
 Output ONLY this JSON, nothing else:
 {
@@ -190,7 +191,8 @@ Output ONLY this JSON, nothing else:
   "special_variants": "",
   "card_condition": "",
   "year": "",
-  "manufacturer": ""
+  "manufacturer": "",
+  "shopify_collection": ""
 }"""
 
             # Generate content with image via Gemini REST API
@@ -230,7 +232,7 @@ Output ONLY this JSON, nothing else:
             card_data = json.loads(response_text)
 
             # Convert null values to empty strings
-            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'full_set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants', 'card_condition']:
+            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'full_set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants', 'card_condition', 'shopify_collection']:
                 if card_data.get(key) is None or card_data.get(key) == 'null':
                     card_data[key] = ''
 
@@ -464,7 +466,8 @@ Output ONLY this JSON, nothing else:
                 'card_name_japanese': card_name_jp,  # Keep for reference
                 'card_name_english': card_name_en,   # Keep for reference
                 'card_condition': card_data.get('card_condition', 'Near Mint'),
-                'full_set_name': card_data.get('full_set_name', '')
+                'full_set_name': card_data.get('full_set_name', ''),
+                'shopify_collection': card_data.get('shopify_collection', ''),
             }
 
             

@@ -2266,6 +2266,7 @@ async def bulk_upload_appraise(
                 "batch_id": batch_id,
                 "intake_date": intake_date,
                 "sequence_index": parsed["sequence_index"],
+                "shopify_collection": appraisal_result.get("shopify_collection", ""),
             })
             
         except Exception as e:
@@ -2429,8 +2430,12 @@ async def bulk_confirm(
                     description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
                 description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
                 
-                # Collections can be empty
-                collections = []
+                # Collections: Gemini already matched the shopify_collection field during appraisal.
+                # Just use it directly — empty string means no collection (that's fine).
+                shopify_collection = card.get("shopify_collection", "")
+                collections = [shopify_collection] if shopify_collection else []
+                safe_print(f"[BULK_UPLOAD] Collection for this card: {collections or 'none'}")
+
                 
                 # Handle image upload using staged uploads (same as add_card)
                 all_images = []
