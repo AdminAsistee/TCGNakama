@@ -253,9 +253,6 @@
                                 Price</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
-                                Tags</th>
-                            <th
-                                class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
                                 Status</th>
                             <th
                                 class="px-4 py-3 text-left text-[10px] font-bold text-white/50 uppercase tracking-wider">
@@ -502,7 +499,7 @@
 
                 if (result.error) {
                     row.innerHTML = `
-                    <td colspan="11" class="px-4 py-3 text-danger-red text-xs bg-danger-red/5">
+                    <td colspan="12" class="px-4 py-3 text-danger-red text-xs bg-danger-red/5">
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-sm">error</span>
                             Error: ${result.error} (${result.filename})
@@ -538,14 +535,6 @@
                         </span>
                     </td>
                     <td class="px-4 py-3 text-neon-green font-mono text-xs">¥${result.price || 'N/A'}</td>
-                    <td class="px-4 py-3">
-                        <div class="flex flex-wrap gap-1">
-                            ${(result.extracted_tags || []).map(tag => `
-                                <span class="px-1.5 py-0.5 text-[9px] bg-white/5 border border-white/10 text-white/60 rounded lowercase tracking-tight">${tag}</span>
-                            `).join('')}
-                            ${(result.extracted_tags || []).length === 0 ? '<span class="text-[9px] text-white/20">—</span>' : ''}
-                        </div>
-                    </td>
                     <td class="px-4 py-3">
                         <span class="px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded ${result.exists ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-neon-green/20 text-neon-green border border-neon-green/30'}">
                             ${result.exists ? 'Exists' : 'New'}
@@ -600,9 +589,7 @@
 
                     return {
                         ...result,
-                        quantity: quantity,
-                        // Ensure tags are passed to confirmation
-                        tags: result.extracted_tags || []
+                        quantity: quantity
                     };
                 });
 

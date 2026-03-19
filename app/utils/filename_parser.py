@@ -127,54 +127,27 @@ def parse_batch_filename(filename: str) -> dict:
         }
 
     # ── Flexible / Generic mode ──
-    # Split by common delimiters: underscore, hyphen, space
+    # The filename does NOT match the strict BATCH structure.
+    # Per RULE-014/015: batch_id, intake_date, and sequence_index MUST be empty
+    # unless the strict BATCH-N-YYYY-MM-DD pattern was matched above.
+    # We still try to extract rarity as a helpful fallback.
+    # (filename-to-tags is handled separately by the frontend via extracted_tags)
+
+    # Split by common delimiters to find rarity token anywhere in filename
     segments = re.split(r"[_\-\s]+", stem)
     segments = [s for s in segments if s]  # Remove empties
 
-    if not segments:
-        return {"batch_id": "", "intake_date": "", "sequence_index": "", "rarity": None}
-
-    batch_id = ""
-    intake_date = ""
-    sequence_index = ""
     rarity = None
+    for seg in segments:
+        seg_lower = seg.lower()
+        if seg_lower in _RARITY_MAP:
+            rarity = _RARITY_MAP[seg_lower]
+            break  # Take the first rarity hit
 
-    # 1. Try to detect a date (YYYY-MM-DD) in the original stem
-    date_match = _DATE_RE.search(stem)
-    if date_match:
-        y, m, d = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
-        if 1990 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
-            intake_date = f"{y:04d}-{m:02d}-{d:02d}"
-
-    # 2. Check segments for compact date (YYYYMMDD) if no date found yet
-    if not intake_date:
-        for seg in segments:
-            cm = _COMPACT_DATE_RE.match(seg)
-            if cm:
-                y, m, d = int(cm.group(1)), int(cm.group(2)), int(cm.group(3))
-                if 1990 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
-                    intake_date = f"{y:04d}-{m:02d}-{d:02d}"
-                    break
-
-    # 3. Sequence index: if the LAST segment is purely numeric, treat as sequence
-    if segments and segments[-1].isdigit():
-        sequence_index = segments[-1]
-        segments = segments[:-1]  # Remove it from consideration
-
-    # 4. Rarity: check if last remaining segment is a known rarity abbreviation
-    if segments:
-        last_lower = segments[-1].lower()
-        if last_lower in _RARITY_MAP:
-            rarity = _RARITY_MAP[last_lower]
-            segments = segments[:-1]
-
-    # 5. Batch ID: use the first segment as the batch identifier
-    if segments:
-        batch_id = segments[0]
-
+    # Always return empty strings for the 3 batch metadata fields
     return {
-        "batch_id": batch_id,
-        "intake_date": intake_date,
-        "sequence_index": sequence_index,
+        "batch_id": "",
+        "intake_date": "",
+        "sequence_index": "",
         "rarity": rarity,
     }
