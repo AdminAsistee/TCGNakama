@@ -2081,6 +2081,7 @@ def cleanup_old_temp_files(temp_dir: Path, days: int = 3):
 @router.post("/bulk-upload/appraise")
 async def bulk_upload_appraise(
     images: List[UploadFile] = File(...),
+    tags: Optional[str] = Form(None),
     admin: str = Depends(get_admin_or_seller_session),
 ):
     """
@@ -2088,6 +2089,13 @@ async def bulk_upload_appraise(
     Returns appraisal data for each card with 'exists' flag.
     """
     results = []
+    import json
+    parsed_tags = []
+    if tags:
+        try:
+            parsed_tags = json.loads(tags)
+        except Exception:
+            parsed_tags = [t.strip() for t in tags.split(',') if t.strip()]
     
     # Get admin token and Shopify client
     admin_token = os.getenv("SHOPIFY_ADMIN_TOKEN")
@@ -2266,6 +2274,7 @@ async def bulk_upload_appraise(
                 "batch_id": batch_id,
                 "intake_date": intake_date,
                 "sequence_index": parsed["sequence_index"],
+                "extracted_tags": parsed_tags,
             })
             
         except Exception as e:
@@ -2382,6 +2391,8 @@ async def bulk_confirm(
                 batch_id = card.get("batch_id", "")
                 intake_date = card.get("intake_date", "")
                 sequence_index = card.get("sequence_index", "")
+                custom_tags = card.get("tags", [])  # Extracted from filename on frontend
+                
                 tags = [
                     f"Set: {set_name}" if set_name else "Set: ",
                     f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
@@ -2393,6 +2404,11 @@ async def bulk_confirm(
                     f"Intake Date: {intake_date}",
                     f"Sequence Index: {sequence_index}",
                 ]
+                
+                # Append custom tags from filename
+                for t in custom_tags:
+                    if t not in tags:
+                        tags.append(t)
                 
                 # ── SELLER TAG INJECTION (bulk upload) ──
                 from app.services.seller_auth import get_current_user
