@@ -874,18 +874,20 @@ async def estimate_market_value(
     card_number: str = "",
     rarity: str = "",
     is_japanese: bool = False,
+    package_type: str = "Raw",
+    slab_grade: str = "",
+    shopify_collection: str = "",
     admin: str = Depends(get_admin_session)
 ):
     """
     Estimate market value for a card based on its details.
     Used by the add card form after AI image appraisal.
-    
-    Note: card_name should be the clean English name (e.g., "Monkey D. Luffy")
-    already extracted by the AI, not the full formatted title.
+    Branches on package_type: sealed products use get_sealed_price_jpy,
+    slabs use highest-price strategy, others use default.
     """
     try:
-        from app.services.appraisal import get_market_value_jpy
-        
+        from app.services.appraisal import get_market_value_jpy, get_sealed_price_jpy
+
         safe_print(f"[ESTIMATE] ===== Market Value Estimation Request =====")
         safe_print(f"[ESTIMATE] card_name: '{card_name}'")
         safe_print(f"[ESTIMATE] set_name: '{set_name}'")
@@ -893,41 +895,63 @@ async def estimate_market_value(
         safe_print(f"[ESTIMATE] card_number: '{card_number}'")
         safe_print(f"[ESTIMATE] rarity: '{rarity}'")
         safe_print(f"[ESTIMATE] is_japanese: {is_japanese}")
+        safe_print(f"[ESTIMATE] package_type: '{package_type}' | slab_grade: '{slab_grade}'")
         safe_print(f"[ESTIMATE] ==========================================")
-        
-        # Build variants list from language
+
         variants = ['Japanese'] if is_japanese else None
-        
-        # Call the market value estimation service
-        # card_name is already clean English name from AI extraction
-        market_data = await get_market_value_jpy(
-            card_name=card_name,
-            rarity=rarity,
-            set_name=set_name,
-            full_set_name=full_set_name,
-            card_number=card_number,
-            variants=variants,
-            force_refresh=True
-        )
-        
+
+        if package_type in ("Booster Pack", "Booster Box"):
+            safe_print(f"[ESTIMATE] Path: SEALED → get_sealed_price_jpy")
+            market_data = await get_sealed_price_jpy(
+                set_name=set_name,
+                package_type=package_type,
+                full_set_name=full_set_name,
+                shopify_collection=shopify_collection,
+            )
+        elif package_type == "Slab":
+            safe_print(f"[ESTIMATE] Path: SLAB → get_market_value_jpy (highest)")
+            market_data = await get_market_value_jpy(
+                card_name=card_name,
+                rarity=rarity,
+                set_name=set_name,
+                full_set_name=full_set_name,
+                card_number=card_number,
+                variants=variants,
+                force_refresh=True,
+                price_strategy="highest",
+                slab_grade=slab_grade,
+            )
+        else:
+            safe_print(f"[ESTIMATE] Path: DEFAULT → get_market_value_jpy")
+            market_data = await get_market_value_jpy(
+                card_name=card_name,
+                rarity=rarity,
+                set_name=set_name,
+                full_set_name=full_set_name,
+                card_number=card_number,
+                variants=variants,
+                force_refresh=True,
+            )
+
         safe_print(f"[ESTIMATE] Market data: {market_data}")
-        
+
         return JSONResponse({
             'success': True,
-            'market_value_jpy': market_data.get('market_jpy'),  # Fixed: was market_value_jpy
-            'market_value_usd': market_data.get('market_usd'),  # Fixed: was market_value_usd
+            'market_value_jpy': market_data.get('market_jpy'),
+            'market_value_usd': market_data.get('market_usd'),
             'source': market_data.get('source', 'estimated'),
             'debug': {
                 'search_params': {
                     'card_name': card_name,
                     'set_name': set_name,
                     'card_number': card_number,
-                    'rarity': rarity
+                    'rarity': rarity,
+                    'package_type': package_type,
                 },
                 'raw_response': market_data
             }
         })
-        
+
     except Exception as e:
         safe_print(f"[ESTIMATE] Error: {e}")
         import traceback
@@ -1407,9 +1431,9 @@ async def add_card(
     vendor: str = Form("TCG Nakama"),
     set_name: str = Form(""),
     card_number: str = Form(""),
-    rarity: str = Form(...),
+    rarity: str = Form(""),
     condition: str = Form(...),
-    card_condition: str = Form("Near Mint"),
+    card_condition: str = Form(""),
     full_set_name: str = Form(""),
     description: str = Form(""),
     stock: int = Form(1),
@@ -1529,11 +1553,11 @@ async def update_card(
     name: str = Form(...),
     price: float = Form(...),
     set_name: str = Form(...),
-    rarity: str = Form(...),
-    card_number: str = Form(...),
+    rarity: str = Form(""),
+    card_number: str = Form(""),
     vendor: str = Form(...),
     condition: str = Form(...),
-    card_condition: str = Form("Near Mint"),
+    card_condition: str = Form(""),
     full_set_name: str = Form(""),
     description: str = Form(""),
     stock: int = Form(1),
@@ -2155,9 +2179,14 @@ async def bulk_upload_appraise(
             if parsed["rarity"] is not None:
                 rarity = parsed["rarity"]
             
+            package_type = appraisal_result.get("package_type", "Raw") or "Raw"
+            slab_grade = appraisal_result.get("slab_grade", "")
+            shopify_collection = appraisal_result.get("shopify_collection", "")
+
             # Detect language: card is Japanese if it has a Japanese name
             is_japanese = bool(card_name_japanese)
             safe_print(f"[BULK_UPLOAD] Language detected: {'Japanese' if is_japanese else 'English'} (jp_name='{card_name_japanese}')")
+            safe_print(f"[BULK_UPLOAD] Package type detected: '{package_type}' | Slab grade: '{slab_grade}'")
             
             # DUPLICATE CHECK DISABLED — every card is created as a new Shopify product
             exists = False
@@ -2207,17 +2236,37 @@ async def bulk_upload_appraise(
             #             break
 
             
-            # If card is new, fetch price from PriceCharting
+            # Fetch price based on package type
             if not exists:
                 try:
-                    price_result = await appraisal.get_market_value_jpy(
-                        card_name=card_name_english,
-                        rarity=rarity,
-                        set_name=set_name,
-                        full_set_name=full_set_name,
-                        card_number=card_number,
-                        variants=['Japanese'] if is_japanese else None
-                    )
+                    safe_print(f"[BULK_UPLOAD] Price path for package_type='{package_type}': {'SEALED' if package_type in ('Booster Pack','Booster Box') else 'HIGHEST' if package_type == 'Slab' else 'DEFAULT'}")
+                    if package_type in ("Booster Pack", "Booster Box"):
+                        price_result = await appraisal.get_sealed_price_jpy(
+                            set_name=set_name,
+                            package_type=package_type,
+                            full_set_name=full_set_name,
+                            shopify_collection=shopify_collection,
+                        )
+                    elif package_type == "Slab":
+                        price_result = await appraisal.get_market_value_jpy(
+                            card_name=card_name_english,
+                            rarity=rarity,
+                            set_name=set_name,
+                            full_set_name=full_set_name,
+                            card_number=card_number,
+                            variants=['Japanese'] if is_japanese else None,
+                            price_strategy="highest",
+                            slab_grade=slab_grade,
+                        )
+                    else:
+                        price_result = await appraisal.get_market_value_jpy(
+                            card_name=card_name_english,
+                            rarity=rarity,
+                            set_name=set_name,
+                            full_set_name=full_set_name,
+                            card_number=card_number,
+                            variants=['Japanese'] if is_japanese else None,
+                        )
                     if not price_result.get("error"):
                         price = price_result.get("market_jpy")
                 except Exception as price_error:
@@ -2240,8 +2289,16 @@ async def bulk_upload_appraise(
                 '.webp': 'image/webp'
             }.get(file_ext, 'image/jpeg')
             
+            # For sealed products, build the correct display/Shopify name
+            if package_type in ("Booster Pack", "Booster Box"):
+                sealed_display_name = f"{full_set_name} {package_type}".strip()
+                if set_name:
+                    sealed_display_name += f" - {set_name}"
+                card_name = sealed_display_name
+
             results.append({
                 "card_name": card_name,
+
                 "set_name": set_name,
                 "card_number": card_number,
                 "rarity": rarity,
@@ -2267,6 +2324,8 @@ async def bulk_upload_appraise(
                 "intake_date": intake_date,
                 "sequence_index": parsed["sequence_index"],
                 "shopify_collection": appraisal_result.get("shopify_collection", ""),
+                "package_type": package_type,
+                "slab_grade": slab_grade,
             })
             
         except Exception as e:
@@ -2379,18 +2438,29 @@ async def bulk_confirm(
             try:
                 # Prepare tags in the same format as add_card
                 full_set_name = card.get("full_set_name", "")
-                card_condition = card.get("card_condition", "Near Mint")
+                card_condition = card.get("card_condition", "")
                 batch_id = card.get("batch_id", "")
                 intake_date = card.get("intake_date", "")
                 sequence_index = card.get("sequence_index", "")
+                package_type = card.get("package_type", "Raw") or "Raw"
+                slab_grade = card.get("slab_grade", "")
+
+                # For sealed products, build a proper title
+                if package_type in ("Booster Pack", "Booster Box"):
+                    if full_set_name:
+                        sealed_title = f"{full_set_name} {package_type}"
+                        if set_name:
+                            sealed_title += f" - {set_name}"
+                        card_name = sealed_title
+                    # else keep whatever Gemini returned
 
                 tags = [
                     f"Set: {set_name}" if set_name else "Set: ",
-                    f"Rarity: {rarity.capitalize()}" if rarity else "Rarity: Unknown",
+                    f"Rarity: {rarity.capitalize()}" if (rarity and package_type not in ("Booster Pack", "Booster Box")) else "Rarity: ",
                     f"Number: {card_number}" if card_number else "Number: ",
-                    "Condition: Raw",
+                    f"Condition: {package_type}",
                     f"Set Name: {full_set_name}" if full_set_name else "Set Name: ",
-                    f"Card: {card_condition}",
+                    f"Card: {card_condition if card_condition else ('Near Mint' if package_type == 'Slab' else '')}",
                     f"Batch ID: {batch_id}",
                     f"Intake Date: {intake_date}",
                     f"Sequence Index: {sequence_index}",
@@ -2411,25 +2481,40 @@ async def bulk_confirm(
                 card_name_en = card.get("card_name_english", "")
                 year = card.get("year", "")
                 manufacturer = card.get("manufacturer", vendor)
-                
-                description_html = ""
-                if card_name_jp:
-                    description_html += f"<p><strong>Japanese Name:</strong> {card_name_jp}</p>"
-                if card_name_en:
-                    description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
-                if set_name:
-                    description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
-                if full_set_name:
-                    description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
-                if card_number:
-                    description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
-                if rarity:
-                    description_html += f"<p><strong>Rarity:</strong> {rarity}</p>"
-                if year:
-                    description_html += f"<p><strong>Year:</strong> {year}</p>"
-                if manufacturer:
-                    description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
-                description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
+
+                is_sealed = package_type in ("Booster Pack", "Booster Box")
+
+                if is_sealed:
+                    # Slim description for sealed products
+                    price_display = f"¥{int(price):,}" if price else "—"
+                    description_html = ""
+                    if card_name:
+                        description_html += f"<p><strong>Product:</strong> {card_name}</p>"
+                    if full_set_name:
+                        description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
+                    if set_name:
+                        description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
+                    description_html += f"<p><strong>Price:</strong> {price_display}</p>"
+                else:
+                    # Full description for Raw / Toploader / Slab
+                    description_html = ""
+                    if card_name_jp:
+                        description_html += f"<p><strong>Japanese Name:</strong> {card_name_jp}</p>"
+                    if card_name_en:
+                        description_html += f"<p><strong>English Name:</strong> {card_name_en}</p>"
+                    if set_name:
+                        description_html += f"<p><strong>Set Code:</strong> {set_name}</p>"
+                    if full_set_name:
+                        description_html += f"<p><strong>Set Name:</strong> {full_set_name}</p>"
+                    if card_number:
+                        description_html += f"<p><strong>Card Number:</strong> {card_number}</p>"
+                    if rarity:
+                        description_html += f"<p><strong>Rarity:</strong> {rarity}</p>"
+                    if year:
+                        description_html += f"<p><strong>Year:</strong> {year}</p>"
+                    if manufacturer:
+                        description_html += f"<p><strong>Manufacturer:</strong> {manufacturer}</p>"
+                    description_html += f"<p><strong>Condition:</strong> {card_condition}</p>"
                 
                 # Collections: Gemini already matched the shopify_collection field during appraisal.
                 # Just use it directly — empty string means no collection (that's fine).

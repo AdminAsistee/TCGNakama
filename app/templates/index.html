@@ -474,8 +474,8 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                                     </button>
                                     <div id="package-type-dropdown-panel"
                                         class="absolute top-full left-0 mt-2 w-auto min-w-[160px] bg-surface border border-white/10 rounded-xl shadow-2xl opacity-0 invisible transition-all duration-200 overflow-hidden z-50 p-2 flex flex-col gap-1">
-                                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-                                        {% set pkg_soon = ['Booster Pack', 'Toploader'] %}
+                                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader', 'Booster Box'] %}
+                                        {% set pkg_soon = ['Booster Pack', 'Toploader', 'Booster Box'] %}
                                         {% for pt in package_types %}
                                         <button type="button" data-package-type-btn="{{ pt }}"
                                             onclick="setPackageTypeFilter('{{ pt }}', this)"
@@ -621,8 +621,8 @@ daily, live market prices in JPY, secure next-day shipping — TCGNakama.{% endb
                 <div>
                     <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">Package Type</h4>
                     <div class="flex flex-wrap gap-2">
-                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader'] %}
-                        {% set pkg_soon = ['Booster Pack', 'Toploader'] %}
+                        {% set package_types = ['Booster Pack', 'Raw', 'Slab', 'Toploader', 'Booster Box'] %}
+                        {% set pkg_soon = ['Booster Pack', 'Toploader', 'Booster Box'] %}
                         {% for pt in package_types %}
                         <button type="button" data-sheet-package-type="{{ pt }}"
                             onclick="setSheetFilter('package-type', '{{ pt }}', this)"

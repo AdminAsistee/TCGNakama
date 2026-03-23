@@ -164,6 +164,7 @@
             </div>
         </div>
 
+
         <form action="{% if edit_mode %}/admin/update-card{% else %}/admin/add-card{% endif %}" method="POST"
             enctype="multipart/form-data" class="flex flex-col gap-8" onsubmit="return checkDuplicateAndSubmit(event)">
             {% if edit_mode %}
@@ -417,20 +418,14 @@
                         </div>
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Rarity</label>
-                            <select name="rarity"
+                            <select name="rarity" id="rarity-select"
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
-                                <option value="Common" {% if edit_mode and product.rarity|lower=='common' %}selected{%
-                                    endif %}>Common</option>
-                                <option value="Uncommon" {% if edit_mode and product.rarity|lower=='uncommon'
-                                    %}selected{% endif %}>Uncommon</option>
-                                <option value="Rare" {% if edit_mode and product.rarity|lower=='rare' %}selected{% endif
-                                    %}>
-                                    Rare</option>
-                                <option value="Epic" {% if edit_mode and product.rarity|lower=='epic' %}selected{% endif
-                                    %}>
-                                    Epic</option>
-                                <option value="Ultra Rare" {% if edit_mode and product.rarity|lower=='ultra rare'
-                                    %}selected{% endif %}>Ultra Rare</option>
+                                <option value="">— Select Rarity —</option>
+                                <option value="Common" {% if edit_mode and product.rarity|lower=='common' %}selected{% endif %}>Common</option>
+                                <option value="Uncommon" {% if edit_mode and product.rarity|lower=='uncommon' %}selected{% endif %}>Uncommon</option>
+                                <option value="Rare" {% if edit_mode and product.rarity|lower=='rare' %}selected{% endif %}>Rare</option>
+                                <option value="Epic" {% if edit_mode and product.rarity|lower=='epic' %}selected{% endif %}>Epic</option>
+                                <option value="Ultra Rare" {% if edit_mode and product.rarity|lower=='ultra rare' %}selected{% endif %}>Ultra Rare</option>
                             </select>
                         </div>
                     </div>
@@ -443,33 +438,41 @@
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
                                 <option value="Booster Pack" {% if edit_mode and product.condition=='Booster Pack'
                                     %}selected{% endif %}>Booster Pack</option>
-                                <option value="Slab" {% if edit_mode and product.condition=='Slab' %}selected{% endif
-                                    %}>
-                                    Slab</option>
                                 <option value="Raw" {% if edit_mode and product.condition=='Raw' %}selected{% endif %}>
                                     Raw
                                 </option>
+                                <option value="Slab" {% if edit_mode and product.condition=='Slab' %}selected{% endif
+                                    %}>
+                                    Slab</option>
                                 <option value="Toploader" {% if edit_mode and product.condition=='Toploader'
                                     %}selected{% endif %}>Toploader</option>
+                                <option value="Booster Box" {% if edit_mode and product.condition=='Booster Box'
+                                    %}selected{% endif %}>Booster Box</option>
                             </select>
                         </div>
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Condition
-                                (Visual) <span class="text-red-400">*</span></label>
-                            <select name="card_condition" id="card-condition-select" required
+                                (Visual) <span class="text-white/30">(Optional)</span></label>
+                            <select name="card_condition" id="card-condition-select"
                                 class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all text-white">
-                                <option value="Near Mint" {% if edit_mode and product.card_condition=='Near Mint'
-                                    %}selected{% endif %}>Near Mint</option>
-                                <option value="Lightly Played" {% if edit_mode and
-                                    product.card_condition=='Lightly Played' %}selected{% endif %}>Lightly Played
-                                </option>
-                                <option value="Mostly Played" {% if edit_mode and
-                                    product.card_condition=='Mostly Played' %}selected{% endif %}>Mostly Played</option>
+                                <option value="">— N/A —</option>
+                                <option value="Near Mint" {% if edit_mode and product.card_condition=='Near Mint' %}selected{% endif %}>Near Mint</option>
+                                <option value="Lightly Played" {% if edit_mode and product.card_condition=='Lightly Played' %}selected{% endif %}>Lightly Played</option>
+                                <option value="Mostly Played" {% if edit_mode and product.card_condition=='Mostly Played' %}selected{% endif %}>Mostly Played</option>
                             </select>
                         </div>
                     </div>
 
-                    <!-- Batch Metadata -->
+                    <!-- Slab Grade (shown always, used only for Slab pricing) -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Slab Grade
+                            <span class="text-white/20">(Optional — Slab only)</span></label>
+                        <input name="slab_grade" id="slab-grade-input"
+                            class="w-full bg-surface-dark border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-white/20"
+                            placeholder="e.g. 10" type="text" value="" />
+                    </div>
+
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="flex flex-col gap-2">
                             <label class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Batch ID <span
@@ -723,6 +726,29 @@
             document.getElementById('toast').classList.add('hidden');
         }
 
+        // Sealed-product field gating — call whenever package_type is known
+        function _applySealedFieldState(isSealed) {
+            const cardConditionSelect = document.querySelector('select[name="card_condition"]');
+            const raritySelect        = document.querySelector('select[name="rarity"]');
+            const cardNumberInput     = document.querySelector('input[name="card_number"]');
+
+            if (isSealed) {
+                if (cardConditionSelect) { cardConditionSelect.value = ''; cardConditionSelect.disabled = true; cardConditionSelect.style.opacity = '0.4'; }
+                if (raritySelect)        { raritySelect.value = '';        raritySelect.disabled = true;        raritySelect.style.opacity = '0.4'; }
+                if (cardNumberInput)     { cardNumberInput.value = '';     cardNumberInput.disabled = true;     cardNumberInput.style.opacity = '0.4'; }
+            } else {
+                if (cardConditionSelect) { cardConditionSelect.disabled = false; cardConditionSelect.style.opacity = '1'; }
+                if (raritySelect)        { raritySelect.disabled = false;        raritySelect.style.opacity = '1'; }
+                if (cardNumberInput)     { cardNumberInput.disabled = false;     cardNumberInput.style.opacity = '1'; }
+            }
+        }
+
+        // Wire up package_type dropdown — fires on manual change too (not just after AI appraisal)
+        document.querySelector('select[name="condition"]').addEventListener('change', function() {
+            const sealed = ['Booster Pack', 'Booster Box'].includes(this.value);
+            _applySealedFieldState(sealed);
+        });
+
         // Image selection mode for appraisal
         let selectionMode = false;
         let imageMetadata = []; // Store metadata about each image (file or URL)
@@ -789,180 +815,140 @@
                 <span>Appraise Card with AI</span>
             `;
 
-            // Show loading toast
-            hideToast();
+            // Run appraisal on the selected image
             showToast('Analyzing Card', 'Gemini AI is analyzing your card...', 'loading');
 
-            // Get image data
-            const fileInput = document.getElementById('file-input');
-            const urlInputs = document.getElementsByName('image_urls');
-            const validUrls = Array.from(urlInputs).filter(input => input.value.trim() !== '').map(input => input.value.trim());
-
-            let formData = new FormData();
-
-            // Determine if this is a file or URL
-            const totalFiles = fileInput.files ? fileInput.files.length : 0;
-
-            if (index < totalFiles) {
-                // This is a file upload
-                formData.append('image_file', fileInput.files[index]);
-            } else {
-                // This is a URL
-                const urlIndex = index - totalFiles;
-                if (urlIndex < validUrls.length) {
-                    formData.append('image_url', validUrls[urlIndex]);
-                }
-            }
-
             try {
-                const response = await fetch('/admin/appraise-card-image', {
-                    method: 'POST',
-                    body: formData
-                });
+                const fileInput = document.getElementById('file-input');
+                const urlInputs = document.getElementsByName('image_urls');
+                const validUrls = Array.from(urlInputs).filter(i => i.value.trim()).map(i => i.value.trim());
+                const totalFiles = fileInput.files ? fileInput.files.length : 0;
 
+                const formData = new FormData();
+                if (index < totalFiles) {
+                    formData.append('image_file', fileInput.files[index]);
+                } else {
+                    // URL-based image: fetch blob and attach
+                    const urlIndex = index - totalFiles;
+                    const imgResp = await fetch(validUrls[urlIndex]);
+                    const imgBlob = await imgResp.blob();
+                    formData.append('image_file', imgBlob, 'image.jpg');
+                }
+
+                const response = await fetch('/admin/appraise-card-image', { method: 'POST', body: formData });
                 const result = await response.json();
 
                 if (result.success && result.data) {
                     const data = result.data;
+                    const isSealed = ['Booster Pack', 'Booster Box'].includes(data.package_type);
 
-                    // Auto-populate form fields
-                    if (data.card_name) {
+                    // For sealed products, build name from full_set_name + package_type + set_code
+                    if (isSealed) {
+                        let sealedName = data.full_set_name
+                            ? `${data.full_set_name} ${data.package_type}`
+                            : (data.card_name || '');
+                        if (data.set_name) sealedName += ` - ${data.set_name}`;
+                        document.querySelector('input[name="name"]').value = sealedName;
+                    } else if (data.card_name) {
                         document.querySelector('input[name="name"]').value = data.card_name;
                     }
-                    if (data.set_name) {
-                        document.querySelector('input[name="set_name"]').value = data.set_name;
-                    }
-                    if (data.card_number) {
-                        document.querySelector('input[name="card_number"]').value = data.card_number;
-                    }
-                    if (data.full_set_name) {
-                        document.querySelector('input[name="full_set_name"]').value = data.full_set_name;
-                    }
+
+                    if (data.set_name) document.querySelector('input[name="set_name"]').value = data.set_name;
+                    if (data.card_number) document.querySelector('input[name="card_number"]').value = data.card_number;
+                    if (data.full_set_name) document.querySelector('input[name="full_set_name"]').value = data.full_set_name;
+
                     if (data.card_condition) {
-                        const conditionSelect = document.querySelector('select[name="card_condition"]');
-                        if (conditionSelect) {
-                            // Find matching option (case insensitive)
-                            const options = Array.from(conditionSelect.options);
-                            const matchingOption = options.find(opt => opt.value.toLowerCase() === data.card_condition.toLowerCase());
-                            if (matchingOption) {
-                                conditionSelect.value = matchingOption.value;
-                            }
+                        const condSel = document.querySelector('select[name="card_condition"]');
+                        if (condSel) {
+                            const match = Array.from(condSel.options).find(o => o.value.toLowerCase() === data.card_condition.toLowerCase());
+                            if (match) condSel.value = match.value;
                         }
                     }
-                    if (data.rarity) {
-                        const raritySelect = document.querySelector('select[name="rarity"]');
-                        // Try to find matching option
-                        const options = Array.from(raritySelect.options);
-                        const matchingOption = options.find(opt => opt.value.toLowerCase() === data.rarity.toLowerCase());
-                        if (matchingOption) {
-                            raritySelect.value = matchingOption.value;
+
+                    // (isSealed already declared above)
+                    if (data.package_type) {
+                        const pkgSel = document.querySelector('select[name="condition"]');
+                        if (pkgSel) {
+                            const m = Array.from(pkgSel.options).find(o => o.value === data.package_type);
+                            if (m) pkgSel.value = m.value;
                         }
                     }
-                    if (data.manufacturer) {
-                        document.querySelector('input[name="vendor"]').value = data.manufacturer;
+                    _applySealedFieldState(isSealed);
+
+                    // Slab: always default card condition to Near Mint
+                    if (data.package_type === 'Slab') {
+                        const condSel = document.querySelector('select[name="card_condition"]');
+                        if (condSel && !condSel.value) condSel.value = 'Near Mint';
                     }
-                    // Batch metadata from filename parser
+
+                    if (data.rarity && !isSealed) {
+                        const rarSel = document.querySelector('select[name="rarity"]');
+                        if (rarSel) {
+                            const m = Array.from(rarSel.options).find(o => o.value.toLowerCase() === data.rarity.toLowerCase());
+                            if (m) rarSel.value = m.value;
+                        }
+                    }
+                    if (data.manufacturer) document.querySelector('input[name="vendor"]').value = data.manufacturer;
+
                     document.getElementById('batch-id-input').value = data.batch_id || '';
                     document.getElementById('intake-date-input').value = data.intake_date || '';
                     document.getElementById('sequence-index-input').value = data.sequence_index || '';
 
-                    // Build description with scanned information in bulleted form
-                    let description = '**Card Detailed Information:**\n\n';
-                    if (data.card_name_japanese) {
-                        description += `• **Japanese Name:** ${data.card_name_japanese}\n`;
+                    let description = '';
+                    if (isSealed) {
+                        description = '**Sealed Product Information:**\n\n';
+                        if (data.card_name) description += `• **Product:** ${data.card_name}\n`;
+                        if (data.full_set_name) description += `• **Set Name:** ${data.full_set_name}\n`;
+                        if (data.set_name) description += `• **Set Code:** ${data.set_name}\n`;
+                    } else {
+                        description = '**Card Detailed Information:**\n\n';
+                        if (data.card_name_japanese) description += `• **Japanese Name:** ${data.card_name_japanese}\n`;
+                        if (data.card_name_english) description += `• **English Name:** ${data.card_name_english}\n`;
+                        if (data.set_name) description += `• **Set Code:** ${data.set_name}\n`;
+                        if (data.full_set_name) description += `• **Set Name:** ${data.full_set_name}\n`;
+                        if (data.card_condition) description += `• **Condition:** ${data.card_condition}\n`;
+                        if (data.card_number) description += `• **Card Number:** ${data.card_number}\n`;
+                        if (data.rarity) description += `• **Rarity:** ${data.rarity}\n`;
+                        if (data.year) description += `• **Year:** ${data.year}\n`;
+                        if (data.manufacturer) description += `• **Manufacturer:** ${data.manufacturer}\n`;
                     }
-                    if (data.card_name_english) {
-                        description += `• **English Name:** ${data.card_name_english}\n`;
-                    }
-                    if (data.set_name) {
-                        description += `• **Set Code:** ${data.set_name}\n`;
-                    }
-                    if (data.full_set_name) {
-                        description += `• **Set Name:** ${data.full_set_name}\n`;
-                    }
-                    if (data.card_condition) {
-                        description += `• **Condition:** ${data.card_condition}\n`;
-                    }
-                    if (data.card_number) {
-                        description += `• **Card Number:** ${data.card_number}\n`;
-                    }
-                    if (data.rarity) {
-                        description += `• **Rarity:** ${data.rarity}\n`;
-                    }
-                    if (data.year) {
-                        description += `• **Year:** ${data.year}\n`;
-                    }
-                    if (data.manufacturer) {
-                        description += `• **Manufacturer:** ${data.manufacturer}\n`;
-                    }
+                    const descField = document.querySelector('textarea[name="description"]');
+                    if (descField) descField.value = description;
 
-                    // Set description
-                    const descriptionField = document.querySelector('textarea[name="description"]');
-                    if (descriptionField) {
-                        descriptionField.value = description;
-                    }
-
-                    // Auto-check TCG collection based on shopify_collection from Gemini appraisal.
-                    // Gemini returns the exact Shopify collection name (e.g. "Pokemon", "One Piece").
                     if (data.shopify_collection) {
-                        const checkboxes = document.querySelectorAll('.collection-checkbox');
-                        // Uncheck all first
-                        checkboxes.forEach(cb => { cb.checked = false; });
-                        // Direct match (Gemini returns exact name), with lowercase fallback
-                        checkboxes.forEach(cb => {
-                            if (cb.value === data.shopify_collection ||
-                                cb.value.toLowerCase() === data.shopify_collection.toLowerCase()) {
-                                cb.checked = true;
-                            }
+                        const cbs = document.querySelectorAll('.collection-checkbox');
+                        cbs.forEach(cb => { cb.checked = false; });
+                        cbs.forEach(cb => {
+                            if (cb.value === data.shopify_collection || cb.value.toLowerCase() === data.shopify_collection.toLowerCase()) cb.checked = true;
                         });
                     }
 
                     // Remove selection highlight
-                    const previews = document.getElementById('image-previews');
-                    const images = previews.querySelectorAll('div');
-                    images.forEach(imgDiv => {
-                        imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
-                        // Remove checkmark if exists
-                        const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
-                        if (checkmark) checkmark.remove();
+                    document.querySelectorAll('#image-previews div').forEach(d => {
+                        d.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                        const ck = d.querySelector('.absolute.top-2.right-2');
+                        if (ck) ck.remove();
                     });
 
                     hideToast();
-                    showToast(
-                        'Appraisal Complete!',
-                        `Identified: ${data.card_name_english || data.card_name_japanese || 'Unknown'} - ${data.rarity || 'Unknown rarity'}. Fetching market value...`,
-                        'loading'
-                    );
-
-                    // Fetch market value using the same appraisal system as admin dashboard
-                    console.log('[APPRAISE] About to call fetchMarketValue with data:', data);
+                    showToast('Appraisal Complete!', `Identified: ${data.card_name_english || data.card_name_japanese || 'Unknown'}. Fetching market value...`, 'loading');
                     fetchMarketValue(data);
                 } else {
-                    // Remove selection highlight on error too
-                    const previews = document.getElementById('image-previews');
-                    const images = previews.querySelectorAll('div');
-                    images.forEach(imgDiv => {
-                        imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
-                        const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
-                        if (checkmark) checkmark.remove();
+                    document.querySelectorAll('#image-previews div').forEach(d => {
+                        d.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                        const ck = d.querySelector('.absolute.top-2.right-2'); if (ck) ck.remove();
                     });
-
                     hideToast();
                     showToast('Appraisal Failed', result.error || 'Could not analyze the card', 'error');
                 }
-            } catch (error) {
-                // Remove selection highlight on error
-                const previews = document.getElementById('image-previews');
-                const images = previews.querySelectorAll('div');
-                images.forEach(imgDiv => {
-                    imgDiv.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
-                    const checkmark = imgDiv.querySelector('.absolute.top-2.right-2');
-                    if (checkmark) checkmark.remove();
+            } catch (err) {
+                document.querySelectorAll('#image-previews div').forEach(d => {
+                    d.classList.remove('ring-4', 'ring-neon-green', 'ring-opacity-100');
+                    const ck = d.querySelector('.absolute.top-2.right-2'); if (ck) ck.remove();
                 });
-
                 hideToast();
                 showToast('Error', 'Failed to connect to appraisal service', 'error');
-                console.error('Appraisal error:', error);
+                console.error('Appraisal error:', err);
             }
         }
 
@@ -1045,6 +1031,16 @@
                 const isJapanese = !!(cardData.card_name_japanese && cardData.card_name_japanese.trim());
                 params.append('is_japanese', isJapanese);
                 console.log('[FETCH_MARKET_VALUE] is_japanese:', isJapanese);
+
+                // Pass package type and slab grade for correct pricing strategy
+                // Fallback to the form field if Gemini didn't detect the grade
+                const slabGrade = cardData.slab_grade || document.getElementById('slab-grade-input')?.value || '';
+                params.append('package_type', cardData.package_type || 'Raw');
+                params.append('slab_grade', slabGrade);
+                params.append('shopify_collection', cardData.shopify_collection || '');
+                console.log('[FETCH_MARKET_VALUE] package_type:', cardData.package_type, '| slab_grade:', slabGrade);
+
+
 
                 // Call the market value estimation endpoint (create a temporary product-like structure)
                 const apiUrl = `/admin/estimate-market-value?${params.toString()}`;

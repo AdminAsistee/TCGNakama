@@ -120,7 +120,15 @@ async def appraise_card_from_image(image_data: bytes = None, image_url: str = No
 
             # Encode image as base64 for Gemini REST API
             buf = io.BytesIO()
+            # Convert RGBA / palette images to RGB — JPEG doesn't support transparency
+            if img.mode in ("RGBA", "P", "LA"):
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
             img.save(buf, format="JPEG")
+
             b64_image = base64.b64encode(buf.getvalue()).decode()
 
 
@@ -175,9 +183,17 @@ Then fill in:
    - "Lightly Played": Minor whitening on edges, light surface scratches.
    - "Mostly Played": Significant whitening, corner wear, or minor creases.
    - Default to "Near Mint" if unsure.
+   - For Booster Pack or Booster Box, leave as "".
 10. year: copyright year if visible, else ""
 11. manufacturer: provide the PUBLISHING COMPANY name if visible (e.g., "Nintendo", "Wizards of the Coast", "Bandai", "Konami"). DO NOT put the set name or full set name here.
 12. shopify_collection: From the following Shopify collection options — "Pokemon", "One Piece", "Yu-Gi-Oh!", "Magic: TG" — return the EXACT option that best matches this card's TCG game franchise. Return "" if none match. Examples: a Pok\u00e9mon card → "Pokemon"; a One Piece card → "One Piece"; a Magic: The Gathering card → "Magic: TG".
+13. package_type: What form is this item in?
+   - "Booster Pack": a sealed foil pack (crinkled foil, multiple cards visible inside)
+   - "Booster Box": a large sealed factory box containing many booster packs
+   - "Slab": a card permanently encased in hard graded plastic (PSA / BGS / CGC label visible)
+   - "Toploader": a card inside a clear rigid plastic sleeve/toploader
+   - "Raw": a bare unprotected card with no casing — DEFAULT if unsure
+14. slab_grade: If package_type is "Slab", read the numeric grade on the grading label (e.g., "10", "9.5", "8"). Leave as "" for all other types or if not visible.
 
 Output ONLY this JSON, nothing else:
 {
@@ -192,7 +208,9 @@ Output ONLY this JSON, nothing else:
   "card_condition": "",
   "year": "",
   "manufacturer": "",
-  "shopify_collection": ""
+  "shopify_collection": "",
+  "package_type": "",
+  "slab_grade": ""
 }"""
 
             # Generate content with image via Gemini REST API
@@ -232,7 +250,7 @@ Output ONLY this JSON, nothing else:
             card_data = json.loads(response_text)
 
             # Convert null values to empty strings
-            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'full_set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants', 'card_condition', 'shopify_collection']:
+            for key in ['card_name_japanese', 'card_name_english', 'set_name', 'full_set_name', 'card_number', 'year', 'manufacturer', 'rarity', 'special_variants', 'card_condition', 'shopify_collection', 'package_type', 'slab_grade']:
                 if card_data.get(key) is None or card_data.get(key) == 'null':
                     card_data[key] = ''
 
@@ -468,6 +486,8 @@ Output ONLY this JSON, nothing else:
                 'card_condition': card_data.get('card_condition', 'Near Mint'),
                 'full_set_name': card_data.get('full_set_name', ''),
                 'shopify_collection': card_data.get('shopify_collection', ''),
+                'package_type': card_data.get('package_type', 'Raw') or 'Raw',
+                'slab_grade': card_data.get('slab_grade', ''),
             }
 
             
@@ -491,62 +511,55 @@ async def get_market_value_jpy(
     card_number: str = "",
     variants: Optional[list] = None,
     force_refresh: bool = False,
-    full_set_name: str = ""
+    full_set_name: str = "",
+    price_strategy: str = "default",
+    slab_grade: str = ""
 ) -> Dict:
     """
     Get market value estimate in JPY for a trading card.
-    
-    Args:
-        card_name: Name of the card
-        rarity: Rarity level (Common, Rare, Epic, Ultra Rare, etc.)
-        set_name: Card set name
-        card_number: Card number (e.g., #001/024)
-        variants: List of variants (e.g., ['1st Edition', 'Holographic', 'Japanese'])
-        force_refresh: If True, bypass cache and fetch fresh data
-    
-    Returns:
-        dict: Market value data including JPY amount and price comparison
+
+    price_strategy:
+      "default"       — existing behaviour (cheapest Gemini-filtered loose price)
+      "highest"       — for Slabs: pick the highest price (appends grade to query)
     """
-    # Create cache key from card details
-    cache_key = f"{card_name}|{rarity}|{set_name}|{card_number}|{variants}"
-    
-    # Check cache first (unless force_refresh is True)
+    # Build a grade suffix for Slab searches
+    grade_suffix = f" Grade {slab_grade}" if slab_grade and price_strategy == "highest" else ""
+    cache_key = f"{card_name}|{rarity}|{set_name}|{card_number}|{variants}|{price_strategy}|{slab_grade}"
+
     if not force_refresh and cache_key in _appraisal_cache:
         cached_data, cached_time = _appraisal_cache[cache_key]
         if datetime.now() - cached_time < _cache_ttl:
             safe_print(f"[APPRAISE] Using cached result for '{card_name}'")
             return cached_data
         else:
-            # Remove expired cache entry
             del _appraisal_cache[cache_key]
-    
+
     if force_refresh:
         safe_print(f"[APPRAISE] Force refresh - bypassing cache for '{card_name}'")
-    
+
     try:
-        # Step 1: Estimate market value in USD
-        market_usd = await estimate_market_value_usd(card_name, rarity, set_name, card_number, variants, full_set_name=full_set_name)
-        
+        market_usd = await estimate_market_value_usd(
+            card_name, rarity, set_name, card_number, variants,
+            full_set_name=full_set_name,
+            price_strategy=price_strategy,
+            slab_grade=slab_grade
+        )
+
         if market_usd == 0:
             return {'error': 'Unable to estimate market value'}
-        
-        # Step 2: Convert USD to JPY using Frankfurter API
+
+        # Convert USD to JPY using Frankfurter API
         exchange_rate = 153.7  # Fallback rate
         rate_date = "estimated"
-        market_jpy = market_usd * exchange_rate # Initialize with fallback
-        
+        market_jpy = market_usd * exchange_rate
+
         try:
             safe_print(f"[APPRAISE] Converting ${market_usd} USD to JPY...")
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(
                     f"https://api.frankfurter.app/latest",
-                    params={
-                        'from': 'USD',
-                        'to': 'JPY',
-                        'amount': market_usd
-                    }
+                    params={'from': 'USD', 'to': 'JPY', 'amount': market_usd}
                 )
-                
                 if response.status_code == 200:
                     data = response.json()
                     safe_print(f"[APPRAISE] Frankfurter API response: {data}")
@@ -555,30 +568,132 @@ async def get_market_value_jpy(
                     rate_date = data.get('date', 'today')
                     safe_print(f"[APPRAISE] Converted: ${market_usd} USD -> ¥{market_jpy} JPY (rate: {exchange_rate})")
                 else:
-                    # Use fallback rate if API returns non-200 status
                     safe_print(f"[APPRAISE] Currency API returned status {response.status_code}, using fallback rate: {exchange_rate}")
-                    # market_jpy is already initialized with fallback
         except (httpx.TimeoutException, Exception) as e:
-            # Use fallback rate if currency API fails or times out
             safe_print(f"[APPRAISE] Currency API timeout or error ({e}), using fallback rate: {exchange_rate}")
-            # market_jpy is already initialized with fallback
-        
+
         result = {
             'market_usd': round(market_usd, 2),
             'market_jpy': int(market_jpy),
             'exchange_rate': round(exchange_rate, 2),
             'rate_date': rate_date,
-            'confidence': 'Medium'  # Mock confidence level
+            'confidence': 'Medium'
         }
-        
-        # Cache the successful result
         _appraisal_cache[cache_key] = (result, datetime.now())
-        
         return result
-    
+
     except Exception as e:
         safe_print(f"[APPRAISE] Unexpected error: {e}")
         return {'error': f'Appraisal failed: {str(e)}'}
+
+
+async def get_sealed_price_jpy(
+    set_name: str,
+    package_type: str,   # "Booster Pack" or "Booster Box"
+    full_set_name: str = "",
+    shopify_collection: str = "",  # e.g. "Pokemon", "One Piece" — prefixed to search
+) -> Dict:
+    """
+    Fetch the lowest sealed-product price for a Booster Pack or Booster Box.
+    Searches PriceCharting with "{game_type} {set_name} Booster Pack" (or Booster Box).
+    Returns the same dict format as get_market_value_jpy.
+    """
+    # Prefix with game type so PriceCharting can disambiguate (e.g. "Pokemon" vs "One Piece")
+    base_name = full_set_name or set_name
+    if shopify_collection:
+        search_name = f"{shopify_collection} {base_name} {package_type}".strip()
+    else:
+        search_name = f"{base_name} {package_type}".strip()
+    safe_print(f"[SEALED_PRICE] Searching PriceCharting for: '{search_name}'")
+
+
+    try:
+        # Use the PriceCharting API with new-price (sealed retail) priority
+        price_usd = await _try_pricecharting_api_sealed(search_name, full_set_name)
+
+        if not price_usd:
+            safe_print(f"[SEALED_PRICE] No sealed price found for '{search_name}'")
+            return {'error': f'No sealed price found for {search_name}'}
+
+        # Convert to JPY
+        exchange_rate = 153.7
+        rate_date = "estimated"
+        market_jpy = price_usd * exchange_rate
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    "https://api.frankfurter.app/latest",
+                    params={'from': 'USD', 'to': 'JPY', 'amount': price_usd}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    market_jpy = data['rates']['JPY']
+                    exchange_rate = market_jpy / price_usd
+                    rate_date = data.get('date', 'today')
+        except Exception:
+            pass
+
+        return {
+            'market_usd': round(price_usd, 2),
+            'market_jpy': int(market_jpy),
+            'exchange_rate': round(exchange_rate, 2),
+            'rate_date': rate_date,
+            'confidence': 'Medium'
+        }
+    except Exception as e:
+        safe_print(f"[SEALED_PRICE] Error: {e}")
+        return {'error': f'Sealed price lookup failed: {str(e)}'}
+
+
+async def _try_pricecharting_api_sealed(search_name: str, full_set_name: str = "") -> Optional[float]:
+    """Search PriceCharting for a sealed product and return the best available price."""
+    try:
+        from urllib.parse import quote_plus
+        api_key = os.getenv("PRICECHARTING_API_KEY")
+        if not api_key:
+            safe_print("[SEALED_PRICE] No PriceCharting API key, skipping")
+            return None
+
+        url = f"https://www.pricecharting.com/api/products?t={api_key}&q={quote_plus(search_name)}"
+        safe_print(f"[SEALED_PRICE] API URL: {url}")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                safe_print(f"[SEALED_PRICE] API returned status {response.status_code}")
+                return None
+            data = response.json()
+            products = data.get('products', [])
+
+        safe_print(f"[SEALED_PRICE] Found {len(products)} products")
+
+        # Pick cheapest price across all available price fields (same as regular card logic)
+        valid_prices = []
+        for product in products:
+            name = product.get('product-name', '')
+            for field in ('loose-price', 'cib-price', 'new-price'):
+                raw = product.get(field)
+                if raw:
+                    try:
+                        val = float(raw) / 100
+                        if val > 0:
+                            valid_prices.append({'name': name, 'price': val})
+                            safe_print(f"[SEALED_PRICE]   '{name}' ({field}) = ${val:.2f}")
+                    except (ValueError, TypeError):
+                        pass
+
+        if not valid_prices:
+            safe_print(f"[SEALED_PRICE] No valid prices found")
+            return None
+
+        cheapest = min(valid_prices, key=lambda x: x['price'])
+        safe_print(f"[SEALED_PRICE] Cheapest: '{cheapest['name']}' = ${cheapest['price']:.2f}")
+        return cheapest['price']
+
+    except Exception as e:
+        safe_print(f"[SEALED_PRICE] API error: {e}")
+        return None
 
 
 async def estimate_market_value_usd(
@@ -587,40 +702,39 @@ async def estimate_market_value_usd(
     set_name: str = "",
     card_number: str = "",
     variants: Optional[list] = None,
-    full_set_name: str = ""
+    full_set_name: str = "",
+    price_strategy: str = "default",
+    slab_grade: str = ""
 ) -> float:
     """
     Estimate market value in USD using PriceCharting with Gemini filtering.
-    
-    Args:
-        card_name: Name of the card
-        rarity: Rarity level
-        set_name: Card set name
-        card_number: Card number
-        variants: List of variants
-    
-    Returns:
-        float: Estimated market value in USD
+    price_strategy: "default" (cheapest) | "highest" (for slabs)
+    slab_grade: e.g. "10" — appended to search query when strategy is "highest"
     """
     import httpx
     from bs4 import BeautifulSoup
     import re
-    
-    # Check if Japanese card
+
     is_japanese = variants and 'Japanese' in variants
-    
-    # Try PriceCharting API first (official, no blocking)
-    price = await _try_pricecharting_api(card_name, set_name, card_number, is_japanese, full_set_name=full_set_name)
+
+    # Append grade to search name for Slab strategy
+    search_card_name = card_name
+    if price_strategy == "highest" and slab_grade:
+        search_card_name = f"{card_name} Grade {slab_grade}"
+        safe_print(f"[APPRAISE] Slab search with grade: '{search_card_name}'")
+
+    price = await _try_pricecharting_api(
+        search_card_name, set_name, card_number, is_japanese,
+        full_set_name=full_set_name, price_strategy=price_strategy
+    )
     if price:
         return price
-    
-    # Fallback to scraping if API not available or failed
+
     safe_print(f"[APPRAISE] API unavailable, trying web scraping...")
-    price = await _try_pricecharting_scrape(card_name, set_name, card_number, is_japanese, full_set_name=full_set_name)
+    price = await _try_pricecharting_scrape(search_card_name, set_name, card_number, is_japanese, full_set_name=full_set_name)
     if price:
         return price
-    
-    # Fallback to mock data if both API and scraping fail
+
     safe_print(f"[APPRAISE] PriceCharting failed for '{card_name}', using mock data")
     return _mock_estimate(card_name, rarity, set_name, variants)
 
@@ -883,7 +997,7 @@ def _filter_by_language(results: List[dict], is_japanese: bool) -> List[dict]:
         return results
 
 
-async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False, full_set_name: str = "") -> Optional[float]:
+async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False, full_set_name: str = "", price_strategy: str = "default") -> Optional[float]:
     """Try to get price from PriceCharting API (official, no scraping)."""
     try:
         import httpx
@@ -906,6 +1020,13 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
         else:
             search_name = card_name.split('(')[0].strip()
         
+        # If the card_name contains a "Grade N" suffix (slab), strip it and re-append at the end
+        grade_suffix = ""
+        grade_match = re.search(r'\s+(Grade\s+\d+)\s*$', search_name, re.IGNORECASE)
+        if grade_match:
+            grade_suffix = grade_match.group(1)
+            search_name = search_name[:grade_match.start()].strip()
+
         query_parts = [search_name]
         
         # For initial query: use set_name (code) if available, else full_set_name
@@ -916,8 +1037,13 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
         if card_number:
             clean_card_number = card_number.replace('#', '')
             query_parts.append(clean_card_number)
+
+        # Append grade at the very end so it doesn't interrupt set/number matching
+        if grade_suffix:
+            query_parts.append(grade_suffix)
         
         search_query = " ".join(query_parts)
+
         
         # API endpoint
         url = f"https://www.pricecharting.com/api/products?t={api_key}&q={quote_plus(search_query)}"
@@ -948,43 +1074,40 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             for product in products:
                 product_name = product.get('product-name', 'Unknown')
                 console_name = product.get('console-name', '')  # Set name from PriceCharting
-                
-                # Try to get price (prefer loose-price for single cards)
-                price = None
-                price_type = None
-                
-                if 'loose-price' in product and product['loose-price']:
+
+                def _cents(key):
+                    raw = product.get(key)
                     try:
-                        # API returns prices in cents, convert to dollars
-                        price = float(product['loose-price']) / 100
-                        price_type = "loose"
+                        return float(raw) / 100 if raw else None
                     except (ValueError, TypeError):
-                        pass
-                
-                if not price and 'cib-price' in product and product['cib-price']:
-                    try:
-                        # API returns prices in cents, convert to dollars
-                        price = float(product['cib-price']) / 100
-                        price_type = "complete"
-                    except (ValueError, TypeError):
-                        pass
-                
-                if not price and 'new-price' in product and product['new-price']:
-                    try:
-                        # API returns prices in cents, convert to dollars
-                        price = float(product['new-price']) / 100
-                        price_type = "new"
-                    except (ValueError, TypeError):
-                        pass
-                
+                        return None
+
+                # Graded price fields (per PriceCharting docs)
+                psa10_price   = _cents('manual-only-price')   # PSA 10
+                grade95_price = _cents('box-only-price')       # Grade 9.5
+                grade9_price  = _cents('graded-price')         # Grade 9
+
+                # Ungraded / fallback price
+                price = _cents('loose-price')
+                price_type = 'loose'
+                if not price:
+                    price = _cents('cib-price'); price_type = 'complete'
+                if not price:
+                    price = _cents('new-price'); price_type = 'new'
+
                 if price and price > 0:
                     valid_prices.append({
+                        'id': product.get('id', ''),
                         'name': product_name,
-                        'console_name': console_name,  # Store set name for language filtering
+                        'console_name': console_name,
                         'price': price,
-                        'type': price_type
+                        'type': price_type,
+                        'psa10_price': psa10_price,
+                        'grade95_price': grade95_price,
+                        'grade9_price': grade9_price,
                     })
-                    safe_print(f"[PRICECHARTING_API]   - '{product_name}' | Set: '{console_name}' = ${price} ({price_type})")
+                    graded_info = f" | PSA10=${psa10_price}" if psa10_price else ""
+                    safe_print(f"[PRICECHARTING_API]   - '{product_name}' | Set: '{console_name}' = ${price} ({price_type}){graded_info}")
             
             if not valid_prices:
                 safe_print(f"[PRICECHARTING_API] No valid prices found")
@@ -1099,23 +1222,94 @@ async def _try_pricecharting_api(card_name: str, set_name: str, card_number: str
             
             gemini_filtered = await _gemini_filter_cards(search_desc, filtered_prices)
             
+            # For slabs: pick highest loose price from all filtered results (Gemini not used)
+            if price_strategy == "highest":
+                best = max(filtered_prices, key=lambda x: x['price'])
+                safe_print(f"[PRICECHARTING_API] Slab: highest from filtered pool: '{best['name']}' = ${best['price']}")
+                return best['price']
+
+            # For raw cards: use Gemini's best match → cheapest fallback
             if gemini_filtered:
-                # Use Gemini's best match (first result from filtered list)
                 best = gemini_filtered[0]
                 safe_print(f"[PRICECHARTING_API] Gemini selected: '{best['name']}' = ${best['price']} ({best.get('type', 'unknown')})")
-                return best['price']
             else:
-                # Gemini found no matches — select cheapest from filtered results as fallback
-                cheapest = min(filtered_prices, key=lambda x: x['price'])
-                safe_print(f"[PRICECHARTING_API] Gemini no match, fallback cheapest: '{cheapest['name']}' = ${cheapest['price']} ({cheapest['type']})")
-                return cheapest['price']
+                best = min(filtered_prices, key=lambda x: x['price'])
+                safe_print(f"[PRICECHARTING_API] Gemini no match, fallback cheapest: '{best['name']}' = ${best['price']} ({best.get('type', 'loose')})")
+
+            return best['price']
+
     
     except Exception as e:
         safe_print(f"[PRICECHARTING_API] Error: {e}")
         return None
 
 
-async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False) -> Optional[float]:
+async def _get_graded_price_from_page(product_id: str, api_key: str) -> Optional[float]:
+    """Scrape the PSA 10 graded price from a PriceCharting product detail page by product ID."""
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+
+        # PriceCharting redirects /game/#{id} to the canonical product page
+        url = f"https://www.pricecharting.com/game/#{product_id}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+
+        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            safe_print(f"[PRICECHARTING_SCRAPE] Product page status: {resp.status_code} → {resp.url}")
+            if resp.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(resp.text, 'html.parser')
+
+            # PriceCharting shows graded prices in a table with id "graded-prices"
+            # or in a <tr> with data-item-id or class containing "grade"
+            # Strategy: look for any price associated with "Grade 10" or "PSA 10"
+            graded_price = None
+
+            # Try: look for the price in the #graded-prices table or similar
+            for row in soup.find_all('tr'):
+                row_text = row.get_text(' ', strip=True).lower()
+                if 'grade 10' in row_text or 'psa 10' in row_text:
+                    # Find the price in this row — look for a span or td with $ value
+                    for cell in row.find_all(['td', 'span']):
+                        cell_text = cell.get_text(strip=True).replace(',', '').replace('$', '')
+                        try:
+                            val = float(cell_text)
+                            if val > 0:
+                                graded_price = val
+                                safe_print(f"[PRICECHARTING_SCRAPE] Found Grade 10 price in row: ${val}")
+                                break
+                        except ValueError:
+                            continue
+                    if graded_price:
+                        break
+
+            # Fallback: look for a meta tag or JSON-LD with graded price
+            if not graded_price:
+                import json, re as _re
+                for script in soup.find_all('script', type='application/ld+json'):
+                    try:
+                        obj = json.loads(script.string or '')
+                        offers = obj.get('offers', {})
+                        if isinstance(offers, dict):
+                            price_val = float(offers.get('price', 0))
+                            if price_val > 0:
+                                graded_price = price_val
+                                safe_print(f"[PRICECHARTING_SCRAPE] JSON-LD price fallback: ${price_val}")
+                                break
+                    except Exception:
+                        pass
+
+            return graded_price
+
+    except Exception as e:
+        safe_print(f"[PRICECHARTING_SCRAPE] Graded page scrape error: {e}")
+        return None
+
+
+async def _try_pricecharting_scrape(card_name: str, set_name: str, card_number: str = "", is_japanese: bool = False, full_set_name: str = "") -> Optional[float]:
+
     """Try to scrape price from PriceCharting.com - SPECIFIC SEARCH ONLY."""
     try:
         import httpx
